@@ -1,0 +1,152 @@
+// Post-processing: ambient occlusion (N8AO) so things sit in their corners and on the ground, bloom for the neon,
+// then a grading pass for ghost vision, blackouts and damage, plus depth of field and a film look for the opening
+// cinematic.
+import * as THREE from 'three';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { N8AOPass } from 'n8ao';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+
+const GradeShader = {
+  uniforms: {
+    tDiffuse: { value: null },
+    tDepth: { value: null },
+    texel: { value: new THREE.Vector2(1 / 1280, 1 / 720) },
+    near: { value: 0.1 },
+    far: { value: 1000 },
+    focus: { value: 10 }, // metres
+    aperture: { value: 0 }, // 0 = everything sharp
+    cine: { value: 0 }, // film look for cutscenes
+    ghost: { value: 0 },
+    dark: { value: 0 },
+    hurt: { value: 0 },
+    storm: { value: 0 },
+    time: { value: 0 },
+  },
+  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+  fragmentShader: `
+    #include <packing>
+    uniform sampler2D tDiffuse; uniform sampler2D tDepth; uniform vec2 texel; uniform float near; uniform float far;
+    uniform float focus; uniform float aperture; uniform float cine;
+    uniform float ghost; uniform float dark; uniform float hurt; uniform float storm; uniform float time;
+    varying vec2 vUv;
+
+    float viewDepth(vec2 uv) {
+      return -perspectiveDepthToViewZ(texture2D(tDepth, uv).x, near, far);
+    }
+    // the image averaged over a small box (four taps)
+    vec3 soft(vec2 p, vec2 t) {
+      return (texture2D(tDiffuse, p + t).rgb + texture2D(tDiffuse, p - t).rgb
+        + texture2D(tDiffuse, p + vec2(t.x, -t.y)).rgb + texture2D(tDiffuse, p + vec2(-t.x, t.y)).rgb) * 0.25;
+    }
+    // blur radius in pixels for something at depth d (a thin-lens circle of confusion)
+    float coc(float d) {
+      return clamp(abs(d - focus) / max(d, 0.1) * aperture * 14.0, 0.0, 14.0);
+    }
+
+    void main(){
+      vec2 uv = vUv;
+      // ghost vision wobbles a little
+      uv += ghost * 0.0025 * vec2(sin(uv.y*30.0 + time*2.0), cos(uv.x*25.0 + time*1.7));
+      vec4 c = texture2D(tDiffuse, uv);
+      if (aperture > 0.0) {
+        // depth of field: gather a disc of samples, each weighted by its own blur so sharp things don't bleed
+        float r = coc(viewDepth(uv));
+        if (r > 0.5) {
+          vec3 acc = c.rgb;
+          float wsum = 1.0;
+          for (int i = 1; i < 24; i++) {
+            float fi = float(i);
+            float a = fi * 2.39996;
+            vec2 o = vec2(cos(a), sin(a)) * sqrt(fi / 23.0) * r * texel;
+            float w = smoothstep(0.0, 1.0, coc(viewDepth(uv + o)) / r + 0.2);
+            acc += texture2D(tDiffuse, uv + o).rgb * w;
+            wsum += w;
+          }
+          c.rgb = acc / wsum;
+        }
+      }
+      float v = distance(vUv, vec2(0.5));
+      if (cine > 0.0) {
+        // lens: colour fringing that grows toward the frame edges. It's taken from a softened image, so fine texture
+        // (gravel, leaves) doesn't split into pink and green specks; only big edges pick up a fringe.
+        vec2 dir = (vUv - 0.5) * cine * 0.004 * smoothstep(0.2, 0.7, v);
+        vec2 t2 = texel * 1.5;
+        vec3 here = soft(uv, t2);
+        c.r = max(0.0, c.r + soft(uv + dir, t2).r - here.r);
+        c.b = max(0.0, c.b + soft(uv - dir, t2).b - here.b);
+      }
+      float l = dot(c.rgb, vec3(0.299,0.587,0.114));
+      vec3 g = vec3(l*0.55, l*1.05, l*0.95) + vec3(0.0,0.03,0.04);
+      c.rgb = mix(c.rgb, g, ghost * 0.75);
+      // blackout: crushing darkness with a small circle of sight
+      c.rgb *= mix(1.0, 0.12 + 0.6*smoothstep(0.45, 0.05, v), dark);
+      c.rgb = mix(c.rgb, vec3(0.5,0.1,0.6), storm * 0.25);
+      c.rgb = mix(c.rgb, vec3(0.7,0.0,0.05), hurt * smoothstep(0.25, 0.75, v) * 0.8);
+      // horror grade: drained colour, cold shadows, crushed vignette, film grain
+      float lum = dot(c.rgb, vec3(0.299,0.587,0.114));
+      c.rgb = mix(c.rgb, vec3(lum), 0.15 * (1.0 - ghost));
+      // contrast, cold shadows and grain in display space (in linear light they crush the night to pure black)
+      vec3 d = pow(max(c.rgb, 0.0), vec3(1.0 / 2.2));
+      d += vec3(-0.012, 0.0, 0.02) * (1.0 - smoothstep(0.0, 0.35, lum));
+      // film: teal shadows, warm highlights, a little more contrast
+      d += cine * (vec3(-0.02, 0.005, 0.025) * (1.0 - smoothstep(0.0, 0.4, lum)) + vec3(0.03, 0.012, -0.02) * smoothstep(0.35, 0.9, lum));
+      d = (d - 0.5) * (1.06 + cine * 0.06) + 0.5;
+      d *= 1.0 - smoothstep(0.6 - cine * 0.15, 1.0, v) * (0.22 + cine * 0.2);
+      float n = fract(sin(dot(vUv * (time + 1.0), vec2(12.9898, 78.233))) * 43758.5453);
+      d += (n - 0.5) * (0.035 + cine * 0.025);
+      c.rgb = pow(max(d, 0.0), vec3(2.2));
+      gl_FragColor = c;
+    }`,
+};
+
+export function createPost(renderer, scene, camera) {
+  const size = renderer.getSize(new THREE.Vector2());
+  const composer = new EffectComposer(renderer);
+  // renders the scene and darkens creases, corners and contact with the ground (half resolution, denoised)
+  const ao = new N8AOPass(scene, camera, size.x, size.y);
+  Object.assign(ao.configuration, {
+    aoRadius: 2.2, distanceFalloff: 1.2, intensity: 2.6, aoSamples: 8, denoiseSamples: 4, denoiseRadius: 10, halfRes: true, gammaCorrection: false,
+  });
+  ao.autosetGamma = false;
+  // its transparency mode re-renders the whole scene twice more each frame; mist, glow and glass do fine without it
+  ao.autoDetectTransparency = false;
+  ao.configuration.transparencyAware = false;
+  composer.addPass(ao);
+  const bloom = new UnrealBloomPass(new THREE.Vector2(size.x / 2, size.y / 2), 0.42, 0.5, 0.86);
+  composer.addPass(bloom);
+  const grade = new ShaderPass(GradeShader);
+  grade.uniforms.near.value = camera.near;
+  grade.uniforms.far.value = camera.far;
+  // depth of field reads the scene depth the AO pass rendered
+  grade.uniforms.tDepth.value = ao.beautyRenderTarget.depthTexture;
+  composer.addPass(grade);
+  composer.addPass(new OutputPass());
+  const texel = () => {
+    const t = composer.renderTarget1;
+    grade.uniforms.texel.value.set(1 / t.width, 1 / t.height);
+    // the AO pass swaps its targets when resized
+    grade.uniforms.tDepth.value = ao.beautyRenderTarget.depthTexture;
+  };
+  texel();
+  return {
+    composer,
+    ao,
+    grade: grade.uniforms,
+    setPixelRatio(r) {
+      composer.setPixelRatio(r);
+      texel();
+    },
+    setSize(w, h) {
+      composer.setSize(w, h);
+      bloom.resolution.set(w / 2, h / 2);
+      texel();
+    },
+    /** Depth of field: sharp at focus metres, blurrier the bigger aperture is (0 turns it off). */
+    setDof(focus, aperture) {
+      grade.uniforms.focus.value = focus;
+      grade.uniforms.aperture.value = aperture;
+    },
+  };
+}

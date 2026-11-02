@@ -1,0 +1,12 @@
+# Render Blueprint: the LAST RIDE game server (free web service, WebSockets).
+services:
+  - type: web
+    name: last-ride-server
+    runtime: node
+    plan: free
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
