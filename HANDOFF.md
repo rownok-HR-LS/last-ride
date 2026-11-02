@@ -14,7 +14,8 @@ I'm continuing work on my browser game **Last Ride**. Here is the full context.
 - The goal is to feel **realistic**: Dying Light-style melee, real human movement, and a scanned, realistic world.
 
 ## Where and how to run
-- Project: `C:\Users\Rownok\last-ride` (Vite + Three.js r186, plain JS, Node ≥20). It is **not a git repo yet**, nothing is committed, and nothing is deployed.
+- Project: `C:\Users\Rownok\last-ride` (Vite + Three.js r186, plain JS, Node ≥20). Public repo https://github.com/rownok-HR-LS/last-ride (commit with the noreply identity set in the repo).
+- Live (2026-11-03): game https://rownok-hr-ls.github.io/last-ride/ (gh-pages branch; update it with `node scripts/deploy-pages.mjs wss://last-ride-server.onrender.com`), server https://last-ride-server.onrender.com (Render workspace "hosting", free plan, Blueprint last-ride-server). The Blueprint uses the public repo URL, not a GitHub connection, so pushing to main does NOT redeploy the server: press Manual sync on the Blueprint in Render. The free server sleeps when idle; the first visitor waits about a minute.
 - Dev server: `npm --prefix C:/Users/Rownok/last-ride run dev`, then open http://localhost:5200. The preview entry is named `last-ride` in the gallery's `.claude/launch.json`.
 - Balance report over many matches: `node scripts/balance.mjs [matches] [firstSeed]` (about 2 s per match). One match log: `node scripts/sim.mjs <seed>` (a match runs about 3.5–6.5 min).
 - Game server: preview entry `last-ride-server` (node --watch server/index.js --bus=6, port 8090; `--bus=N` or BUS_WAIT shortens the wait at the stop). `npm start` runs it for real. The client finds it at `?server=…`, VITE_SERVER_URL (baked in by scripts/deploy-pages.mjs), or ws://<this host>:8090.
