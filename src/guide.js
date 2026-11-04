@@ -1,5 +1,6 @@
 // Tells the player what to do next: an objective line, on-screen markers, a ghost tutorial and a controls card.
 import * as THREE from 'three';
+import { icon as svgIcon } from './icons.js';
 import { FERRIS, STATION, PRIZE_BOOTHS } from '../shared/map.js';
 
 const TUT_KEY = 'last-ride-ghost-tutorial';
@@ -42,7 +43,8 @@ export class Guide {
     this.tutStart = null;
     this.lastKeys = '';
     this.lastObj = '';
-    this.showKeys = true;
+    // the controls card waits for H; a small reminder shows instead
+    this.showKeys = false;
   }
 
   marker(i) {
@@ -79,15 +81,25 @@ export class Guide {
     const h = window.innerHeight;
     m.style.transform = `translate(${((sx + 1) / 2) * w}px, ${((1 - sy) / 2) * h}px) translate(-50%, -50%)`;
     m.className = `marker ${cls || ''} ${edge ? 'edge' : ''}`;
-    m.firstChild.textContent = icon;
+    if (m.firstChild.dataset.i !== icon) {
+      m.firstChild.dataset.i = icon;
+      m.firstChild.innerHTML = svgIcon(icon);
+    }
     m.lastChild.textContent = label;
   }
 
   setObjective(title, sub = '') {
     const html = `<b>${title}</b>${sub ? `<span>${sub}</span>` : ''}`;
     if (html === this.lastObj) return;
+    // a new title gets the explanation for a few seconds; after that only the title stays
+    const fresh = !this.lastObj.startsWith(`<b>${title}</b>`);
     this.lastObj = html;
     this.obj.innerHTML = html;
+    if (fresh) {
+      this.obj.classList.remove('settled');
+      clearTimeout(this.settleT);
+      this.settleT = setTimeout(() => this.obj.classList.add('settled'), 7000);
+    }
     this.obj.classList.remove('pop');
     void this.obj.offsetWidth;
     this.obj.classList.add('pop');
@@ -144,14 +156,14 @@ export class Guide {
         const k = r / Math.max(1, Math.hypot(p.x - cx, p.z - cz));
         const tx = cx + (p.x - cx) * k * 0.8;
         const tz = cz + (p.z - cz) * k * 0.8;
-        this.place(n++, cam, tx, p.y + 1.5, tz, '🌀', `${dist(tx, tz)} m`, 'zone');
+        this.place(n++, cam, tx, p.y + 1.5, tz, 'storm', `${dist(tx, tz)} m`, 'zone');
       } else if (!armed) {
         this.setObjective('Find a weapon', 'You only have your fists. Look for glowing weapons and gold chests, walk up and press E.');
         const near = this.nearestLoot(client, p, (l) => l.kind === 'chest' || l.kind === 'weapon');
-        if (near) this.place(n++, cam, near.x, near.y + 1, near.z, near.kind === 'chest' ? '🧰' : '🪓', `${dist(near.x, near.z)} m`, near.kind === 'weapon' ? `r${near.rarity}` : 'chest');
+        if (near) this.place(n++, cam, near.x, near.y + 1, near.z, near.kind === 'chest' ? 'chest' : 'weapon', `${dist(near.x, near.z)} m`, near.kind === 'weapon' ? `r${near.rarity}` : 'chest');
       } else if (me.tickets >= 30 && booth) {
         this.setObjective(`Spend your tickets · 🎟 ${me.tickets}`, 'A Prize Counter sells chainsaws, crossbows and blessed relics. Walk up and press B.');
-        this.place(n++, cam, booth.x, 4.5, booth.z, '🎟', `Prize Counter · ${dist(booth.x, booth.z)} m`, 'chest');
+        this.place(n++, cam, booth.x, 4.5, booth.z, 'ticket', `Prize Counter · ${dist(booth.x, booth.z)} m`, 'chest');
       } else if (p.hp < 60 && (me.items.bandage || me.items.medkit)) {
         this.setObjective('Heal up', `Press ${me.items.medkit ? '5 for a medkit' : '4 for a bandage'} somewhere safe`);
       } else if (p.shield < 50 && me.items.soda) {
@@ -163,8 +175,8 @@ export class Guide {
       this.ghostObjective(snap, me, p, client);
       // ghosts see the rides and nearby survivors
       if (!me.possess) {
-        if (!snap.ferris.driver) this.place(n++, cam, FERRIS.x, FERRIS.hubY, FERRIS.z, '🎡', `Ferris wheel · ${dist(FERRIS.x, FERRIS.z)} m`, 'ride');
-        if (!snap.coaster.running) this.place(n++, cam, STATION.x, 3, STATION.z, '🎢', snap.coaster.cd > 0 ? `Coaster ${Math.ceil(snap.coaster.cd)}s` : `Coaster · ${dist(STATION.x, STATION.z)} m`, 'ride');
+        if (!snap.ferris.driver) this.place(n++, cam, FERRIS.x, FERRIS.hubY, FERRIS.z, 'ferris', `Ferris wheel · ${dist(FERRIS.x, FERRIS.z)} m`, 'ride');
+        if (!snap.coaster.running) this.place(n++, cam, STATION.x, 3, STATION.z, 'coaster', snap.coaster.cd > 0 ? `Coaster ${Math.ceil(snap.coaster.cd)}s` : `Coaster · ${dist(STATION.x, STATION.z)} m`, 'ride');
         let car = null;
         let cd = Infinity;
         for (const c of snap.cars) {
@@ -175,7 +187,7 @@ export class Guide {
             car = c;
           }
         }
-        if (car) this.place(n++, cam, car.x, car.y + 1.5, car.z, '🚗', `Bumper car · ${Math.round(cd)} m`, 'ride');
+        if (car) this.place(n++, cam, car.x, car.y + 1.5, car.z, 'car', `Bumper car · ${Math.round(cd)} m`, 'ride');
       }
       const living = snap.players
         .filter((q) => q.state === 'alive')
@@ -184,7 +196,7 @@ export class Guide {
         .sort((a, b) => a.d - b.d)
         .slice(0, 4);
       for (const { q, d } of living) {
-        this.place(n++, cam, q.x, q.y + 2.4, q.z, q.protected ? '🛡️' : '🎯', `${q.name} · ${Math.round(q.hp + q.shield)} HP · ${Math.round(d)} m`, 'prey');
+        this.place(n++, cam, q.x, q.y + 2.4, q.z, q.protected ? 'shield' : 'target', `${q.name} · ${Math.round(q.hp + q.shield)} HP · ${Math.round(d)} m`, 'prey');
       }
     }
     for (let i = n; i < this.markers.length; i++) this.markers[i].style.display = 'none';
@@ -196,8 +208,9 @@ export class Guide {
       this.lastKeys = keys;
       this.keys.innerHTML = keys
         ? `${CONTROLS[keys].map(([k, d]) => `<div><kbd>${k}</kbd><span>${d}</span></div>`).join('')}<div class="dim">H hides this</div>`
-        : '';
-      this.keys.classList.toggle('show', !!keys);
+        : set ? '<div class="keys-hint"><kbd>H</kbd><span>Controls</span></div>' : '';
+      this.keys.classList.toggle('show', !!set);
+      this.keys.classList.toggle('mini', !keys);
     }
   }
 

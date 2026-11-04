@@ -1,5 +1,6 @@
 // Floating loot: weapons with rarity beams, ammo, tickets, healing and occult items, and treasure chests.
 import * as THREE from 'three';
+import { softShaft } from './shafts.js';
 import { RARITIES, AMMO, ITEMS } from '../shared/items.js';
 import { weaponModel, itemModel as occultModel, GRIP } from './weapons.js';
 import { glow } from './textures.js';
@@ -36,11 +37,15 @@ function discMat(col) {
 }
 const beamMats = new Map();
 
-const beamGeo = new THREE.CylinderGeometry(0.12, 0.3, 1, 8, 1, true);
+const beamGeo = new THREE.CylinderGeometry(0.06, 0.2, 1, 16, 1, true);
 const discGeo = new THREE.CircleGeometry(0.75, 20);
 
+/** A soft shaft of light rising from the loot (see shafts.js). */
 function beamMat(color) {
-  if (!beamMats.has(color)) beamMats.set(color, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.4, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false }));
+  if (!beamMats.has(color)) {
+    const m = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.85, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, side: THREE.DoubleSide });
+    beamMats.set(color, softShaft(m, { bright: 'bottom' }));
+  }
   return beamMats.get(color);
 }
 

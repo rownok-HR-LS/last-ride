@@ -668,8 +668,11 @@ export class Client {
           ch?.char.event(e, this.time);
           audio.play('block', pos, { broke: e.broke });
           if (pl) this.fx.sparkle(pl.x, pl.y + 1.3, pl.z, '#fff2c0', e.broke ? 20 : 8);
-          if (e.id === me && e.broke) this.hud.toast('Guard broken!');
-          if (e.by === me) this.hud.hitMarker(false);
+          if (e.by === me) {
+            this.hud.hitMarker(false);
+            this.combatWord(pl, e.broke ? 'GUARD BROKEN' : 'BLOCKED', e.broke ? 'broke' : 'blocked');
+            this.impact(false);
+          } else if (e.id === me) this.combatWord(pl, e.broke ? 'GUARD BROKEN' : 'BLOCKED', e.broke ? 'broke' : 'blocked');
           break;
         case 'parry': {
           // the guard went up just in time: a ringing clang, a shower of sparks, and the attacker reels back open
@@ -678,12 +681,14 @@ export class Client {
           audio.play('block', pos, { parry: true });
           if (pl) this.fx.sparkle(pl.x, pl.y + 1.4, pl.z, '#ffe08a', 26);
           if (e.id === me) {
-            this.hud.toast('Parry!');
+            this.combatWord(pl, 'PARRY', 'parry');
             this.slowmo = 0.25;
             this.shake = Math.max(this.shake, 0.3);
+            this.impact(true);
           } else if (e.by === me) {
-            this.hud.toast('Parried!');
+            this.combatWord(this.game.players.get(e.by), 'PARRIED', 'parried');
             this.shake = Math.max(this.shake, 0.45);
+            this.impact(true, true);
           }
           break;
         }
@@ -745,7 +750,10 @@ export class Client {
             const heavy = e.amt > 40;
             this.chars.get(e.id)?.char.event({ e: 'hit', heavy, victim: true }, this.time);
             this.chars.get(e.by)?.char.event({ e: 'hit', heavy }, this.time);
-            if (e.by === me || e.id === me) this.shake = Math.max(this.shake, heavy ? 0.55 : 0.32);
+            if (e.by === me || e.id === me) {
+              this.shake = Math.max(this.shake, heavy ? 0.45 : 0.22);
+              this.impact(heavy, e.id === me);
+            }
             // blood sprays away from the hit
             if (pl) for (let k = 0; k < (heavy ? 3 : 1); k++) this.fx.impact(pl.x + (Math.random() - 0.5) * 0.3, pl.y + 1.1 + Math.random() * 0.4, pl.z + (Math.random() - 0.5) * 0.3, 'head');
             // it lands on the ground around them, flung away from the blow
@@ -818,7 +826,7 @@ export class Client {
         case 'busJump':
           if (pl) this.fx.dust(e.x, 0.1, e.z);
           audio.play('hiss', [e.x, 1, e.z]);
-          if (e.id === me) this.hud.banner(nearestRegion(e.x, e.z).toUpperCase(), 'Find a weapon. Stay out of the storm.', 2.5);
+          if (e.id === me) this.hud.banner(nearestRegion(e.x, e.z).toUpperCase(), '', 2.5);
           break;
         case 'chest':
           this.fx.sparkle(e.x, e.y + 0.5, e.z);
@@ -912,10 +920,27 @@ export class Client {
   damageNumber(p, amt, head, shield) {
     if (!p) return;
     const el = document.createElement('div');
-    el.className = `dmg ${head ? 'head' : ''} ${shield ? 'shield' : ''}`;
+    el.className = `dmg ${head ? 'head' : ''} ${shield ? 'shield' : ''} ${amt >= 30 ? 'big' : ''}`;
     el.textContent = amt;
     this.dmgLayer.appendChild(el);
     this.dmgNums.push({ el, x: p.x + (Math.random() - 0.5) * 0.6, y: p.y + 2, z: p.z, t: 0.9 });
+  }
+
+  /** A word over a fighter: BLOCKED, PARRY, GUARD BROKEN. */
+  combatWord(p, text, cls) {
+    if (!p) return;
+    const el = document.createElement('div');
+    el.className = `dmg word ${cls}`;
+    el.textContent = text;
+    this.dmgLayer.appendChild(el);
+    this.dmgNums.push({ el, x: p.x, y: p.y + 2.25, z: p.z, t: 1.1 });
+  }
+
+  /** The camera jolts toward a blow you land and away from one you take. heavy: a bigger jolt. */
+  impact(heavy, taken = false) {
+    this.punch = Math.max(this.punch || 0, heavy ? 1 : 0.6);
+    this.kick += (taken ? -1 : 1) * (heavy ? 0.035 : 0.02);
+    this.kickYaw += (Math.random() - 0.5) * (heavy ? 0.05 : 0.025);
   }
 
   // ---------------------------------------------------------------- per-frame
@@ -1143,9 +1168,11 @@ export class Client {
       ch.root.updateMatrixWorld();
       // name tags
       const dist = meP ? Math.hypot(p.x - meP.x, p.z - meP.z) : 0;
-      const showTag = p.id !== this.myId && !hidden && !seat && (p.state === 'ghost' ? (ghostView || p.exposed) && dist < 40 : dist < (ghostView ? 60 : 30));
+      const showTag = p.id !== this.myId && !hidden && !seat && (p.state === 'ghost' ? (ghostView || p.exposed) && dist < 40 : dist < (ghostView ? 35 : 22));
       c.tag.visible = showTag;
       c.tag.material.depthTest = !ghostView;
+      // names fade in as people come close (ghosts read them from further off)
+      c.tag.material.opacity = Math.min(1, Math.max(0, ((ghostView ? 35 : 22) - dist) / 7));
       c.tag.position.set(p.x, p.y + (p.state === 'ghost' ? 2.6 : 2.35), p.z);
       // revealed by a jump scare: a red beacon everyone can see through walls
       if (p.revealed && p.state === 'alive') {
@@ -1175,6 +1202,7 @@ export class Client {
     this.shake = Math.max(0, this.shake - dt * 1.5);
     this.kick *= Math.exp(-dt * 9);
     this.kickYaw *= Math.exp(-dt * 9);
+    this.punch = (this.punch || 0) * Math.exp(-dt * 12);
     this.shotPulse = Math.max(0, this.shotPulse - dt * 6);
     this.muzzleLight.intensity = Math.max(0, this.muzzleLight.intensity - dt * 900);
     const shake = this.shake * this.shake * 0.4;
@@ -1230,9 +1258,14 @@ export class Client {
     } else if (!p || (p.state === 'bus' && snap.phase !== 'end')) {
       // riding the bus: orbit it with the mouse
       const b = snap.bus;
-      const [fx, fy, fz] = dirFromAngles(this.camYaw, Math.min(0.2, this.camPitch - 0.25));
-      cam.position.set(b.x - fx * 14, 2 - fy * 14 + 3, b.z - fz * 14);
-      cam.lookAt(b.x, 2.4, b.z);
+      // close and low enough to pass under the gate sign, pulled in when something stands in the way
+      const [fx, fy, fz] = dirFromAngles(this.camYaw, Math.min(0.15, this.camPitch - 0.18));
+      let bd = 9.5;
+      const rl = Math.hypot(fx, fy - 0.12, fz);
+      const hit = rayWorld(b.x, 2.6, b.z, -fx / rl, (-fy + 0.12) / rl, -fz / rl, bd * rl + 0.5);
+      if (hit) bd = Math.max(3, (hit.t - 0.5) / rl);
+      cam.position.set(b.x - fx * bd, 2.6 - fy * bd + bd * 0.12, b.z - fz * bd);
+      cam.lookAt(b.x, 2.2, b.z);
       this.camDistNow = 4;
     } else if (snap.phase === 'end' && snap.winner) {
       const w = snap.players.find((q) => q.id === snap.winner) || p;
@@ -1250,9 +1283,13 @@ export class Client {
       const ghost = p.state === 'ghost';
       const car = me?.possess?.kind === 'car';
       const meleeCam = !ghost && !car && !this.aiming;
-      let dist = car ? 7 : ghost ? 4.4 : this.aiming ? 1.8 : 3.7;
-      let side = ghost || car ? 0 : (this.aiming ? 0.62 : meleeCam ? 0.45 : 0.75) * (this.shoulder || 1);
-      const up = car ? 1.8 : 0.32;
+      // in a fight the camera pulls out and over the shoulder so the one you are fighting stays in view
+      const fight = meleeCam && this.lockOn ? 1 : 0;
+      this.fightCam = (this.fightCam ?? 0) + (fight - (this.fightCam ?? 0)) * Math.min(1, dt * 4);
+      const fc = this.fightCam;
+      let dist = car ? 7 : ghost ? 4.4 : this.aiming ? 1.8 : 3.7 + fc * 0.9;
+      let side = ghost || car ? 0 : (this.aiming ? 0.62 : meleeCam ? 0.62 + fc * 0.5 : 0.75) * (this.shoulder || 1);
+      const up = car ? 1.8 : 0.32 + fc * 0.25;
       // smooth the pivot so landing, stepping and sliding don't jerk the camera
       const targetY = p.y + (ghost ? 1.3 : p.slide ? 1.0 : this.lockOn ? 1.45 : 1.6);
       if (!this.pivot || Math.hypot(this.pivot.x - p.x, this.pivot.z - p.z) > 3) this.pivot = new THREE.Vector3(p.x, targetY, p.z);
@@ -1299,8 +1336,10 @@ export class Client {
     }
     if (me?.shakeT > 0) cam.rotation.z += Math.sin(this.time * 40) * 0.02;
     this.fov += (fov - this.fov) * Math.min(1, dt * 10);
-    if (Math.abs(cam.fov - this.fov) > 0.01) {
-      cam.fov = this.fov;
+    // a blow lands: the lens punches in for an instant
+    const punchFov = this.fov - (this.punch || 0) * 4.5;
+    if (Math.abs(cam.fov - punchFov) > 0.01) {
+      cam.fov = punchFov;
       cam.updateProjectionMatrix();
     }
     // shadows follow the camera

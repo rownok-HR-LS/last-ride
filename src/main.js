@@ -37,7 +37,7 @@ async function title() {
   el.innerHTML = `
     <div class="t-logo">
       <div class="t-name">Last Ride</div>
-      <div class="t-sub">Midnight Wonderland Tours · closed 1987 · 20 seats</div>
+      <div class="t-sub">Midnight Wonderland Tours · closed 1987</div>
     </div>
     <div class="t-rider"><b class="t-rider-name"></b><span class="t-rider-blurb"></span></div>
     <div class="sign t-panel">
@@ -50,7 +50,7 @@ async function title() {
       <div class="choices t-diff">${['easy', 'normal', 'hard'].map((d) => `<button class="choice" data-d="${d}">${d[0].toUpperCase()}${d.slice(1)}</button>`).join('')}</div>
       <div class="stack">
         <button class="ticket t-play" disabled>Loading the park…</button>
-        <button class="ticket cream t-practice" disabled>Practice offline <small>vs bots</small></button>
+        <button class="ticket cream t-practice" disabled>Practice <small>offline vs bots</small></button>
         <button class="ticket cream t-settings">Settings</button>
       </div>
       <p class="fine center">Online: one public ride. The bus leaves every half minute with everyone waiting, and bots take the empty seats.</p>
@@ -71,13 +71,14 @@ async function title() {
   const riderName = el.querySelector('.t-rider-name');
   const riderBlurb = el.querySelector('.t-rider-blurb');
   let client = null;
+  let ridersReady = false;
 
   const showRider = () => {
     const o = OUTFITS.find((x) => x.id === profile.outfit);
     el.querySelectorAll('[data-id]').forEach((b) => b.classList.toggle('on', b.dataset.id === profile.outfit));
     riderName.textContent = o.name;
     riderBlurb.textContent = o.blurb;
-    client?.showcase(profile.outfit);
+    if (ridersReady) client?.showcase(profile.outfit);
   };
   const showDiff = () => el.querySelectorAll('[data-d]').forEach((b) => b.classList.toggle('on', b.dataset.d === profile.difficulty));
   el.querySelector('.t-outfits').addEventListener('click', (e) => {
@@ -108,26 +109,28 @@ async function title() {
   const step = (what) => {
     play.textContent = what;
   };
-  step('Loading riders… 0%');
-  await loadCharacters((u) => step(`Loading riders… ${Math.round(u * 100)}%`));
-  step('Opening the gates…');
-  try {
-    await Promise.all([document.fonts.load('80px Rye'), document.fonts.load('900 80px Cinzel')]);
-  } catch {
+  // the riders, the fonts, the bus and the ground textures all download at once
+  step('Loading the park… 0%');
+  const riders = loadCharacters((u) => step(`Loading the park… ${Math.round(u * 100)}%`));
+  const fonts = Promise.all([document.fonts.load('80px Rye'), document.fonts.load('900 80px Cinzel')]).catch(() => {
     /* fall back to Impact */
-  }
+  });
   // the bus carries everyone in the opening shots, so it has to be there from the first frame
   const bus = import('./bus.js').then((m) => m.preloadBus()).catch((e) => console.warn('bus model', e));
   // the signs paint over the rust photo, so make sure the textures are in first
-  const tex = await import('./textures.js');
-  ['rusty_metal_02', 'damaged_plaster', 'forrest_ground_01', 'cobblestone_floor_08'].forEach((n) => tex.pbr(n));
-  await tex.texturesReady();
-  await bus;
-  const { Client } = await import('./client.js');
+  const textures = import('./textures.js').then((tex) => {
+    ['rusty_metal_02', 'damaged_plaster', 'forrest_ground_01', 'cobblestone_floor_08'].forEach((n) => tex.pbr(n));
+    return tex.texturesReady();
+  });
+  const clientModule = import('./client.js');
+  // the bus driver is one of the riders, so the park is built once they are all in
+  await Promise.all([fonts, bus, textures, riders]);
+  const { Client } = await clientModule;
   client = new Client(app, profile, settings, { attract: true });
   window.__lr = client;
   // the canvas goes under the sign
   app.insertBefore(client.renderer.domElement, app.firstChild);
+  ridersReady = true;
   client.showcase(profile.outfit);
   play.disabled = false;
   practice.disabled = false;

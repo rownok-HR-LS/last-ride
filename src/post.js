@@ -7,6 +7,7 @@ import { N8AOPass } from 'n8ao';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import { SMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass.js';
 
 const GradeShader = {
   uniforms: {
@@ -95,7 +96,7 @@ const GradeShader = {
       d = (d - 0.5) * (1.06 + cine * 0.06) + 0.5;
       d *= 1.0 - smoothstep(0.6 - cine * 0.15, 1.0, v) * (0.22 + cine * 0.2);
       float n = fract(sin(dot(vUv * (time + 1.0), vec2(12.9898, 78.233))) * 43758.5453);
-      d += (n - 0.5) * (0.035 + cine * 0.025);
+      d += (n - 0.5) * (0.014 + cine * 0.03);
       c.rgb = pow(max(d, 0.0), vec3(2.2));
       gl_FragColor = c;
     }`,
@@ -123,6 +124,9 @@ export function createPost(renderer, scene, camera) {
   grade.uniforms.tDepth.value = ao.beautyRenderTarget.depthTexture;
   composer.addPass(grade);
   composer.addPass(new OutputPass());
+  // smooth edges: rendering through the composer loses the canvas's own anti-aliasing
+  const smaa = new SMAAPass(size.x * renderer.getPixelRatio(), size.y * renderer.getPixelRatio());
+  composer.addPass(smaa);
   const texel = () => {
     const t = composer.renderTarget1;
     grade.uniforms.texel.value.set(1 / t.width, 1 / t.height);

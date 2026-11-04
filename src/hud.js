@@ -5,6 +5,7 @@ import {
 import { MAP_HALF, MAX_REVIVES } from '../shared/constants.js';
 import { COLLIDERS, REGIONS, FERRIS, TRACK, BUS_ROUTE } from '../shared/map.js';
 import { groundTex } from './textures.js';
+import { icon } from './icons.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -17,8 +18,8 @@ const WEAPON_ICON = {
   fists: '👊', mallet: '🔨', spike: '🍡', lever: '🎚️', sledge: '⚒️', crowbar: '🔧', machete: '🔪', axe: '🪓', chainsaw: '🪚',
   darts: '🎯', bow: '🏹', crossbow: '🏹', harpoon: '🔱', fireworks: '🎆',
 };
-const ITEM_ICON = { bandage: '🩹', medkit: '➕', soda: '🥤', holy: '💧', flare: '🧨', salt: '🧂', relic: '✝️' };
-const POWER_ICON = { trap: '🪤', cursed: '🎁', steps: '👣', blackout: '💡', scare: '😱', storm: '🌀' };
+const ITEM_ICON = Object.fromEntries(['bandage', 'medkit', 'soda', 'holy', 'flare', 'salt', 'relic'].map((k) => [k, icon(k)]));
+const POWER_ICON = Object.fromEntries(['trap', 'cursed', 'steps', 'blackout', 'scare', 'storm'].map((k) => [k, icon(k)]));
 const HOW = { storm: 'the storm', trap: 'a bear trap', cursed: 'cursed loot', ferris: 'a flying gondola', coaster: 'the coaster', car: 'a bumper car' };
 
 /** Pre-rendered top-down park map (ground + structures + labels). */
@@ -285,18 +286,18 @@ export class Hud {
       }
     }
 
-    this.set('.c-alive', `👤 ${snap.alive}`);
-    this.set('.c-ghosts', `👻 ${snap.ghosts}`);
-    if (me) this.set('.c-kills', `💀 ${me.kills + me.ghostKills}`);
+    this.set('.c-alive', `${icon('alive')}<b>${snap.alive}</b>`);
+    this.set('.c-ghosts', `${icon('ghost')}<b>${snap.ghosts}</b>`);
+    if (me) this.set('.c-kills', `${icon('skull')}<b>${me.kills + me.ghostKills}</b>`);
 
     // storm
     const z = snap.zone;
     let zt = '';
     if (snap.phase === 'launch') zt = 'Arriving at Wonderland Park…';
     else if (z.state === 'idle') zt = 'Storm gathering…';
-    else if (z.state === 'wait') zt = `🌀 Storm moves in <b>${fmt(z.t)}</b>`;
-    else if (z.state === 'shrink') zt = `🌀 <b class="warn">Storm closing ${fmt(z.t)}</b>`;
-    else zt = '🌀 <b class="warn">Storm closed</b>';
+    else if (z.state === 'wait') zt = `${icon('storm')}Storm moves in <b>${fmt(z.t)}</b>`;
+    else if (z.state === 'shrink') zt = `${icon('storm', 'warn')}<span class="warn">Storm closing <b>${fmt(z.t)}</b></span>`;
+    else zt = `${icon('storm', 'warn')}<span class="warn">Storm closed</span>`;
     this.set('.zone-info', zt);
 
     // final ride
@@ -304,7 +305,7 @@ export class Hud {
     if (snap.finalT !== null && snap.phase === 'live') {
       fr.classList.add('show');
       const surv = snap.players.find((p) => p.state !== 'ghost');
-      this.set('.final-ride', `<div class="fr-title">🎢 THE FINAL RIDE</div><div class="fr-time">${Math.ceil(snap.finalT)}</div><div class="fr-sub">${surv ? `${esc(surv.name)} must survive` : ''}</div>`);
+      this.set('.final-ride', `<div class="fr-title">The final ride</div><div class="fr-time">${Math.ceil(snap.finalT)}</div><div class="fr-sub">${surv ? `${esc(surv.name)} must survive` : ''}</div>`);
     } else fr.classList.remove('show');
 
     if (me && me.state === 'alive') this.updateLiving(snap, me, view);
@@ -318,16 +319,16 @@ export class Hud {
       if (it.kind === 'chest') label = 'Open chest';
       else if (it.kind === 'weapon') label = `Pick up <b style="color:${RARITIES[it.rarity].color}">${weaponLabel(it.w, it.rarity)}</b>`;
       else if (it.kind === 'ammo') label = `Take ${AMMO[it.ammo].name} ×${it.count}`;
-      else if (it.kind === 'tickets') label = `Take 🎟 ${it.count} tickets`;
+      else if (it.kind === 'tickets') label = `Take ${it.count} tickets`;
       else label = `Take ${ITEMS[it.item].name} ×${it.count}`;
       prompt = `<kbd>E</kbd> ${label}`;
     } else if (me?.state === 'alive' && me.booth >= 0 && !this.prizesOpen) {
-      prompt = `<kbd>B</kbd> Prize Counter <span class="dim">(you have 🎟 ${me.tickets})</span>`;
+      prompt = `<kbd>B</kbd> Prize counter <span class="dim">· ${me.tickets} tickets</span>`;
     } else if (ghost && me.ride && !me.possess) {
       const R = RIDES[me.ride.kind];
       const cost = me.ride.kind === 'ferris' ? `${R.cost} per gondola` : `${R.cost} ecto`;
       prompt = me.ride.kind === 'coaster' && !me.ride.ready
-        ? `🎢 Coaster recharging… ${Math.ceil(snap.coaster.cd)}s`
+        ? `Coaster recharging… ${Math.ceil(snap.coaster.cd)}s`
         : me.riseT > 0 ? `Still rising from the grave… ${Math.ceil(me.riseT)}s` : `<kbd>E</kbd> Possess <b>${R.name}</b> <span class="dim">(${cost})</span>`;
     } else if (ghost && me.possess) {
       const k = me.possess.kind;
@@ -371,16 +372,16 @@ export class Hud {
     $('.vitals .hp div', this.root).style.width = `${Math.max(0, p.hp)}%`;
     $('.vitals .shield div', this.root).style.width = `${Math.max(0, p.shield)}%`;
     this.set('.vitals .hp span', `${Math.ceil(Math.max(0, p.hp))}`);
-    this.set('.vitals .shield span', `${Math.ceil(p.shield)}`);
+    this.set('.vitals .shield span', p.shield > 0 ? `${Math.ceil(p.shield)}` : '');
     let rev = '';
-    for (let i = 0; i < MAX_REVIVES; i++) rev += `<i class="${i < me.revivesLeft ? 'on' : ''}" title="Revives left">💀</i>`;
+    for (let i = 0; i < MAX_REVIVES; i++) rev += `<i class="${i < me.revivesLeft ? 'on' : ''}" title="Revives left">${icon('skull')}</i>`;
     this.set('.revives', rev);
     const st = $('.vitals .stam', this.root);
     st.firstChild.style.width = `${Math.round(me.stam)}%`;
     st.classList.toggle('low', me.stam < 25);
-    this.set('.tickets', `🎟 ${me.tickets}`);
+    this.set('.tickets', me.tickets ? `${icon('ticket')}<b>${me.tickets}</b>` : '');
     const slots = me.slots.map((s, i) => {
-      if (!s) return `<div class="slot empty ${i === me.cur ? 'cur' : ''}" data-key="Digit${i + 1}"><kbd>${i + 1}</kbd>${i === me.cur ? '<div class="gi">👊</div><div class="gn">Fists</div>' : ''}</div>`;
+      if (!s) return `<div class="slot empty ${i === me.cur ? 'cur' : ''}" data-key="Digit${i + 1}"><kbd>${i + 1}</kbd>${i === me.cur ? '<div class="gn">Fists</div>' : ''}</div>`;
       const def = WEAPONS[s.w];
       const col = RARITIES[s.rarity].color;
       let info;
@@ -390,10 +391,10 @@ export class Hud {
         const u = Math.max(0, s.dura / max);
         info = `<div class="dura ${u < 0.25 ? 'low' : ''}"><i style="width:${Math.round(u * 100)}%"></i></div>`;
       } else info = `<div class="ga">${def.mag ? `${s.mag}<small>/${me.ammo[def.ammo]}</small>` : me.ammo[def.ammo]}</div>`;
-      return `<div class="slot ${i === me.cur ? 'cur' : ''}" style="--rc:${col}" data-key="Digit${i + 1}"><kbd>${i + 1}</kbd><div class="gi">${WEAPON_ICON[s.w]}</div><div class="gn">${def.name}</div>${info}</div>`;
+      return `<div class="slot ${i === me.cur ? 'cur' : ''}" style="--rc:${col}" data-key="Digit${i + 1}"><kbd>${i + 1}</kbd><div class="gn">${def.name}</div><div class="gr">${RARITIES[s.rarity].name}</div>${info}</div>`;
     });
     this.set('.weapons', slots.join(''));
-    const items = Object.keys(ITEMS).map((k) => `<div class="item ${me.items[k] ? '' : 'none'} ${ITEMS[k].occult ? 'occult' : ''}" data-key="Digit${ITEMS[k].key}" title="${esc(ITEMS[k].help || ITEMS[k].name)}"><kbd>${ITEMS[k].key}</kbd>${ITEM_ICON[k]}<b>${me.items[k]}</b></div>`);
+    const items = Object.keys(ITEMS).map((k) => `<div class="item ${me.items[k] ? '' : 'none'} ${ITEMS[k].occult ? 'occult' : ''}" data-key="Digit${ITEMS[k].key}" title="${esc(ITEMS[k].help || ITEMS[k].name)}"><kbd>${ITEMS[k].key}</kbd>${ITEM_ICON[k]}<b>${me.items[k]}</b></div>`).filter((h, i) => me.items[Object.keys(ITEMS)[i]]);
     this.set('.items', items.join(''));
   }
 

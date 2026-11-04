@@ -610,3 +610,170 @@ body.touch .minimap { width: 130px; height: 130px; }
   .t-logo .t-sub { font-size: 10px; }
   .lobby-sign { padding: 20px 22px 16px; }
 }
+
+/* ================================================================ 2026 HUD
+   Nothing in boxes: type and thin lines straight on the picture, soft shadows for legibility, and only what you
+   need right now. Health bottom-left, what you hold bottom-right, the ride's state top-right. */
+:root { --hud: 'Barlow Condensed', 'Rubik', sans-serif; --ui: 'Barlow', 'Rubik', system-ui, sans-serif; --hud-shadow: 0 1px 2px rgba(0,0,0,0.9), 0 0 12px rgba(0,0,0,0.55); }
+.hud { font-family: var(--ui); text-shadow: var(--hud-shadow); }
+.hud .ico { width: 1.15em; height: 1.15em; vertical-align: -0.2em; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.8)); }
+.hud kbd { border: 1px solid rgba(255,255,255,0.55); background: rgba(0,0,0,0.35); border-radius: 4px; font: 600 11px/1.5 var(--hud); padding: 0 5px; text-shadow: none; }
+/* a soft darkening behind the bottom of the screen so the numbers read on bright ground */
+.hud::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 150px; pointer-events: none; background: linear-gradient(transparent, rgba(0,0,0,0.38)); z-index: -1; }
+.hud.cinematic::after { display: none; }
+
+/* top right: counters and storm, plain */
+.hud-top-right { top: 20px; right: 24px; gap: 6px; }
+.counts { gap: 18px; }
+.counts span { background: none; border: 0; padding: 0; font: 600 22px var(--hud); display: inline-flex; align-items: center; gap: 6px; }
+.counts span .ico { width: 18px; height: 18px; opacity: 0.85; }
+.counts .c-ghosts { color: var(--ecto); }
+.counts .c-kills { color: #ffb4a0; }
+.zone-info { background: none; border: 0; padding: 0; font: 500 15px var(--hud); letter-spacing: 0.06em; text-transform: uppercase; color: #d6cfe8; display: flex; align-items: center; gap: 6px; }
+.zone-info b { font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; }
+.zone-info .warn, .zone-info .warn b, .ico.warn { color: #ff6a6a; }
+.feed { margin-top: 6px; gap: 2px; }
+.feed-item { background: none; border: 0 !important; padding: 1px 0; font: 500 14px var(--hud); letter-spacing: 0.02em; }
+.feed-item.mine .k, .feed-item.mine .v { text-decoration: underline 1px rgba(216,201,160,0.6); text-underline-offset: 3px; }
+
+/* top left: a smaller, quieter minimap */
+.hud-top-left { top: 18px; left: 22px; }
+.minimap { width: 150px; height: 150px; box-shadow: 0 0 0 1px rgba(255,255,255,0.18), 0 8px 30px rgba(0,0,0,0.45); opacity: 0.92; }
+
+/* the objective: one line of type at the top; the explanation fades after a few seconds */
+.objective { top: 22px; background: none; border: 0; padding: 0; max-width: min(520px, 50vw); }
+.objective b { font: 600 17px var(--hud); letter-spacing: 0.14em; text-transform: uppercase; color: #f4ead8; }
+.objective b::before, .objective b::after { content: ''; display: inline-block; width: 22px; height: 1px; background: currentColor; opacity: 0.5; vertical-align: middle; margin: 0 10px; }
+.objective span { font: 400 14px var(--ui); color: #d4ccc0; margin-top: 3px; max-height: 3em; overflow: hidden; transition: opacity 0.8s, max-height 0.8s; }
+.objective.settled span { opacity: 0; max-height: 0; }
+.is-ghost .objective b { color: var(--ecto); }
+@keyframes pop { from { opacity: 0; transform: translateX(-50%) translateY(-6px); } }
+
+/* place names: wide-tracked caps between two thin rules, not a giant title */
+.banner { top: 30%; }
+.banner .big { font: 600 clamp(26px, 3.6vw, 40px) / 1 var(--hud); letter-spacing: 0.42em; text-transform: uppercase; color: #f4ead8; text-shadow: var(--hud-shadow); padding-left: 0.42em; }
+.banner .small { font: 400 15px var(--ui); color: #d4ccc0; margin-top: 10px; letter-spacing: 0.02em; }
+.banner .big::before, .banner .big::after { content: ''; display: block; width: 120px; height: 1px; margin: 12px auto; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent); }
+.banner.ghost .big { color: var(--ecto); text-shadow: 0 0 18px rgba(125,255,216,0.5), var(--hud-shadow); }
+.banner.danger .big { color: #ff6a6a; text-shadow: 0 0 18px rgba(255,60,80,0.5), var(--hud-shadow); }
+
+/* the living HUD: health on the left, what you hold on the right */
+.living-ui { left: 0; right: 0; bottom: 0; transform: none; padding: 0 28px 24px; justify-content: flex-start; align-items: flex-end; gap: 22px; }
+.vitals { width: 250px; gap: 4px; }
+.vitals .bar { height: 4px; border: 0; border-radius: 2px; background: rgba(255,255,255,0.16); overflow: visible; }
+.vitals .bar div { border-radius: 2px; }
+.vitals .hp { height: 6px; margin-top: 30px; }
+.vitals .hp div { background: #f1ece2; box-shadow: 0 0 8px rgba(255,255,255,0.35); }
+.vitals .shield div { background: #5cc8ff; box-shadow: 0 0 8px rgba(92,200,255,0.5); }
+.vitals .bar span { right: auto; left: 0; top: auto; bottom: 8px; font: 700 34px/1 var(--hud); color: #fff; }
+.vitals .shield span { left: 62px; bottom: -30px; font: 600 16px/1 var(--hud); color: #8ed8ff; }
+.vitals .shield span:empty { display: none; }
+.vitals .bar.stam { height: 2px; margin-top: 3px; }
+.vitals .bar.stam div { background: #e8c25a; box-shadow: none; }
+.revives { order: 9; gap: 6px; margin-top: 6px; color: #f1ece2; }
+.revives i .ico { width: 14px; height: 14px; }
+.tickets { font: 600 18px var(--hud); color: #ffb05a; display: flex; align-items: center; gap: 5px; padding-bottom: 2px; }
+.tickets:empty { display: none; }
+.items { order: 2; margin-left: auto; flex-direction: row; gap: 14px; align-items: flex-end; padding-bottom: 4px; }
+.item { background: none; border: 0; padding: 0; display: flex; flex-direction: column; align-items: center; gap: 1px; font-size: 22px; color: #f1ece2; }
+.item.occult { color: #b4dcff; }
+.item .ico { width: 24px; height: 24px; }
+.item b { font: 600 14px/1 var(--hud); }
+.item kbd { order: 3; font-size: 9px; padding: 0 4px; opacity: 0.7; }
+.weapons { order: 3; flex-direction: column-reverse; align-items: flex-end; gap: 3px; min-width: 190px; }
+.slot { width: auto; height: auto; background: none; border: 0; border-radius: 0; padding: 0; display: flex; align-items: baseline; gap: 8px; opacity: 0.55; transform: none; box-shadow: none; }
+.slot.empty:not(.cur) { display: none; }
+.slot kbd { position: static; order: -1; font-size: 10px; }
+.slot .gn { font: 600 15px var(--hud); letter-spacing: 0.08em; text-transform: uppercase; color: #f1ece2; overflow: visible; }
+.slot .gr { display: none; }
+.slot .ga { font: 600 15px var(--hud); }
+.slot .dura { display: none; }
+.slot.cur { opacity: 1; transform: none; box-shadow: none; flex-wrap: wrap; justify-content: flex-end; border-right: 3px solid var(--rc, #f1ece2); padding-right: 10px; }
+.slot.cur .gn { font: 700 30px/1 var(--hud); letter-spacing: 0.04em; }
+.slot.cur .gr { display: block; width: 100%; text-align: right; font: 600 11px var(--hud); letter-spacing: 0.24em; text-transform: uppercase; color: var(--rc, #aaa); order: -2; }
+.slot.cur .ga { font: 700 30px/1 var(--hud); color: #fff; }
+.slot.cur .ga small { font-size: 16px; }
+.slot.cur .dura { display: block; width: 100%; height: 2px; margin-top: 6px; background: rgba(255,255,255,0.18); }
+.slot.cur kbd { display: none; }
+
+/* prompts: a key cap and a few words, low in the middle */
+.prompt { top: auto; bottom: 22%; background: none; border: 0; padding: 0; font: 500 18px var(--hud); letter-spacing: 0.04em; }
+.prompt kbd { font-size: 14px; padding: 1px 8px; margin-right: 6px; background: rgba(255,255,255,0.9); color: #111; border-color: #fff; }
+.progress { top: auto; bottom: 28%; width: 200px; }
+.progress .bar { height: 3px; background: #f1ece2; }
+.progress span { font: 500 13px var(--hud); letter-spacing: 0.12em; text-transform: uppercase; color: #e8e0d4; }
+.toast { background: none; border: 0; font: 500 16px var(--hud); letter-spacing: 0.04em; bottom: 30%; }
+
+/* crosshair: finer */
+.crosshair i { background: rgba(255,255,255,0.92); box-shadow: 0 0 1px #000, 0 0 3px rgba(0,0,0,0.6); }
+.crosshair i:nth-child(1), .crosshair i:nth-child(2) { width: 1.5px; height: 7px; }
+.crosshair i:nth-child(3), .crosshair i:nth-child(4) { width: 7px; height: 1.5px; }
+.crosshair b { width: 2.5px; height: 2.5px; }
+.dmg { font: 700 22px var(--hud); letter-spacing: 0.02em; }
+.dmg.head { font-size: 28px; }
+
+/* controls card: a reminder chip until H is pressed */
+.keys-card { top: 186px; left: 22px; background: rgba(0,0,0,0.35); border: 0; backdrop-filter: blur(6px); font: 500 13px var(--hud); letter-spacing: 0.03em; }
+.keys-card.mini { background: none; backdrop-filter: none; padding: 0; }
+.keys-hint { opacity: 0.75; }
+.keys-card kbd { min-width: 0; }
+.keys-card:not(.mini) kbd { min-width: 70px; }
+/* mouse lock: a small pill, not a dialog */
+.lock-hint { top: auto; bottom: 34%; background: rgba(0,0,0,0.45); border: 0; border-radius: 999px; padding: 8px 18px; backdrop-filter: blur(6px); max-width: none; white-space: nowrap; }
+.lock-hint b { display: inline; font: 600 15px var(--hud); letter-spacing: 0.12em; text-transform: uppercase; color: #fff; }
+.lock-hint span { display: inline; margin: 0 0 0 10px; font: 400 13px var(--ui); color: #cfc7bb; }
+
+/* on-screen markers */
+.marker .ico { width: 22px; height: 22px; color: #fff; }
+.marker.zone .ico { color: #e0a0ff; }
+.marker.prey .ico { color: #ff8a9a; }
+.marker.ride .ico { color: var(--ecto); }
+.marker.chest .ico { color: var(--gold); }
+.marker span { background: none; font: 600 12px var(--hud); letter-spacing: 0.04em; text-shadow: var(--hud-shadow); }
+
+/* ghost HUD: a thin ecto line and round power buttons */
+.ghost-ui { gap: 10px; bottom: 24px; }
+.ghost-title { font: 600 15px var(--hud); letter-spacing: 0.3em; text-transform: uppercase; }
+.ghost-title span { font: 500 13px var(--hud); letter-spacing: 0.06em; }
+.ecto { height: 3px; border: 0; background: rgba(125,255,216,0.15); width: 360px; overflow: visible; margin-top: 18px; }
+.ecto div { box-shadow: 0 0 10px var(--ecto); }
+.ecto span { inset: auto; left: 0; right: 0; top: -18px; color: var(--ecto); font: 600 12px var(--hud); letter-spacing: 0.18em; text-transform: uppercase; line-height: 1; }
+.powers { gap: 14px; margin-bottom: 16px; }
+.power { width: 56px; height: 56px; border-radius: 50%; background: rgba(0,0,0,0.35); border: 1px solid rgba(125,255,216,0.4); padding: 0; display: grid; place-items: center; backdrop-filter: blur(4px); color: var(--ecto); }
+.power .pi { line-height: 0; }
+.power .pi .ico { width: 24px; height: 24px; }
+.power .pn { position: absolute; top: 60px; left: 50%; transform: translateX(-50%); font: 500 11px var(--hud); letter-spacing: 0.06em; color: #cfe; }
+.power kbd { left: -4px; top: -4px; font-size: 9px; }
+.power .pc { right: -2px; top: -6px; font: 700 12px var(--hud); }
+.power .pcd { border-radius: 50%; font: 700 20px var(--hud); }
+.power.sel { box-shadow: 0 0 0 2px var(--ecto), 0 0 20px rgba(125,255,216,0.5); transform: translateY(-4px); }
+.ghost-hint { font: 400 13px var(--ui); margin-top: 10px; }
+.final-ride .fr-title { font: 600 18px var(--hud); letter-spacing: 0.4em; text-transform: uppercase; }
+.final-ride .fr-time { font: 700 52px/1 var(--hud); }
+
+/* combat feedback: numbers punch in and float up; words for blocks and parries */
+.dmg { animation: dmgPop 0.28s cubic-bezier(.2, 1.6, .4, 1); }
+.dmg.big { font-size: 30px; color: #ffd6a0; }
+.dmg.word { font: 700 17px var(--hud); letter-spacing: 0.22em; padding-left: 0.22em; }
+.dmg.word.blocked { color: #c9d2dc; }
+.dmg.word.broke { color: #ff9a6a; font-size: 20px; }
+.dmg.word.parry { color: #ffd76a; font-size: 26px; text-shadow: 0 0 14px rgba(255, 200, 80, 0.7), var(--hud-shadow); }
+.dmg.word.parried { color: #ff7a6a; font-size: 22px; }
+@keyframes dmgPop { from { scale: 1.8; } }
+
+/* touch screens with the 2026 HUD: everything you carry stacks bottom-left, clear of the right thumb */
+body.touch .is-living .living-ui { right: auto; padding: 0 0 10px max(14px, env(safe-area-inset-left)); flex-direction: column; align-items: flex-start; gap: 8px; }
+body.touch .living-ui .items { margin-left: 0; order: -2; flex-wrap: nowrap; }
+body.touch .living-ui .weapons { order: -1; align-items: flex-start; min-width: 0; }
+body.touch .slot { width: auto; height: auto; padding: 0; }
+body.touch .slot.cur { border-right: 0; border-left: 3px solid var(--rc, #f1ece2); padding: 0 0 0 10px; justify-content: flex-start; }
+body.touch .slot.cur .gn, body.touch .slot.cur .ga { font-size: 22px; }
+body.touch .slot.cur .gr { text-align: left; }
+body.touch .vitals { width: 170px; }
+body.touch .vitals .bar { height: 4px; }
+body.touch .vitals .hp { height: 5px; margin-top: 24px; }
+body.touch .vitals .hp span { font-size: 26px; line-height: 1; }
+body.touch .vitals .shield span { font-size: 13px; line-height: 1; bottom: -24px; left: 48px; }
+body.touch .item { padding: 0; font-size: 20px; }
+body.touch .item .ico { width: 20px; height: 20px; }
+body.touch .hud-top-right { right: max(14px, env(safe-area-inset-right)); }

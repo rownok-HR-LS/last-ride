@@ -1,6 +1,7 @@
 // Builds the static park: sky, ground, lighting and every prop from shared/map.js.
 // Static geometry is merged per material to keep draw calls low.
 import * as THREE from 'three';
+import { softShaft, nightAir } from './shafts.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
 import { PROPS, LAMPS, LAMP_HEAD, PARK_EDGE, PRIZE_BOOTHS, DECOR, LANDMARKS_OUT, rotXZ } from '../shared/map.js';
@@ -826,7 +827,19 @@ function buildLamps(scene) {
     pools.setMatrixAt(i, m);
   });
   pools.renderOrder = 1;
-  scene.add(heads, pools);
+  // the light falling from each head, made visible by the rain and mist
+  const coneH = LAMP_HEAD.y - 0.25;
+  const coneMat = softShaft(new THREE.MeshBasicMaterial({
+    color: '#ffffff', transparent: true, opacity: 0.38, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+  }), { bright: 'top', power: 2.4, near0: 1.5, near1: 6 });
+  const cones = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.18, 3.4, coneH, 20, 1, true), coneMat, n);
+  LAMPS.forEach((l, i) => {
+    m.makeTranslation(l.x + LAMP_HEAD.x, LAMP_HEAD.y - 0.2 - coneH / 2, l.z);
+    cones.setMatrixAt(i, m);
+  });
+  cones.renderOrder = 2;
+  cones.frustumCulled = false;
+  scene.add(heads, pools, cones);
   const lights = [];
   for (let i = 0; i < 3; i++) {
     const pl = new THREE.PointLight('#ffa860', 0, 26, 1.6);
@@ -848,9 +861,11 @@ function buildLamps(scene) {
         level[i] = v;
         heads.setColorAt(i, c.copy(off).lerp(warm, v).multiplyScalar(1 + v * 1.5));
         pools.setColorAt(i, c.copy(warm).multiplyScalar(v));
+        cones.setColorAt(i, c.copy(warm).multiplyScalar(v));
       });
       heads.instanceColor.needsUpdate = true;
       pools.instanceColor.needsUpdate = true;
+      cones.instanceColor.needsUpdate = true;
       // real lights on the closest working lamps
       const near = LAMPS.map((l, i) => ({ i, d: Math.hypot(l.x - cx, l.z - cz) }))
         .filter((o) => level[o.i] > 0)
@@ -870,6 +885,8 @@ function buildLamps(scene) {
 }
 
 // ------------------------------------------------------------------ sky and light
+
+nightAir(new THREE.Vector3(-0.45, 0.5, -0.74));
 
 /** The background sky photo is stored divided by this (see scripts/sky.mjs); backgroundIntensity puts it back. */
 export const SKY_SCALE = 2.5;

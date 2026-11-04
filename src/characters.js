@@ -9,6 +9,20 @@ import { weaponModel, GRIP } from './weapons.js';
 import { OUTFITS, PLAYER_HEIGHT } from '../shared/constants.js';
 import { grimyStripes, glow } from './textures.js';
 
+/** How far out from vertical (seen from the front) a relaxed upper arm may hang. */
+const ARM_HANG = 9 * (Math.PI / 180);
+const _up = new THREE.Vector3(0, 1, 0);
+const _r = new THREE.Vector3();
+const _f = new THREE.Vector3();
+const _h = new THREE.Vector3();
+const _a = new THREE.Vector3();
+const _d = new THREE.Vector3();
+const _s = new THREE.Vector3();
+const _t = new THREE.Vector3();
+const _rq1 = new THREE.Quaternion();
+const _rq2 = new THREE.Quaternion();
+const _rq3 = new THREE.Quaternion();
+
 const matCache = new Map();
 function M(color, opts = {}) {
   const key = `${color}:${JSON.stringify(opts)}`;
@@ -105,13 +119,13 @@ export function setCharacterRim(v) {
  */
 function lookShader(sh) {
   const L = this.userData.look;
-  Object.assign(sh.uniforms, { rimAmount, lookWet: L.wet, lookBlood: L.blood, lookGrime: L.grime, lookSeed: L.seed, lookTint: L.tint });
+  Object.assign(sh.uniforms, { rimAmount, lookWet: L.wet, lookBlood: L.blood, lookGrime: L.grime, lookSeed: L.seed, lookTint: L.tint, lookHit: L.hit || { value: 0 } });
   sh.vertexShader = `attribute vec3 bodyP;\nvarying vec3 vBody;\n${sh.vertexShader}`.replace(
     '#include <begin_vertex>',
     '#include <begin_vertex>\n  vBody = bodyP;',
   );
   sh.fragmentShader = `uniform float rimAmount; uniform float lookWet; uniform float lookBlood; uniform float lookGrime;
-    uniform float lookSeed; uniform vec3 lookTint;
+    uniform float lookSeed; uniform vec3 lookTint; uniform float lookHit;
     varying vec3 vBody;
     float lkH(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
     float lkN(vec3 p) {
@@ -169,7 +183,10 @@ function lookShader(sh) {
     .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
       float rimK = pow(1.0 - abs(dot(normalize(-vViewPosition), normal)), 2.5);
       rimK *= rimAmount * smoothstep(5.0, 20.0, length(vViewPosition));
-      totalEmissiveRadiance += vec3(0.45, 0.55, 0.7) * rimK * 0.55;`);
+      totalEmissiveRadiance += vec3(0.45, 0.55, 0.7) * rimK * 0.55;
+      // struck: a hot flash that hugs the outline, so a hit reads at a glance
+      float hitRim = pow(1.0 - abs(dot(normalize(-vViewPosition), normal)), 1.5);
+      totalEmissiveRadiance += vec3(1.0, 0.42, 0.3) * lookHit * (0.18 + hitRim * 1.1);`);
 }
 
 /** Bake each vertex's bind-pose position (metres above the feet, centred) for the look masks. */
@@ -559,6 +576,7 @@ export class Character {
       blood: { value: 0 },
       grime: { value: 0.35 + r() * 0.6 },
       seed: { value: r() * 50 },
+      hit: { value: 0 },
       // hue turn, value scale, how much of the cloth it applies to (some riders keep their scan's colours)
       tint: { value: new THREE.Vector3((r() - 0.5) * 3.2, 0.62 + r() * 0.55, r() < 0.15 ? 0 : 0.6 + r() * 0.4) },
     };
@@ -982,7 +1000,11 @@ export class Character {
       } else a?.setEffectiveWeight(this.upW);
     }
     this.hitstop = Math.max(0, this.hitstop - dt);
+    this.look.hit.value *= Math.exp(-dt * 16);
     this.mixer.update(this.hitstop > 0 ? 0 : dt);
+    // the clips were made for a narrower body: at rest and on the move the arms stick out from the scanned
+    // riders' sides, so bring them in to a natural hang (not while a swing, block or guard owns the arms)
+    if (!ghost && p.state === 'alive' && !this.over && !upName) this.relaxArms(p.combat ? 0.5 : 1);
 
     // aim pitch bends the spine so a launcher follows the crosshair; hits kick it back
     if (!ghost && p.state === 'alive') {
@@ -1003,9 +1025,46 @@ export class Character {
     }
   }
 
+  /**
+   * Swing each upper arm in toward the body until it hangs no more than ARM_HANG out from vertical (seen from the
+   * front). w: how much of the correction to apply.
+   */
+  relaxArms(w) {
+    const b = this.bones;
+    if (!b.LeftArm || !b.RightArm || !b.LeftForeArm || !b.RightForeArm || !b.Hips) return;
+    this.model.updateMatrixWorld(true);
+    const right = _r.set(1, 0, 0).applyQuaternion(this.root.getWorldQuaternion(_rq1));
+    right.y = 0;
+    right.normalize();
+    const fwd = _f.crossVectors(right, _up).normalize();
+    b.Hips.getWorldPosition(_h);
+    for (const [arm, fore] of [[b.LeftArm, b.LeftForeArm], [b.RightArm, b.RightForeArm]]) {
+      arm.getWorldPosition(_a);
+      fore.getWorldPosition(_d);
+      _d.sub(_a).normalize();
+      // which way is "away from the body" for this arm
+      const s = Math.sign(_s.copy(_a).sub(_h).dot(right)) || 1;
+      const side = _s.copy(right).multiplyScalar(s);
+      const out = _d.dot(side);
+      const down = -_d.y;
+      const ang = Math.atan2(out, down);
+      if (ang <= ARM_HANG) continue;
+      const to = ang - (ang - ARM_HANG) * w;
+      const r = Math.hypot(out, down);
+      _t.copy(fwd).multiplyScalar(_d.dot(fwd)).addScaledVector(side, r * Math.sin(to)).addScaledVector(_up, -r * Math.cos(to)).normalize();
+      // the world turn from where the arm points to where it should, applied in the arm's own space
+      _rq2.setFromUnitVectors(_d, _t);
+      arm.parent.getWorldQuaternion(_rq1);
+      _rq3.copy(_rq1).invert().multiply(_rq2).multiply(_rq1);
+      arm.quaternion.premultiply(_rq3);
+      arm.updateMatrixWorld(true);
+    }
+  }
+
   /** A quick upper-body jerk when hit. */
   hit() {
     this.flinch = 1;
+    this.look.hit.value = 1;
   }
 
   /** World position of a launcher's mouth (where projectiles appear to leave). */
@@ -1055,18 +1114,20 @@ export function nameTag(text, color = '#ffffff') {
   c.width = 256;
   c.height = 64;
   const ctx = c.getContext('2d');
-  ctx.font = '600 28px "Rubik", "Trebuchet MS", sans-serif';
+  ctx.font = '600 30px "Barlow Condensed", "Rubik", sans-serif';
+  if ('letterSpacing' in ctx) ctx.letterSpacing = '2px';
+  text = String(text).toUpperCase();
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.lineWidth = 6;
-  ctx.strokeStyle = 'rgba(5,4,4,0.85)';
-  ctx.strokeText(text, 128, 32);
+  // a soft shadow rather than a hard outline
+  ctx.shadowColor = 'rgba(0,0,0,0.9)';
+  ctx.shadowBlur = 6;
   ctx.fillStyle = color;
   ctx.fillText(text, 128, 32);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
-  sprite.scale.set(2.0, 0.5, 1);
+  sprite.scale.set(1.45, 0.36, 1);
   sprite.renderOrder = 10;
   return sprite;
 }

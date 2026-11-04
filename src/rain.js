@@ -216,8 +216,14 @@ export class Rain {
     // gusts swing the slant around a little
     u.wind.value.set(1.6 + Math.sin(this.time * 0.13) * 1.2, 0.7 + Math.sin(this.time * 0.09 + 1) * 0.9);
     if (bus) {
-      u.bus.value.set(bus.x, bus.z, 5.2, 3.4);
-      u.busDir.value.set(-Math.sin(bus.yaw), -Math.cos(bus.yaw));
+      // from inside the cabin no drop over the bus can be seen (the roof hides them, and long streaks poked through)
+      const fx = -Math.sin(bus.yaw);
+      const fz = -Math.cos(bus.yaw);
+      const dx = camera.position.x - bus.x;
+      const dz = camera.position.z - bus.z;
+      const inside = Math.abs(dx * fx + dz * fz) < 5.2 && Math.abs(-dx * fz + dz * fx) < 1.45 && camera.position.y < 3.4;
+      u.bus.value.set(bus.x, bus.z, 5.2, inside ? 60 : 3.4);
+      u.busDir.value.set(fx, fz);
     } else u.bus.value.set(0, 9999, 0, 0);
     // the nearest lamps light up the rain falling past them, and so do the bus headlights out in front of it
     const c = camera.position;
