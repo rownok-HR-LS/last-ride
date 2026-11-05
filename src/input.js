@@ -1,4 +1,5 @@
-// Keyboard and mouse. Pointer lock when available, drag-to-look otherwise.
+// Keyboard and mouse. Pointer lock when available, drag-to-look otherwise. (Touch and game controllers feed the
+// same fields: see touch.js and gamepad.js.)
 export class Input {
   constructor(canvas) {
     this.canvas = canvas;
@@ -81,6 +82,23 @@ export class Input {
     canvas.addEventListener('wheel', (e) => {
       this.wheel += Math.sign(e.deltaY);
     }, { passive: true });
+  }
+
+  // a button counts whether the mouse (or a touch button) or a controller trigger holds it
+  get lmb() {
+    return this._lmb || !!this.padFire;
+  }
+
+  set lmb(v) {
+    this._lmb = v;
+  }
+
+  get rmb() {
+    return this._rmb || !!this.padAim;
+  }
+
+  set rmb(v) {
+    this._rmb = v;
   }
 
   down(code) {

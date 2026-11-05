@@ -30,6 +30,7 @@ import { sceneWet } from './wet.js';
 import { PauseMenu } from './menu.js';
 import { loadSettings } from './settings.js';
 import { Touch, isTouch } from './touch.js';
+import { Pads } from './gamepad.js';
 
 const FEMALE = new Set(OUTFITS.filter((o) => o.voice === 'f').map((o) => o.id));
 
@@ -166,11 +167,13 @@ export class Client {
     this.time = 0;
     this.running = true;
     this.paused = false;
+    this.pads = new Pads(this);
     const loop = (now) => {
       if (!this.running) return;
       requestAnimationFrame(loop);
       const dt = Math.min(0.05, (now - this.last) / 1000);
       this.last = now;
+      this.pads.poll(dt);
       // the graphics card was reset: nothing can be drawn until the browser hands the context back
       if (this.gpuLost) return;
       if (!this.paused && !document.hidden) this.adaptQuality(dt);
@@ -1128,6 +1131,7 @@ export class Client {
 
   /** The camera jolts toward a blow you land and away from one you take. heavy: a bigger jolt. */
   impact(heavy, taken = false) {
+    this.pads?.rumble(heavy || taken);
     this.punch = Math.max(this.punch || 0, heavy ? 1 : 0.6);
     this.kick += (taken ? -1 : 1) * (heavy ? 0.035 : 0.02) * (this.settings.shake ?? 1);
     this.kickYaw += (Math.random() - 0.5) * (heavy ? 0.05 : 0.025);

@@ -671,7 +671,9 @@ export class Hud {
       <p><kbd>1</kbd>–<kbd>6</kbd> pick a power, <kbd>click</kbd> to use</p>
       <p><kbd>E</kbd> possess a ride (Ferris wheel, coaster station, bumper car)</p>
       <p>Land the killing blow to steal a survivor's body.</p></div></div>
-      <p class="dim"><kbd>M</kbd> map · <kbd>Tab</kbd> scoreboard · <kbd>H</kbd> this help · <kbd>Esc</kbd> free the mouse</p></div>`;
+      <p class="dim"><kbd>M</kbd> map · <kbd>Tab</kbd> scoreboard · <kbd>H</kbd> this help · <kbd>Esc</kbd> free the mouse</p>
+      <h4>Controller</h4>
+      <p class="dim"><kbd>L stick</kbd> move (push all the way to sprint) · <kbd>R stick</kbd> look · <kbd>RT</kbd> attack · <kbd>LT</kbd> block / aim · <kbd>A</kbd> jump · <kbd>B</kbd> slide · <kbd>X</kbd> pick up · <kbd>Y</kbd> next weapon · <kbd>LB</kbd> dodge · <kbd>RB</kbd> reload · <kbd>D-pad</kbd> medkit, bandage, soda, holy water (as a ghost: powers) · <kbd>View</kbd> map · <kbd>Start</kbd> pause</p></div>`;
   }
 }
 
