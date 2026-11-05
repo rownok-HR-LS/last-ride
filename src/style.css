@@ -784,3 +784,13 @@ body.touch .hud-top-right { right: max(14px, env(safe-area-inset-right)); }
 .scoreboard { background: rgba(6, 8, 12, 0.82); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; backdrop-filter: blur(6px); font: 500 15px var(--hud); letter-spacing: 0.03em; }
 .scoreboard th { font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; font-size: 12px; color: #a9a39a; }
 .scoreboard .ico { width: 15px; height: 15px; }
+
+/* title while loading: a still of the park behind the sign, a slim bar and a tip; the live park fades in behind */
+.title2 .t-still { position: fixed; inset: 0; z-index: -1; pointer-events: none; background: #06070a center / cover no-repeat; transition: opacity 1.4s ease; }
+.title2 .t-still::after { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 30% 60%, transparent 40%, rgba(0,0,0,0.55)); }
+.title2.ready .t-still { opacity: 0; }
+.t-load { margin-top: 22px; width: min(340px, 40vw); transition: opacity 0.8s; }
+.title2.ready .t-load { opacity: 0; }
+.t-bar { height: 2px; background: rgba(241,223,182,0.18); overflow: hidden; }
+.t-bar i { display: block; height: 100%; width: 0; background: #f1dfb6; box-shadow: 0 0 10px rgba(255,200,120,0.6); transition: width 0.4s ease; }
+.t-tip { display: block; margin-top: 10px; font: 400 14px/1.45 var(--typewriter); color: #d8c7a3; text-shadow: 0 1px 3px #000; min-height: 2.9em; }

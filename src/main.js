@@ -8,6 +8,17 @@ import { loadSettings } from './settings.js';
 import { settingsBoard } from './menu.js';
 
 const app = document.getElementById('app');
+/** Shown while the park loads. */
+const TIPS = [
+  'Hold attack to wind up a heavy swing. Let go to land it.',
+  'Raise your guard just before a blow lands to parry and stagger the attacker.',
+  'The dead come back as ghosts. Land the killing blow on a survivor to steal their body.',
+  'Ghosts can take over the Ferris wheel, the roller coaster and the bumper cars.',
+  'Holy water burns ghosts. A circle of salt keeps them out.',
+  'The storm closes in around the big top. Stay inside the circle.',
+  'Tickets buy prizes at the booths: a chainsaw, a legendary crossbow, medkits and more.',
+  'Heavy weapons hit harder but tire you faster. Watch your stamina.',
+];
 const PROFILE_KEY = 'last-ride-profile';
 
 function loadProfile() {
@@ -35,9 +46,11 @@ async function title() {
   const el = document.createElement('div');
   el.className = 'title2';
   el.innerHTML = `
+    <div class="t-still"></div>
     <div class="t-logo">
       <div class="t-name">Last Ride</div>
       <div class="t-sub">Midnight Wonderland Tours · closed 1987</div>
+      <div class="t-load"><div class="t-bar"><i></i></div><span class="t-tip"></span></div>
     </div>
     <div class="t-rider"><b class="t-rider-name"></b><span class="t-rider-blurb"></span></div>
     <div class="sign t-panel">
@@ -106,12 +119,24 @@ async function title() {
   });
 
   // load everything the park needs, then build it behind the sign
-  const step = (what) => {
+  // relative to the page, so it works under the GitHub Pages sub-path too
+  el.querySelector('.t-still').style.backgroundImage = 'url(./title_still.webp)';
+  const bar = el.querySelector('.t-bar i');
+  const step = (what, u) => {
     play.textContent = what;
+    if (u !== undefined) bar.style.width = `${Math.round(u * 100)}%`;
   };
+  // a tip every few seconds while it loads
+  const tipEl = el.querySelector('.t-tip');
+  let tip = Math.floor(Math.random() * TIPS.length);
+  const nextTip = () => {
+    tipEl.textContent = TIPS[tip++ % TIPS.length];
+  };
+  nextTip();
+  const tipTimer = setInterval(nextTip, 4500);
   // the riders, the fonts, the bus and the ground textures all download at once
-  step('Loading the park… 0%');
-  const riders = loadCharacters((u) => step(`Loading the park… ${Math.round(u * 100)}%`));
+  step('Loading the park…', 0);
+  const riders = loadCharacters((u) => step(`Loading the park… ${Math.round(u * 100)}%`, u * 0.9));
   const fonts = Promise.all([document.fonts.load('80px Rye'), document.fonts.load('900 80px Cinzel'), document.fonts.load('600 20px "Barlow Condensed"')]).catch(() => {
     /* fall back to Impact */
   });
@@ -132,6 +157,10 @@ async function title() {
   app.insertBefore(client.renderer.domElement, app.firstChild);
   ridersReady = true;
   client.showcase(profile.outfit);
+  // the still of the park fades into the live one, and the loading line goes
+  step('', 1);
+  clearInterval(tipTimer);
+  requestAnimationFrame(() => el.classList.add('ready'));
   play.disabled = false;
   practice.disabled = false;
   play.innerHTML = 'Ride online <small>admit one</small>';

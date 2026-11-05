@@ -58,7 +58,7 @@ export const ENV = {
   carousel_real: ['sketchfab-env/sf_ab3bd8f68e3b4ab787961e77eafec4b2.glb', 70000, 1024, true],
   dodgem: ['sketchfab-env/sf_5e2c5bfed4f643f6bb1a65cbfcda2b60.glb', 6000, 1024, false, 0.2],
   light_poles: ['sketchfab-env/sf_7166d53851a54d2fb2bdbf2695694e10.glb', 4000, 1024, true],
-  welcome_sign: ['sketchfab-env/sf_fef3e02d052a489db9c3a9548ac4aa4e.glb', 9000, 1024, false, 0.08],
+  welcome_sign: ['sketchfab-env/sf_fef3e02d052a489db9c3a9548ac4aa4e.glb', 40000, 1024, false, 0.08],
   graffiti_shop: ['sketchfab-env/sf_40bbfd989b864ea8809ab5a6156cb200.glb', 14000, 2048, false, 0.05],
   clown_statue: ['sketchfab-env/sf_af4c9e73aa9b4e42a4842653a36d2b02.glb', 5000, 1024],
   popcorn_cart: ['sketchfab-env/sf_30e6c59907754093bf4d48a94fea0888.glb', 8000, 1024, true],
