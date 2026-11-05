@@ -794,3 +794,21 @@ body.touch .hud-top-right { right: max(14px, env(safe-area-inset-right)); }
 .t-bar { height: 2px; background: rgba(241,223,182,0.18); overflow: hidden; }
 .t-bar i { display: block; height: 100%; width: 0; background: #f1dfb6; box-shadow: 0 0 10px rgba(255,200,120,0.6); transition: width 0.4s ease; }
 .t-tip { display: block; margin-top: 10px; font: 400 14px/1.45 var(--typewriter); color: #d8c7a3; text-shadow: 0 1px 3px #000; min-height: 2.9em; }
+
+/* the prize counter in the park-sign style: prizes as torn tickets with the price punched in */
+.prize-card { width: min(420px, 92vw); text-shadow: none; }
+.prize-card h2 { font-size: clamp(26px, 3.4vw, 38px); margin-bottom: 6px; }
+.prize-card .have { text-align: center; color: #e8c98a; margin-bottom: 12px; font: 400 15px var(--typewriter); }
+.prize-card .have .ico { width: 18px; height: 18px; vertical-align: -4px; }
+.prize { display: flex; width: 100%; align-items: center; gap: 12px; margin: 6px 0; padding: 9px 30px 9px 12px; border: 0; border-radius: 0; cursor: pointer; position: relative;
+  color: #2a1712; font: 400 15px var(--typewriter); text-align: left;
+  background: radial-gradient(circle at 0 50%, transparent 7px, #d9c49a 7.5px) left / 51% 100% no-repeat, radial-gradient(circle at 100% 50%, transparent 7px, #d9c49a 7.5px) right / 51% 100% no-repeat;
+  filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.45)); }
+.prize::after { content: ''; position: absolute; top: 6px; bottom: 6px; right: 58px; border-left: 2px dotted rgba(42, 23, 18, 0.4); }
+.prize kbd { background: #2a1712; color: #e8d7b4; border-color: #2a1712; }
+.prize span { flex: 1; }
+.prize b { min-width: 38px; text-align: right; font: 400 20px var(--carnival); color: #8e1620; }
+.prize:hover { background: radial-gradient(circle at 0 50%, transparent 7px, #e8d6ae 7.5px) left / 51% 100% no-repeat, radial-gradient(circle at 100% 50%, transparent 7px, #e8d6ae 7.5px) right / 51% 100% no-repeat; transform: rotate(-0.6deg); }
+.prize.off { opacity: 0.45; filter: grayscale(0.6) drop-shadow(0 3px 0 rgba(0, 0, 0, 0.45)); }
+/* where a hit came from: a thin glowing arc rather than a thick red band */
+.dmg-dir .dir { left: -95px; top: -95px; width: 190px; height: 190px; border-top: 3px solid rgba(255, 86, 76, 0.9); filter: drop-shadow(0 0 6px rgba(255, 40, 30, 0.85)); }

@@ -638,9 +638,11 @@ export class Hud {
     const key = `${me.tickets}`;
     if (key === this.prizeKey && el.innerHTML) return;
     this.prizeKey = key;
-    el.innerHTML = `<div class="prize-card"><h3>🎟 PRIZE COUNTER</h3><div class="have">You have <b>${me.tickets}</b> tickets</div>
-      ${PRIZES.map((p, i) => `<button class="prize ${me.tickets >= p.cost ? '' : 'off'}" data-prize="${p.id}"><kbd>${i + 1}</kbd><span>${esc(p.label)}</span><b>🎟 ${p.cost}</b></button>`).join('')}
-      <p class="dim">Kills give 🎟 20, chests 🎟 6. <kbd>B</kbd> or <kbd>Esc</kbd> to close</p></div>`;
+    // a worn park sign like the menus: the prizes as torn tickets with their price punched in
+    el.innerHTML = `<div class="sign prize-card"><div class="bulbs"></div><h2>Prize Counter</h2>
+      <div class="have">${icon('ticket')} <b>${me.tickets}</b> tickets</div>
+      ${PRIZES.map((p, i) => `<button class="prize ${me.tickets >= p.cost ? '' : 'off'}" data-prize="${p.id}"><kbd>${i + 1}</kbd><span>${esc(p.label)}</span><b>${p.cost}</b></button>`).join('')}
+      <p class="fine center">Kills give 20 tickets, chests 6 · <kbd>B</kbd> or <kbd>Esc</kbd> to close</p></div>`;
     el.querySelectorAll('.prize').forEach((b) => b.addEventListener('click', () => onBuy(b.dataset.prize)));
   }
 
