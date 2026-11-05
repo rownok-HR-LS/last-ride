@@ -536,11 +536,11 @@ const LOWER_BODY = /(Hips|UpLeg|Leg|Foot|Toe)/;
 
 /** Clips that play on the upper body only (an _up copy without the hips and legs is made at load). */
 const UPPER = ['m_idle', 'fight_idle', 'm_light', 'm_light2', 'm_heavy', 'm_block', 'm_block_hit', 'm_stagger', 'punch', 'punch2', 'punch_hook', 'punch_upper', 'throw', 'bow_draw',
-  'gs_idle', 'gs_combo', 'gs_down', 'gs_power', 'gs_block', 'gs_block_hit', 'gs_hit', 'react_left', 'react_right', 'react_gut', 'head_hit_big'];
+  'gs_idle', 'gs_combo', 'gs_down', 'gs_power', 'gs_block', 'gs_block_hit', 'gs_hit', 'react_left', 'react_right', 'react_gut', 'head_hit_big', 'mc_combo3'];
 /** The big two-handed weapons fight with the great-sword set: both hands on the haft, the weight behind each swing. */
 const TWO_HANDED = new Set(['sledge', 'axe', 'lever']);
 /** Cuts that live inside a longer clip (the great-sword combo holds three slashes). */
-const CLIP_OF = { gs_c1: 'gs_combo', gs_c2: 'gs_combo', gs_c3: 'gs_down' };
+const CLIP_OF = { gs_c1: 'gs_combo', gs_c2: 'gs_combo', gs_c3: 'gs_down', mc_c1: 'mc_combo3', mc_c2: 'mc_combo3', mc_c3: 'mc_combo3' };
 const REACTS = ['react_left', 'react_right', 'react_gut'];
 /** Seconds into each attack clip: [start, impact, end, windup hold for heavy swings]. */
 export const CUTS = {
@@ -556,6 +556,10 @@ export const CUTS = {
   gs_c2: [1.2, 1.67, 2.1, 1.45],
   gs_c3: [0.12, 0.53, 0.95, 0.35],
   gs_power: [0.0, 0.73, 1.3, 0.48],
+  // one-handed weapons: a three-hit combo that flows from each strike into the next
+  mc_c1: [0.45, 0.93, 1.3, 0.7],
+  mc_c2: [1.3, 1.73, 2.1, 1.5],
+  mc_c3: [2.1, 2.63, 3.2, 2.35],
   gs_block: [0, 0.5, 0.96],
   gs_block_hit: [0, 0.3, 0.8],
   gs_hit: [0, 0.3, 0.8],
@@ -792,7 +796,7 @@ export class Character {
       // combo: forehand, backhand, then an overhead finisher
       const name = two
         ? p.atk.heavy ? 'gs_power' : ['gs_c1', 'gs_c2', 'gs_c3'][this.combo]
-        : p.atk.heavy ? (fists ? (this.clips.punch_upper ? 'punch_upper' : 'punch2') : 'm_heavy') : fists ? ['punch2', this.clips.punch_hook ? 'punch_hook' : 'punch', this.clips.punch_upper ? 'punch_upper' : 'punch2'][this.combo] : ['m_light', 'm_light2', 'm_heavy'][this.combo];
+        : p.atk.heavy ? (fists ? (this.clips.punch_upper ? 'punch_upper' : 'punch2') : 'm_heavy') : fists ? ['punch2', this.clips.punch_hook ? 'punch_hook' : 'punch', this.clips.punch_upper ? 'punch_upper' : 'punch2'][this.combo] : this.clips.mc_combo3 ? ['mc_c1', 'mc_c2', 'mc_c3'][this.combo] : ['m_light', 'm_light2', 'm_heavy'][this.combo];
       const c = CUTS[name];
       const u = Math.min(1, p.atk.u);
       const from = p.atk.heavy ? c[3] : c[0];
