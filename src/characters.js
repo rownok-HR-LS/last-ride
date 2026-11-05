@@ -535,7 +535,13 @@ const RIFLE_SET = {
 const LOWER_BODY = /(Hips|UpLeg|Leg|Foot|Toe)/;
 
 /** Clips that play on the upper body only (an _up copy without the hips and legs is made at load). */
-const UPPER = ['m_idle', 'fight_idle', 'm_light', 'm_light2', 'm_heavy', 'm_block', 'm_block_hit', 'm_stagger', 'punch', 'punch2', 'punch_hook', 'punch_upper', 'throw', 'bow_draw'];
+const UPPER = ['m_idle', 'fight_idle', 'm_light', 'm_light2', 'm_heavy', 'm_block', 'm_block_hit', 'm_stagger', 'punch', 'punch2', 'punch_hook', 'punch_upper', 'throw', 'bow_draw',
+  'gs_idle', 'gs_combo', 'gs_down', 'gs_power', 'gs_block', 'gs_block_hit', 'gs_hit', 'react_left', 'react_right', 'react_gut', 'head_hit_big'];
+/** The big two-handed weapons fight with the great-sword set: both hands on the haft, the weight behind each swing. */
+const TWO_HANDED = new Set(['sledge', 'axe', 'lever']);
+/** Cuts that live inside a longer clip (the great-sword combo holds three slashes). */
+const CLIP_OF = { gs_c1: 'gs_combo', gs_c2: 'gs_combo', gs_c3: 'gs_down' };
+const REACTS = ['react_left', 'react_right', 'react_gut'];
 /** Seconds into each attack clip: [start, impact, end, windup hold for heavy swings]. */
 export const CUTS = {
   m_light: [0.45, 1.0, 1.45, 0.75],
@@ -545,6 +551,18 @@ export const CUTS = {
   punch2: [0.6, 1.0, 1.3, 0.8],
   punch_hook: [0.6, 0.97, 1.35, 0.75],
   punch_upper: [0.2, 0.5, 0.85, 0.35],
+  // great sword: impacts measured at the hand's fastest moment
+  gs_c1: [0.25, 0.7, 1.15, 0.5],
+  gs_c2: [1.2, 1.67, 2.1, 1.45],
+  gs_c3: [0.12, 0.53, 0.95, 0.35],
+  gs_power: [0.0, 0.73, 1.3, 0.48],
+  gs_block: [0, 0.5, 0.96],
+  gs_block_hit: [0, 0.3, 0.8],
+  gs_hit: [0, 0.3, 0.8],
+  react_left: [0, 0.25, 0.7],
+  react_right: [0, 0.3, 0.8],
+  react_gut: [0, 0.3, 0.85],
+  head_hit_big: [0, 0.3, 0.8],
   m_block: [0, 0.5, 1.0],
   m_block_hit: [0, 0.6, 1.2],
   m_stagger: [0, 0.6, 1.5],
@@ -745,7 +763,13 @@ export class Character {
     if (e.e === 'swing') this.combo = e.heavy ? 0 : e.combo || 0;
     // a hit freezes both fighters for a few frames
     if (e.e === 'hit' || e.e === 'block') this.hitstop = e.heavy ? 0.09 : 0.06;
-    if (e.e === 'hit' && e.victim) this.hitClip = e.heavy ? (this.clips.hit_body ? 'hit_body' : 'm_stagger') : this.clips.hit_head ? 'hit_head' : 'm_stagger';
+    if (e.e === 'hit' && e.victim) {
+      const r = REACTS[Math.floor(Math.random() * REACTS.length)];
+      this.hitClip = this.clips[r] ? (e.heavy ? 'react_gut' : r) : e.heavy ? (this.clips.hit_body ? 'hit_body' : 'm_stagger') : this.clips.hit_head ? 'hit_head' : 'm_stagger';
+      // a quick reaction in the shoulders and head for any blow that doesn't stagger
+      this.reactAt = time;
+      this.reactClip = this.twoHanded && this.clips.gs_hit ? 'gs_hit' : this.clips[r] ? (e.heavy ? 'head_hit_big' : r) : null;
+    }
     if (e.e === 'block') this.blockHitAt = time;
     if (e.e === 'dodge') this.dodgeDir = e.dir;
     if (e.e === 'fire' && (e.kind === 'darts' || e.kind === 'holy' || e.kind === 'flare')) this.throwAt = time;
@@ -756,6 +780,8 @@ export class Character {
     const w = p.wpn;
     const def = w === 'fists' ? FISTS : WEAPONS[w];
     if (!def) return null;
+    const two = TWO_HANDED.has(w) && !!this.clips.gs_combo;
+    this.twoHanded = two;
     const at = (name, u) => {
       const c = CUTS[name];
       return { name, t: c ? c[0] + (c[2] - c[0]) * u : u };
@@ -764,25 +790,29 @@ export class Character {
     if (p.atk && def.type === 'melee') {
       const fists = w === 'fists';
       // combo: forehand, backhand, then an overhead finisher
-      const name = p.atk.heavy ? (fists ? (this.clips.punch_upper ? 'punch_upper' : 'punch2') : 'm_heavy') : fists ? ['punch2', this.clips.punch_hook ? 'punch_hook' : 'punch', this.clips.punch_upper ? 'punch_upper' : 'punch2'][this.combo] : ['m_light', 'm_light2', 'm_heavy'][this.combo];
+      const name = two
+        ? p.atk.heavy ? 'gs_power' : ['gs_c1', 'gs_c2', 'gs_c3'][this.combo]
+        : p.atk.heavy ? (fists ? (this.clips.punch_upper ? 'punch_upper' : 'punch2') : 'm_heavy') : fists ? ['punch2', this.clips.punch_hook ? 'punch_hook' : 'punch', this.clips.punch_upper ? 'punch_upper' : 'punch2'][this.combo] : ['m_light', 'm_light2', 'm_heavy'][this.combo];
       const c = CUTS[name];
       const u = Math.min(1, p.atk.u);
       const from = p.atk.heavy ? c[3] : c[0];
       const t = u < def.hitAt ? from + (c[1] - from) * (u / def.hitAt) : c[1] + (c[2] - c[1]) * ((u - def.hitAt) / (1 - def.hitAt));
-      return { name, t };
+      return { name: CLIP_OF[name] || name, t };
     }
     // charging a heavy swing: wind up and hold
     if (p.charge > 0 && def.type === 'melee' && !def.auto) {
-      const name = w === 'fists' ? 'punch2' : 'm_heavy';
+      const name = w === 'fists' ? 'punch2' : two ? 'gs_power' : 'm_heavy';
       const c = CUTS[name];
       return { name, t: c[0] + (c[3] - c[0]) * Math.min(1, p.charge / 0.3) };
     }
     if (p.charge > 0 && w === 'bow') return at('bow_draw', Math.min(1, p.charge / def.draw));
-    if (time - (this.blockHitAt ?? -9) < 0.35) return at('m_block_hit', (time - this.blockHitAt) / 0.35);
-    if (p.blocking) return at('m_block', 0.5);
+    if (time - (this.blockHitAt ?? -9) < 0.35) return at(two ? 'gs_block_hit' : 'm_block_hit', (time - this.blockHitAt) / 0.35);
+    if (p.blocking) return at(two ? 'gs_block' : 'm_block', 0.5);
+    // taking a blow: the shoulders and head snap away from it
+    if (this.reactClip && !p.stagger && time - (this.reactAt ?? -9) < 0.45) return at(this.reactClip, (time - this.reactAt) / 0.45);
     if (time - (this.throwAt ?? -9) < 0.5) return at('throw', (time - this.throwAt) / 0.5);
     // in a fight the legs strafe with the directional clips while the arms hold a guard
-    const guard = def.type === 'melee' && p.combat ? (w === 'fists' && this.clips.fight_idle ? 'fight_idle' : 'm_idle') : null;
+    const guard = def.type === 'melee' && p.combat ? (w === 'fists' && this.clips.fight_idle ? 'fight_idle' : two ? 'gs_idle' : 'm_idle') : null;
     if (p.stagger) {
       if (this.staggerAt === null) this.staggerAt = time;
       return at('m_stagger', Math.min(1, (time - this.staggerAt) / 0.7));
@@ -885,7 +915,7 @@ export class Character {
     const free = !ghost && !p.combat;
     const set = RIFLE_SET;
     const aimIdle = ranged && (p.aim || recentShot);
-    const idleClip = free ? 'u_idle' : aimIdle ? 'idle_aiming' : 'idle';
+    const idleClip = free ? (this.clips.breath_idle ? 'breath_idle' : 'u_idle') : aimIdle ? 'idle_aiming' : 'idle';
     const move = Math.min(1, speed / 1.0);
     const n = speed > 0.01 ? speed : 1;
     const dirW = {
