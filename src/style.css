@@ -879,3 +879,6 @@ body.pad .slot kbd, body.pad .item kbd:empty, body.pad .power kbd:empty { displa
 /* ---------------------------------------------------------------- the death camera: one card, nothing else */
 .hud.dying .ghost-ui, .hud.dying .objective, .hud.dying .prompt, .hud.dying .keys-card, .hud.dying .vitals, .hud.dying .weapons,
 .hud.dying .items, .hud.dying .markers, .hud.dying .crosshair, .hud.dying .banner { visibility: hidden; }
+/* touch buttons carry line icons too (the touch layer sits outside .hud) */
+.touch-ui .ico { width: 26px; height: 26px; vertical-align: middle; }
+.touch-ui .t-top .ico { width: 20px; height: 20px; }
