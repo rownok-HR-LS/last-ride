@@ -22,7 +22,10 @@ export function softShaft(mat, { bright = 'bottom', power = 1.8, near0 = 2.5, ne
         vec3 sv = normalize(cameraPosition - sp.xyz);
         vShaftV = uv.y;
         vShaftEdge = abs(dot(sn, sv));
-        vShaftNear = smoothstep(${near0.toFixed(2)}, ${near1.toFixed(2)}, distance(cameraPosition, sp.xyz));`);
+        // fade by how close the camera is to the shaft's centre line (standing inside a wide lamp cone, its walls
+        // are metres away but it still fills the view)
+        vec3 sc = (sw * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+        vShaftNear = smoothstep(${near0.toFixed(2)}, ${near1.toFixed(2)}, distance(cameraPosition.xz, sc.xz));`);
     const along = bright === 'top' ? 'vShaftV' : '(1.0 - vShaftV)';
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>\n${vars}`)

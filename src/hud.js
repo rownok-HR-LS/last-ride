@@ -22,69 +22,90 @@ const ITEM_ICON = Object.fromEntries(['bandage', 'medkit', 'soda', 'holy', 'flar
 const POWER_ICON = Object.fromEntries(['trap', 'cursed', 'steps', 'blackout', 'scare', 'storm'].map((k) => [k, icon(k)]));
 const HOW = { storm: 'the storm', trap: 'a bear trap', cursed: 'cursed loot', ferris: 'a flying gondola', coaster: 'the coaster', car: 'a bumper car' };
 
-/** Pre-rendered top-down park map (ground + structures + labels). */
+/**
+ * Pre-rendered top-down park map, drawn like a modern tactical map: the ground photo darkened and drained, a faint
+ * 25 m grid, structures as light outlines, the landmarks in muted colour and the area names in condensed caps.
+ */
 function renderMapImage(size) {
   const c = document.createElement('canvas');
   c.width = c.height = size;
   const ctx = c.getContext('2d');
+  ctx.filter = 'grayscale(0.7) brightness(0.45) contrast(1.15)';
   ctx.drawImage(groundTex().image, 0, 0, size, size);
-  ctx.fillStyle = 'rgba(20,10,30,0.25)';
+  ctx.filter = 'none';
+  ctx.fillStyle = 'rgba(12, 16, 24, 0.35)';
   ctx.fillRect(0, 0, size, size);
   const k = size / (MAP_HALF * 2);
   const tx = (v) => (v + MAP_HALF) * k;
+  // grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  ctx.lineWidth = 1;
+  for (let g = -MAP_HALF; g <= MAP_HALF; g += 25) {
+    ctx.beginPath();
+    ctx.moveTo(tx(g), 0);
+    ctx.lineTo(tx(g), size);
+    ctx.moveTo(0, tx(g));
+    ctx.lineTo(size, tx(g));
+    ctx.stroke();
+  }
   for (const col of COLLIDERS) {
-    if (col.y1 < 0.6 && col.y0 < 0.1 && col.hx > 3) {
-      ctx.fillStyle = 'rgba(150,120,170,0.5)';
-    } else ctx.fillStyle = col.y0 > 2 ? 'rgba(40,24,52,0.45)' : 'rgba(26,16,34,0.85)';
+    const flat = col.y1 < 0.6 && col.y0 < 0.1 && col.hx > 3;
+    const high = col.y0 > 2;
+    ctx.fillStyle = flat ? 'rgba(230,220,200,0.12)' : high ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.10)';
+    ctx.strokeStyle = flat || high ? 'transparent' : 'rgba(255,255,255,0.22)';
+    ctx.lineWidth = Math.max(1, size / 640);
     if (col.k === 'cyl') {
       if (col.r < 0.5) continue;
       ctx.beginPath();
       ctx.arc(tx(col.x), tx(col.z), col.r * k, 0, Math.PI * 2);
       ctx.fill();
+      ctx.stroke();
     } else {
       ctx.save();
       ctx.translate(tx(col.x), tx(col.z));
       ctx.rotate(-col.rot);
       ctx.fillRect(-col.hx * k, -col.hz * k, col.hx * 2 * k, col.hz * 2 * k);
+      ctx.strokeRect(-col.hx * k, -col.hz * k, col.hx * 2 * k, col.hz * 2 * k);
       ctx.restore();
     }
   }
-  // the big top in red and white
-  ctx.fillStyle = '#c7283c';
-  ctx.beginPath();
-  ctx.arc(tx(0), tx(0), 15 * k, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#efe4d2';
-  for (let i = 0; i < 8; i++) {
+  // the big top in muted red and cream
+  for (let i = 0; i < 16; i++) {
+    ctx.fillStyle = i % 2 ? 'rgba(216,205,184,0.8)' : 'rgba(150,40,52,0.85)';
     ctx.beginPath();
     ctx.moveTo(tx(0), tx(0));
-    ctx.arc(tx(0), tx(0), 15 * k, (i / 8) * Math.PI * 2, (i / 8 + 1 / 16) * Math.PI * 2);
+    ctx.arc(tx(0), tx(0), 15 * k, (i / 16) * Math.PI * 2, ((i + 1) / 16) * Math.PI * 2);
     ctx.fill();
   }
   // roller coaster track
-  ctx.strokeStyle = '#e2384f';
-  ctx.lineWidth = Math.max(1.5, 0.5 * k);
+  ctx.strokeStyle = 'rgba(214,80,96,0.75)';
+  ctx.lineWidth = Math.max(1.2, 0.35 * k);
   ctx.beginPath();
   TRACK.pts.forEach((pt, i) => (i ? ctx.lineTo(tx(pt[0]), tx(pt[2])) : ctx.moveTo(tx(pt[0]), tx(pt[2]))));
   ctx.closePath();
   ctx.stroke();
-  // ferris wheel ring
-  ctx.strokeStyle = '#ff4fd8';
-  ctx.lineWidth = Math.max(1.5, 0.6 * k);
+  // ferris wheel
+  ctx.strokeStyle = 'rgba(214,112,200,0.8)';
+  ctx.lineWidth = Math.max(1.2, 0.5 * k);
   ctx.beginPath();
   ctx.moveTo(tx(FERRIS.x - FERRIS.r), tx(FERRIS.z));
   ctx.lineTo(tx(FERRIS.x + FERRIS.r), tx(FERRIS.z));
   ctx.stroke();
+  // darker toward the edges
+  const vg = ctx.createRadialGradient(size / 2, size / 2, size * 0.3, size / 2, size / 2, size * 0.72);
+  vg.addColorStop(0, 'rgba(0,0,0,0)');
+  vg.addColorStop(1, 'rgba(0,0,0,0.55)');
+  ctx.fillStyle = vg;
+  ctx.fillRect(0, 0, size, size);
   if (size >= 400) {
-    ctx.font = `bold ${Math.round(size / 44)}px "Trebuchet MS", sans-serif`;
+    ctx.font = `600 ${Math.round(size / 50)}px "Barlow Condensed", "Rubik", sans-serif`;
+    if ('letterSpacing' in ctx) ctx.letterSpacing = `${Math.round(size / 300)}px`;
     ctx.textAlign = 'center';
-    ctx.lineWidth = 4;
-    for (const r of REGIONS) {
-      ctx.strokeStyle = 'rgba(10,4,16,0.9)';
-      ctx.strokeText(r.name.toUpperCase(), tx(r.x), tx(r.z));
-      ctx.fillStyle = '#f5e9ff';
-      ctx.fillText(r.name.toUpperCase(), tx(r.x), tx(r.z));
-    }
+    ctx.shadowColor = 'rgba(0,0,0,0.9)';
+    ctx.shadowBlur = 5;
+    ctx.fillStyle = 'rgba(240,232,218,0.88)';
+    for (const r of REGIONS) ctx.fillText(r.name.toUpperCase(), tx(r.x), tx(r.z));
+    ctx.shadowBlur = 0;
   }
   return c;
 }
@@ -556,7 +577,7 @@ export class Hud {
     if (!show) return;
     const rows = [...snap.players]
       .sort((a, b) => (a.state === 'ghost') - (b.state === 'ghost') || b.kills - a.kills)
-      .map((p) => `<tr class="${p.id === snap.me?.id ? 'me' : ''} ${p.state === 'ghost' ? 'ghost' : ''}"><td>${p.state === 'ghost' ? '👻' : '👤'}</td><td>${esc(p.name)}${p.bot ? ' <span class="dim">bot</span>' : ''}</td><td>${p.kills}</td><td>${'💀'.repeat(p.revivesLeft)}</td></tr>`)
+      .map((p) => `<tr class="${p.id === snap.me?.id ? 'me' : ''} ${p.state === 'ghost' ? 'ghost' : ''}"><td>${icon(p.state === 'ghost' ? 'ghost' : 'alive')}</td><td>${esc(p.name)}${p.bot ? ' <span class="dim">bot</span>' : ''}</td><td>${p.kills}</td><td>${icon('skull').repeat(p.revivesLeft)}</td></tr>`)
       .join('');
     this.set('.scoreboard', `<table><tr><th></th><th>Rider</th><th>Kills</th><th>Revives</th></tr>${rows}</table>`);
   }

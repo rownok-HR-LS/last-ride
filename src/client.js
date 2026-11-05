@@ -70,8 +70,9 @@ export class Client {
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.4;
+    // neutral tone mapping keeps the sodium lamps orange and the night deep instead of washing everything out
+    renderer.toneMapping = THREE.NeutralToneMapping;
+    renderer.toneMappingExposure = 1.15;
     container.appendChild(renderer.domElement);
     this.renderer = renderer;
 
@@ -1148,8 +1149,11 @@ export class Client {
       if (p.state === 'ghost') {
         // survivors only catch a faint shimmer, brighter for a moment after a ghost uses a power
         ghostOpacity = ghostView || p.exposed ? 0.9 : 0.12 + Math.min(1, p.flash / 1.6) * 0.75;
+        // your own wraith sits right in front of the camera: keep it faint and its mist thin so it doesn't block the view
+        const mine = p.id === this.myId;
+        if (mine) ghostOpacity = 0.35;
         // black mist trailing behind the wraith
-        if (Math.random() < (ghostView ? 0.5 : 0.15 + p.flash * 0.3)) this.fx.mist(p.x, p.y + 0.6, p.z);
+        if (Math.random() < (mine ? 0.06 : ghostView ? 0.5 : 0.15 + p.flash * 0.3)) this.fx.mist(p.x, p.y + 0.6, p.z);
         if (p.possess === 'coaster' || p.possess === 'car') ch.root.position.y -= 0.4;
       }
       // far-away characters animate at a lower rate (nobody can tell, and it saves a lot of CPU)

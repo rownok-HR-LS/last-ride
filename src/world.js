@@ -831,7 +831,7 @@ function buildLamps(scene) {
   const coneH = LAMP_HEAD.y - 0.25;
   const coneMat = softShaft(new THREE.MeshBasicMaterial({
     color: '#ffffff', transparent: true, opacity: 0.38, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
-  }), { bright: 'top', power: 2.4, near0: 1.5, near1: 6 });
+  }), { bright: 'top', power: 2.4, near0: 3.6, near1: 7.5 });
   const cones = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.18, 3.4, coneH, 20, 1, true), coneMat, n);
   LAMPS.forEach((l, i) => {
     m.makeTranslation(l.x + LAMP_HEAD.x, LAMP_HEAD.y - 0.2 - coneH / 2, l.z);

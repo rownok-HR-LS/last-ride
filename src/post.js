@@ -93,7 +93,7 @@ const GradeShader = {
       d += vec3(-0.012, 0.0, 0.02) * (1.0 - smoothstep(0.0, 0.35, lum));
       // film: teal shadows, warm highlights, a little more contrast
       d += cine * (vec3(-0.02, 0.005, 0.025) * (1.0 - smoothstep(0.0, 0.4, lum)) + vec3(0.03, 0.012, -0.02) * smoothstep(0.35, 0.9, lum));
-      d = (d - 0.5) * (1.06 + cine * 0.06) + 0.5;
+      d = (d - 0.5) * (1.1 + cine * 0.05) + 0.5;
       d *= 1.0 - smoothstep(0.6 - cine * 0.15, 1.0, v) * (0.22 + cine * 0.2);
       float n = fract(sin(dot(vUv * (time + 1.0), vec2(12.9898, 78.233))) * 43758.5453);
       d += (n - 0.5) * (0.014 + cine * 0.03);

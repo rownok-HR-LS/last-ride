@@ -112,7 +112,7 @@ async function title() {
   // the riders, the fonts, the bus and the ground textures all download at once
   step('Loading the park… 0%');
   const riders = loadCharacters((u) => step(`Loading the park… ${Math.round(u * 100)}%`));
-  const fonts = Promise.all([document.fonts.load('80px Rye'), document.fonts.load('900 80px Cinzel')]).catch(() => {
+  const fonts = Promise.all([document.fonts.load('80px Rye'), document.fonts.load('900 80px Cinzel'), document.fonts.load('600 20px "Barlow Condensed"')]).catch(() => {
     /* fall back to Impact */
   });
   // the bus carries everyone in the opening shots, so it has to be there from the first frame
