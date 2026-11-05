@@ -169,11 +169,16 @@ export class FX {
         float n(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);
           return mix(mix(h(i),h(i+vec2(1,0)),f.x), mix(h(i+vec2(0,1)),h(i+vec2(1,1)),f.x), f.y); }
         void main(){
-          vec2 p = vec2(vUv.x*60.0, vUv.y*8.0);
-          float s = n(p + vec2(time*0.6, -time*0.9)) * 0.6 + n(p*2.3 - vec2(time*1.1, time*0.4)) * 0.4;
-          float band = smoothstep(0.35, 0.9, s);
-          vec3 col = mix(vec3(0.10,0.02,0.02), vec3(0.55,0.06,0.04), band);
-          float a = (0.38 + band*0.35) * smoothstep(1.0, 0.6, vUv.y) ;
+          // a curtain, not clouds: fine vertical streaks drifting upward, a glowing skirt where it meets the
+          // ground, thinning out with height; violet-crimson like the storm on the map and the screen tint
+          float up = vUv.y;
+          vec2 p = vec2(vUv.x * 220.0, up * 2.5 - time * 0.22);
+          float streak = n(p) * 0.6 + n(vec2(p.x * 2.6, p.y * 1.8 - time * 0.35)) * 0.4;
+          float curtain = smoothstep(0.35, 0.95, streak);
+          float skirt = exp(-up * 7.0);
+          float height = smoothstep(0.8, 0.12, up);
+          vec3 col = mix(vec3(0.05, 0.01, 0.05), vec3(0.24, 0.04, 0.19), curtain) + vec3(0.32, 0.07, 0.25) * skirt;
+          float a = (0.12 + curtain * 0.18 + skirt * 0.3) * height;
           gl_FragColor = vec4(col, a);
         }`,
     });
