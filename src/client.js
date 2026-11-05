@@ -31,6 +31,7 @@ import { PauseMenu } from './menu.js';
 import { loadSettings } from './settings.js';
 import { Touch, isTouch } from './touch.js';
 import { Pads } from './gamepad.js';
+import { setBinds } from './prompts.js';
 
 const FEMALE = new Set(OUTFITS.filter((o) => o.voice === 'f').map((o) => o.id));
 
@@ -395,6 +396,7 @@ export class Client {
   applySettings(s) {
     this.settings = s;
     this.input.binds = s.keys;
+    setBinds(s.keys);
     audio.setVolumes(s.volume);
     const base = Math.min(window.devicePixelRatio, 1.5);
     const Q = { high: [1, 1, 2048, true], medium: [0.8, 0.7, 1536, true], low: [0.62, 0.4, 1024, false] }[s.quality];

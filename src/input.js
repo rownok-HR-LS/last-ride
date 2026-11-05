@@ -1,5 +1,7 @@
 // Keyboard and mouse. Pointer lock when available, drag-to-look otherwise. (Touch and game controllers feed the
 // same fields: see touch.js and gamepad.js.)
+import { setPad } from './prompts.js';
+
 export class Input {
   constructor(canvas) {
     this.canvas = canvas;
@@ -20,6 +22,7 @@ export class Input {
     this.binds = {};
 
     window.addEventListener('keydown', (e) => {
+      setPad(false);
       if (e.code === 'Escape' && !this.locked) this.onEscape?.();
       if (!this.enabled || e.target.tagName === 'INPUT') return;
       if (!this.keys.has(e.code)) this.pressed.add(e.code);
@@ -32,6 +35,7 @@ export class Input {
       this.lmb = this.rmb = false;
     });
     canvas.addEventListener('mousedown', (e) => {
+      setPad(false);
       if (!this.enabled) return;
       if (!this.locked && canvas.requestPointerLock) {
         try {

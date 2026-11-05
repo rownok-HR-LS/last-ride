@@ -871,3 +871,7 @@ body.touch .foe-bar { width: 96px; }
 .gpu-reset b { font: 600 28px/1.1 var(--hud); letter-spacing: 0.08em; text-transform: uppercase; }
 .gpu-reset span { color: #c9c2b6; }
 .gpu-reset button[hidden] { display: none; }
+
+/* ---------------------------------------------------------------- playing with a controller */
+/* weapon slots cycle with Y: their number keys mean nothing; an item with no D-pad direction shows no cap */
+body.pad .slot kbd, body.pad .item kbd:empty, body.pad .power kbd:empty { display: none; }

@@ -3,9 +3,11 @@
 // stick, the right stick looks, the triggers are the mouse buttons. On menus the D-pad or stick moves between buttons
 // and A presses one. Hits rumble.
 //
-//   A jump · B slide / fly down · X pick up / open · Y next weapon · LB dodge · RB reload
+//   A jump · B slide / fly down · X pick up / open (at a booth: prize counter) · Y next weapon · LB dodge · RB reload
 //   RT attack · LT aim / block · L3 sprint · R3 swap shoulder · View map · Start pause
 //   D-pad: medkit, bandage, shield soda, holy water (as a ghost: powers 1-4; LB, RB powers 5-6)
+
+import { setPad } from './prompts.js';
 
 const DEAD = 0.16;
 /** Full right-stick tilt turns this fast (rad/s); the curve keeps small tilts fine for aiming. */
@@ -57,6 +59,8 @@ export class Pads {
     if (!p) return;
     const now = p.buttons.map((b) => b.pressed || b.value > 0.5);
     const hit = (i) => now[i] && !this.prev[i];
+    // prompts name controller buttons from the moment it is used
+    if (now.some(Boolean) || p.axes.some((v) => Math.abs(v) > 0.4)) setPad(true);
     if (this.inMenu()) {
       this.release();
       this.menu(p, now, hit, dt);
@@ -75,12 +79,14 @@ export class Pads {
     const inp = c.input;
     if (!inp.enabled) return;
     const binds = inp.binds;
+    const me = c.snap?.me;
     const key = (action) => (binds[action] || [])[0];
     // held buttons become held keys (so every check the game makes for that action sees them)
     const want = new Map([
       [key('jump'), now[B.A]],
       [key('slide'), now[B.B]],
-      [key('interact'), now[B.X]],
+      // X picks things up; at a prize booth with nothing to pick up it opens the counter
+      [key(me?.booth >= 0 && !me?.interact ? 'prizes' : 'interact'), now[B.X]],
       [key('dodge'), now[B.LB]],
       [key('reload'), now[B.RB]],
       [key('sprint'), now[B.L3]],
@@ -161,6 +167,7 @@ export class Pads {
       // back out: the pause sign's resume, or the prize counter / settings back button
       const c = this.client;
       if (c.pauseMenu?.open) c.input.onEscape?.();
+      else if (c.hud?.prizesOpen) c.closePrizes();
       else document.querySelector('.settings-board .back')?.click();
     }
   }

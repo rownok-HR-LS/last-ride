@@ -1,20 +1,22 @@
 // Tells the player what to do next: an objective line, on-screen markers, a ghost tutorial and a controls card.
 import * as THREE from 'three';
 import { icon as svgIcon } from './icons.js';
+import { keyOf, usingPad } from './prompts.js';
 import { FERRIS, STATION, PRIZE_BOOTHS } from '../shared/map.js';
 
 const TUT_KEY = 'last-ride-ghost-tutorial';
 const v = new THREE.Vector3();
 
+/** The controls card: [action (see prompts.js), what it does]; the key or button is named for what is in use. */
 const CONTROLS = {
   alive: [
-    ['WASD', 'move'], ['Shift', 'sprint'], ['C / Ctrl', 'slide (while running)'], ['Space', 'jump'], ['Left mouse', 'swing (hold: heavy)'], ['Right mouse', 'block / aim (just before a hit: parry)'],
-    ['V', 'dodge'], ['E', 'pick up / open'], ['R', 'reload'], ['1-3', 'weapons'], ['4 5 6', 'heal / shield'], ['7 8 9 0', 'holy water, flare, salt, relic'],
-    ['B', 'prize counter'], ['M', 'map'],
+    ['move', 'move'], ['sprint', 'sprint'], ['slide', 'slide (while running)'], ['jump', 'jump'], ['attack', 'swing (hold: heavy)'], ['aim', 'block / aim (just before a hit: parry)'],
+    ['dodge', 'dodge'], ['interact', 'pick up / open'], ['reload', 'reload'], ['weapons', 'weapons'], ['items', 'heal, shield, holy water, flare, salt, relic'],
+    ['prizes', 'prize counter'], ['map', 'map'],
   ],
   ghost: [
-    ['WASD', 'fly'], ['Space / Ctrl', 'up / down'], ['Shift', 'fly fast'], ['1-6', 'pick a power'], ['Click', 'use power'],
-    ['Right click', 'cancel'], ['E', 'possess ride'], ['M', 'map'],
+    ['move', 'fly'], ['up', 'up'], ['down', 'down'], ['fast', 'fly fast'], ['powers', 'pick a power'], ['attack', 'use power'],
+    ['cancel', 'cancel'], ['interact', 'possess ride'], ['map', 'map'],
   ],
 };
 
@@ -124,7 +126,7 @@ export class Guide {
     this.obj.style.display = client.hud.mapOpen ? 'none' : '';
     if (!me || !p) return;
     if (me.spectator) {
-      this.setObjective('Watching this ride', `${snap.alive} still alive. You board the next bus when it ends. Fly with WASD, Space goes up, Ctrl goes down, Shift is fast.`);
+      this.setObjective('Watching this ride', `${snap.alive} still alive. You board the next bus when it ends. Fly with ${keyOf('move')}, ${keyOf('up')} goes up, ${keyOf('down')} goes down, ${keyOf('fast')} is fast.`);
       return;
     }
     const ghost = me.state === 'ghost';
@@ -158,11 +160,11 @@ export class Guide {
         const tz = cz + (p.z - cz) * k * 0.8;
         this.place(n++, cam, tx, p.y + 1.5, tz, 'storm', `${dist(tx, tz)} m`, 'zone');
       } else if (!armed) {
-        this.setObjective('Find a weapon', 'You only have your fists. Look for glowing weapons and gold chests, walk up and press E.');
+        this.setObjective('Find a weapon', `You only have your fists. Look for glowing weapons and gold chests, walk up and press ${keyOf('interact')}.`);
         const near = this.nearestLoot(client, p, (l) => l.kind === 'chest' || l.kind === 'weapon');
         if (near) this.place(n++, cam, near.x, near.y + 1, near.z, near.kind === 'chest' ? 'chest' : 'weapon', `${dist(near.x, near.z)} m`, near.kind === 'weapon' ? `r${near.rarity}` : 'chest');
       } else if (me.tickets >= 30 && booth) {
-        this.setObjective(`Spend your tickets · 🎟 ${me.tickets}`, 'A Prize Counter sells chainsaws, crossbows and blessed relics. Walk up and press B.');
+        this.setObjective(`Spend your tickets · 🎟 ${me.tickets}`, `A Prize Counter sells chainsaws, crossbows and blessed relics. Walk up and press ${keyOf('prizes')}.`);
         this.place(n++, cam, booth.x, 4.5, booth.z, 'ticket', `Prize Counter · ${dist(booth.x, booth.z)} m`, 'chest');
       } else if (p.hp < 60 && (me.items.bandage || me.items.medkit)) {
         this.setObjective('Heal up', `Press ${me.items.medkit ? '5 for a medkit' : '4 for a bandage'} somewhere safe`);
@@ -204,10 +206,12 @@ export class Guide {
     // controls card
     const set = ghost ? 'ghost' : me.state === 'alive' ? 'alive' : null;
     const keys = set && this.showKeys ? set : '';
-    if (keys !== this.lastKeys) {
-      this.lastKeys = keys;
+    // (drawn again when the player switches between the keyboard and a controller)
+    const drawn = `${keys}|${usingPad()}`;
+    if (drawn !== this.lastKeys) {
+      this.lastKeys = drawn;
       this.keys.innerHTML = keys
-        ? `${CONTROLS[keys].map(([k, d]) => `<div><kbd>${k}</kbd><span>${d}</span></div>`).join('')}<div class="dim">H hides this</div>`
+        ? `${CONTROLS[keys].map(([k, d]) => `<div><kbd>${keyOf(k)}</kbd><span>${d}</span></div>`).join('')}<div class="dim">H hides this</div>`
         : set ? '<div class="keys-hint"><kbd>H</kbd><span>Controls</span></div>' : '';
       this.keys.classList.toggle('show', !!set);
       this.keys.classList.toggle('mini', !keys);

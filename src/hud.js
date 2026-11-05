@@ -1,4 +1,9 @@
 // DOM heads-up display: vitals, weapons, ghost powers, minimap, landing map, kill feed, banners, end screen.
+import { kbd, usingPad } from './prompts.js';
+
+/** With a controller, items and ghost powers sit on the D-pad (and the bumpers): see gamepad.js. */
+const PAD_ITEM = { medkit: '↑', bandage: '↓', soda: '←', holy: '→' };
+const PAD_POWER = ['↑', '→', '↓', '←', 'LB', 'RB'];
 import {
   WEAPONS, RARITIES, AMMO, ITEMS, POWERS, POWER_IDS, RIDES, PRIZES, weaponLabel,
 } from '../shared/items.js';
@@ -348,25 +353,25 @@ export class Hud {
       else if (it.kind === 'ammo') label = `Take ${AMMO[it.ammo].name} ×${it.count}`;
       else if (it.kind === 'tickets') label = `Take ${it.count} tickets`;
       else label = `Take ${ITEMS[it.item].name} ×${it.count}`;
-      prompt = `<kbd>E</kbd> ${label}`;
+      prompt = `${kbd('interact')} ${label}`;
     } else if (me?.state === 'alive' && me.booth >= 0 && !this.prizesOpen) {
-      prompt = `<kbd>B</kbd> Prize counter <span class="dim">· ${me.tickets} tickets</span>`;
+      prompt = `${kbd('prizes')} Prize counter <span class="dim">· ${me.tickets} tickets</span>`;
     } else if (ghost && me.ride && !me.possess) {
       const R = RIDES[me.ride.kind];
       const cost = me.ride.kind === 'ferris' ? `${R.cost} per gondola` : `${R.cost} ecto`;
       prompt = me.ride.kind === 'coaster' && !me.ride.ready
         ? `Coaster recharging… ${Math.ceil(snap.coaster.cd)}s`
-        : me.riseT > 0 ? `Still rising from the grave… ${Math.ceil(me.riseT)}s` : `<kbd>E</kbd> Possess <b>${R.name}</b> <span class="dim">(${cost})</span>`;
+        : me.riseT > 0 ? `Still rising from the grave… ${Math.ceil(me.riseT)}s` : `${kbd('interact')} Possess <b>${R.name}</b> <span class="dim">(${cost})</span>`;
     } else if (ghost && me.possess) {
       const k = me.possess.kind;
-      prompt = k === 'ferris' ? '<kbd>Click</kbd> fling a gondola · <kbd>E</kbd> let go'
-        : k === 'car' ? `Drive with <kbd>WASD</kbd> and ram survivors · ${Math.ceil(me.carT)}s · <kbd>E</kbd> let go`
+      prompt = k === 'ferris' ? `${kbd('attack')} fling a gondola · ${kbd('interact')} let go`
+        : k === 'car' ? `Drive with ${kbd('move')} and ram survivors · ${Math.ceil(me.carT)}s · ${kbd('interact')} let go`
           : 'Riding the coaster… hold on!';
     } else if (ghost && view.power) {
       const P = POWERS[view.power];
       prompt = view.power === 'scare'
-        ? (view.scareTarget ? `<kbd>Click</kbd> scare <b>${esc(view.scareTarget)}</b>` : 'Aim at a nearby survivor')
-        : `<kbd>Click</kbd> ${P.name} · <kbd>Right-click</kbd> cancel${view.inRange ? '' : ' <b class="warn">(too far)</b>'}`;
+        ? (view.scareTarget ? `${kbd('attack')} scare <b>${esc(view.scareTarget)}</b>` : 'Aim at a nearby survivor')
+        : `${kbd('attack')} ${P.name} · ${kbd('cancel')} cancel${view.inRange ? '' : ' <b class="warn">(too far)</b>'}`;
     }
     this.set('.prompt', prompt);
     $('.prompt', root).classList.toggle('show', !!prompt);
@@ -421,7 +426,7 @@ export class Hud {
       return `<div class="slot ${i === me.cur ? 'cur' : ''}" style="--rc:${col}" data-key="Digit${i + 1}"><kbd>${i + 1}</kbd><div class="gn">${def.name}</div><div class="gr">${RARITIES[s.rarity].name}</div>${info}</div>`;
     });
     this.set('.weapons', slots.join(''));
-    const items = Object.keys(ITEMS).map((k) => `<div class="item ${me.items[k] ? '' : 'none'} ${ITEMS[k].occult ? 'occult' : ''}" data-key="Digit${ITEMS[k].key}" title="${esc(ITEMS[k].help || ITEMS[k].name)}"><kbd>${ITEMS[k].key}</kbd>${ITEM_ICON[k]}<b>${me.items[k]}</b></div>`).filter((h, i) => me.items[Object.keys(ITEMS)[i]]);
+    const items = Object.keys(ITEMS).map((k) => `<div class="item ${me.items[k] ? '' : 'none'} ${ITEMS[k].occult ? 'occult' : ''}" data-key="Digit${ITEMS[k].key}" title="${esc(ITEMS[k].help || ITEMS[k].name)}"><kbd>${usingPad() ? PAD_ITEM[k] ?? '' : ITEMS[k].key}</kbd>${ITEM_ICON[k]}<b>${me.items[k]}</b></div>`).filter((h, i) => me.items[Object.keys(ITEMS)[i]]);
     this.set('.items', items.join(''));
   }
 
@@ -434,7 +439,7 @@ export class Hud {
       const cd = me.cds[id] || 0;
       const ok = me.ecto >= P.cost && cd <= 0 && me.riseT <= 0 && !me.possess;
       return `<div class="power ${ok ? '' : 'off'} ${view.power === id ? 'sel' : ''}" data-power="${id}" title="${esc(P.help)}">
-        <kbd>${P.key}</kbd><div class="pi">${POWER_ICON[id]}</div><div class="pn">${P.name}</div><div class="pc">${P.cost}</div>
+        <kbd>${usingPad() ? PAD_POWER[P.key - 1] ?? '' : P.key}</kbd><div class="pi">${POWER_ICON[id]}</div><div class="pn">${P.name}</div><div class="pc">${P.cost}</div>
         ${cd > 0 ? `<div class="pcd">${Math.ceil(cd)}</div>` : ''}</div>`;
     }).join('');
     this.set('.powers', html);
@@ -648,7 +653,7 @@ export class Hud {
     el.innerHTML = `<div class="sign prize-card"><div class="bulbs"></div><h2>Prize Counter</h2>
       <div class="have">${icon('ticket')} <b>${me.tickets}</b> tickets</div>
       ${PRIZES.map((p, i) => `<button class="prize ${me.tickets >= p.cost ? '' : 'off'}" data-prize="${p.id}"><kbd>${i + 1}</kbd><span>${esc(p.label)}</span><b>${p.cost}</b></button>`).join('')}
-      <p class="fine center">Kills give 20 tickets, chests 6<span class="keys-only"> · <kbd>B</kbd> or <kbd>Esc</kbd> to close</span></p>
+      <p class="fine center">Kills give 20 tickets, chests 6<span class="keys-only"> · ${kbd('close')} to close</span></p>
       <button class="ticket dark p-close">Close</button></div>`;
     el.querySelectorAll('.prize').forEach((b) => b.addEventListener('click', () => onBuy(b.dataset.prize)));
     // a way out on touch screens, where there is no B or Esc
