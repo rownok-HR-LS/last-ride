@@ -1263,6 +1263,19 @@ export class Client {
       if (c.tick !== 0) continue;
       ch.animate(p, c.adt, this.time, { ghostOpacity, eyes: ghostView || p.flash > 0, lastShotAt: this.time - (snap.time - p.lastShot), seat: seat ? (p.id % 3 ? 'sit' : 'sit2') : null, lookAt: cd < 25 ? this.lookTarget(p, snap) : null });
       c.adt = 0;
+      // a landing you can hear and see: the thud, a splash or a puff of dirt, and for you the camera takes the drop
+      if (ch.landed > 3 && cd < 32) {
+        const hard = Math.min(1, (ch.landed - 3) / 12);
+        audio.play('land', p.id === this.myId ? null : [p.x, p.y, p.z]);
+        const stone = pathDistance(p.x, p.z) < 0;
+        const wet = sheltered(p.x, p.y + 1.6, p.z, snap.bus) ? 0 : this.rainAmount || 0;
+        if (wet > 0.1) for (const s of [-1, 1]) this.fx.footSplash(p.x + Math.cos(p.yaw) * 0.14 * s, p.y, p.z - Math.sin(p.yaw) * 0.14 * s, p.vx, p.vz, Math.min(1, wet * (1 + hard)), true, stone);
+        if (!stone && hard > 0.25) this.fx.dust(p.x, p.y, p.z);
+        if (p.id === this.myId) {
+          this.landDip = Math.max(this.landDip || 0, 0.25 + hard * 0.75);
+          if (hard > 0.4) this.shake = Math.max(this.shake, hard * 0.35);
+        }
+      }
       // footsteps: stone on the walkways, softer on dirt and grass
       if (ch.step && cd < 28) {
         const surface = pathDistance(p.x, p.z) < 0 ? 'stone' : 'dirt';
@@ -1405,7 +1418,9 @@ export class Client {
       let side = ghost || car ? 0 : (this.aiming ? 0.62 : meleeCam ? 0.62 + fc * 0.5 : 0.75) * (this.shoulder || 1);
       const up = car ? 1.8 : 0.32 + fc * 0.25;
       // smooth the pivot so landing, stepping and sliding don't jerk the camera
-      const targetY = p.y + (ghost ? 1.3 : p.slide ? 1.0 : this.lockOn ? 1.45 : 1.6);
+      // a landing pushes the camera down for a moment (springing back as landDip fades)
+      this.landDip = (this.landDip || 0) * Math.exp(-dt * 7);
+      const targetY = p.y + (ghost ? 1.3 : p.slide ? 1.0 : this.lockOn ? 1.45 : 1.6) - this.landDip * 0.32;
       if (!this.pivot || Math.hypot(this.pivot.x - p.x, this.pivot.z - p.z) > 3) this.pivot = new THREE.Vector3(p.x, targetY, p.z);
       const follow = 1 - Math.exp(-dt * 16);
       this.pivot.x += (p.x - this.pivot.x) * follow;

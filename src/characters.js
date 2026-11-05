@@ -604,6 +604,7 @@ export const CUTS = {
   throw: [2.0, 2.4, 2.8],
   bow_draw: [0.05, 0.55, 0.6],
   slide: [0.1, 0.4, 0.72], // [drop starts, flat on the ground, starts getting up]
+  jump_down: [0.33], // the feet touch down (before that the legs are still tucked in the air)
 };
 
 /** Small seeded random numbers, so a rider looks the same every time it's built (corpse, stolen body, rejoin). */
@@ -889,7 +890,24 @@ export class Character {
     this.roll = (this.roll || 0) + (rollGoal - (this.roll || 0)) * lk;
     this.pitchLean = (this.pitchLean || 0) + (pitchGoal - (this.pitchLean || 0)) * lk;
     this.root.rotation.set(this.pitchLean, p.yaw, this.roll, 'YXZ');
-    this.model.position.y = this.baseY + (ghost ? 0.25 + Math.sin(time * 1.6 + p.id) * 0.12 : 0);
+    // landing: remember how fast we came down; the client reads 'landed' (m/s) for the thud, the splash and the camera
+    this.landed = 0;
+    if (!ghost && p.state === 'alive') {
+      if (!p.onGround) this.fallV = Math.min(this.fallV || 0, p.vy);
+      else if (this.wasAir) {
+        this.landed = -(this.fallV || 0);
+        // a real drop: the knees take it (a standing landing plays the clip; a running one dips the body)
+        if (this.landed > 3) {
+          this.landT = Math.min(0.45, 0.2 + this.landed * 0.018);
+          this.landDip = Math.min(0.16, this.landed * 0.011);
+        }
+        this.fallV = 0;
+      }
+      this.wasAir = !p.onGround;
+    } else this.wasAir = false;
+    this.landT = Math.max(0, (this.landT || 0) - dt);
+    this.landDip = (this.landDip || 0) * Math.exp(-dt * 9);
+    this.model.position.y = this.baseY + (ghost ? 0.25 + Math.sin(time * 1.6 + p.id) * 0.12 : -this.landDip);
     this.recoil = Math.max(0, this.recoil - dt * 7);
     this.flinch = Math.max(0, this.flinch - dt * 5);
     const melee = !!w && (w === 'fists' || WEAPONS[w]?.type === 'melee');
@@ -923,6 +941,10 @@ export class Character {
         const t = this.clips.slide ? this.action('slide').time : 0;
         overSpeed = t > c[1] && t < c[2] && speed > 4.5 ? 0.45 : 1;
       } else if (!p.onGround) over = p.vy > 1 ? 'jump_up' : 'jump_loop';
+      else if (this.landT > 0 && speed < 3.2 && this.clips.jump_down) {
+        over = 'jump_down';
+        overSpeed = 1.25;
+      }
       else if (speed < 0.6 && p.using) over = 'drink';
       else if (speed < 0.6 && p.reloading) {
         over = 'reload';
@@ -937,6 +959,11 @@ export class Character {
         a.reset();
         a.setLoop(THREE.LoopRepeat, Infinity);
         // the slide clip starts as the feet go out, not at the run-up
+        if (over === 'jump_down') {
+          a.setLoop(THREE.LoopOnce, 1);
+          a.clampWhenFinished = true;
+          a.time = CUTS.jump_down ? CUTS.jump_down[0] : 0;
+        }
         if (over === 'slide') {
           a.setLoop(THREE.LoopOnce, 1);
           a.clampWhenFinished = true;
@@ -945,7 +972,7 @@ export class Character {
         a.play();
       }
     }
-    this.overW += ((over ? 1 : 0) - this.overW) * Math.min(1, dt * (over?.startsWith('dodge') || over === 'slide' || over === 'idle_crouching' ? 22 : 9));
+    this.overW += ((over ? 1 : 0) - this.overW) * Math.min(1, dt * (over?.startsWith('dodge') || over === 'slide' || over === 'idle_crouching' || over === 'jump_down' || this.over === 'jump_down' ? 22 : 9));
 
     // locomotion targets
     // out of combat the body faces where it runs: plain walk / run / sprint cycles
