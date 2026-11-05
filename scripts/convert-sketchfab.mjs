@@ -28,8 +28,9 @@ const SPLIT = { bgpeople: 4 };
 const TURN = { spice: Math.PI };
 /** Dense Character Creator models are cut down harder than the light Renderpeople scans (default ratio 0.6). */
 const SIMPLIFY = {
-  oldlady: { ratio: 0.12, error: 0.02 },
-  spice: { ratio: 0.2, error: 0.01 },
+  oldlady: { ratio: 0.045, error: 0.03 },
+  spice: { ratio: 0.1, error: 0.02 },
+  businessman: { ratio: 0.45, error: 0.01 },
   sweater: { ratio: 0.25, error: 0.01 },
   balthazar: { ratio: 0.3, error: 0.01 },
   jaxon: { ratio: 0.2, error: 0.01 },

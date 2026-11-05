@@ -84,6 +84,30 @@ function tris(doc) {
   return n;
 }
 
+/**
+ * When seams (texture and normal splits) stop the careful simplifier short of the budget, finish with a rough pass
+ * that ignores them: each part gets its share of the budget. Fine for props seen from a few metres away.
+ */
+function sloppy(doc, budget) {
+  const total = tris(doc);
+  if (total <= budget * 1.3) return;
+  for (const m of doc.getRoot().listMeshes()) {
+    for (const p of m.listPrimitives()) {
+      const idx = p.getIndices();
+      const pos = p.getAttribute('POSITION');
+      if (!idx || !pos || p.getMode() !== 4) continue;
+      const count = idx.getCount();
+      const target = Math.max(36, Math.floor(((count / 3) * budget) / total) * 3);
+      if (target >= count) continue;
+      const verts = new Float32Array(pos.getCount() * 3);
+      const v = [0, 0, 0];
+      for (let i = 0; i < pos.getCount(); i++) verts.set(pos.getElement(i, v), i * 3);
+      const [out] = MeshoptSimplifier.simplifySloppy(new Uint32Array(idx.getArray()), verts, 3, null, target, 0.02);
+      if (out.length >= 36) idx.setArray(pos.getCount() > 65535 ? out : new Uint16Array(out));
+    }
+  }
+}
+
 function sourceFile(src) {
   const full = path.join('assets-src', src);
   if (full.endsWith('.glb') || full.endsWith('.gltf')) return full;
@@ -103,6 +127,7 @@ for (const name of process.argv.slice(2).length ? process.argv.slice(2) : Object
   await doc.transform(metalRough(), dedup(), ...(keepNodes ? [] : [flatten(), join()]), weld({ tolerance: 0.0001 }));
   const ratio = Math.min(1, budget / Math.max(1, tris(doc)));
   if (ratio < 1) await doc.transform(simplify({ simplifier: MeshoptSimplifier, ratio, error, lockBorder: false }));
+  sloppy(doc, budget);
   await doc.transform(
     prune(),
     textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [tex, tex], quality: 80 }),
