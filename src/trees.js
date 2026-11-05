@@ -2,6 +2,7 @@
 // leafless oaks, ashes and pines (long dead), plus dark pines that still carry their needles to make the woods
 // read as a dense forest. Detailed versions near play, lighter ones for the far woods.
 import * as THREE from 'three';
+import { sway } from './wind.js';
 import { Tree } from '@dgreenheck/ez-tree';
 import { cullable, lodLimit } from './cull.js';
 
@@ -51,19 +52,20 @@ function grow(name, seed, tweak, lite, needles) {
   const src = tree.branchesMesh.material;
   const parts = [{
     geo,
-    mat: new THREE.MeshStandardMaterial({
+    // the crown sways a little more than the trunk (heights here are 0..1 of the tree)
+    mat: sway(new THREE.MeshStandardMaterial({
       color: BARK_TINT[o.bark.type] || '#6e665e',
       map: src.map, normalMap: src.normalMap, roughnessMap: src.roughnessMap, aoMap: src.aoMap,
       roughness: 1, metalness: 0,
-    }),
+    }), 0.008),
   }];
   if (needles && tree.leavesMesh.geometry.attributes.position) {
     const lsrc = tree.leavesMesh.material;
     parts.push({
       geo: norm(tree.leavesMesh.geometry),
-      mat: new THREE.MeshStandardMaterial({
+      mat: sway(new THREE.MeshStandardMaterial({
         color: '#3b4a36', map: lsrc.map, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 1, metalness: 0,
-      }),
+      }), 0.011),
     });
   }
   const tris = parts.reduce((n, p) => n + (p.geo.index ? p.geo.index.count : p.geo.attributes.position.count) / 3, 0);

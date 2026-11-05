@@ -1,6 +1,7 @@
 // Ground cover: Poly Haven scans (CC0) of ferns, shrubs, dry branches, stumps, mossy rocks, fallen trunks and roots,
 // plus procedural tufts of dead grass. Everything is instanced and placed off the walkways and outside buildings.
 import * as THREE from 'three';
+import { sway } from './wind.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { PARK_EDGE, pathDistance, clearance, LANDMARKS_OUT } from '../shared/map.js';
@@ -89,6 +90,11 @@ function place(scene, pieces, list, shadows) {
   const p = new THREE.Vector3();
   const s = new THREE.Vector3();
   for (const [geo, mat] of pieces) {
+    // plants move in the wind; stumps, rocks and logs (the ones that cast shadows) don't
+    if (!shadows && !mat.userData.sway) {
+      mat.userData.sway = true;
+      sway(mat, 0.09);
+    }
     const mesh = new THREE.InstancedMesh(geo, mat, list.length);
     list.forEach((t, i) => {
       e.set(t.tilt, t.rot, 0);
@@ -149,7 +155,7 @@ function grassTuft() {
 
 function plantGrass(scene, rr) {
   const geo = grassTuft();
-  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, side: THREE.DoubleSide });
+  const mat = sway(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, side: THREE.DoubleSide }), 0.12);
   const list = [];
   for (let i = 0; i < 28000; i++) {
     const s = spot(rr, i < 18000, 0.2);

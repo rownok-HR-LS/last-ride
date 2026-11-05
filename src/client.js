@@ -25,6 +25,7 @@ import { Bus } from './bus.js';
 import { Projectiles } from './projectiles.js';
 import { weaponModel, projectileModel, itemModel } from './weapons.js';
 import * as audio from './audio.js';
+import { windTime } from './wind.js';
 import { PauseMenu } from './menu.js';
 import { loadSettings } from './settings.js';
 import { Touch, isTouch } from './touch.js';
@@ -254,6 +255,7 @@ export class Client {
     this.moonLight.target.updateMatrixWorld();
     this.rain.update(dt, cam, { amount: 0.85, flash, bus: null });
     groundRain.time.value = t % 1000;
+    windTime.value = t % 1000;
     groundRain.amount.value = 0.85;
     this.lamps.update([], t, cam.position.x, cam.position.z, 1);
     if (this.showChar) {
@@ -354,6 +356,7 @@ export class Client {
       this.game.fillBots(MAX_PLAYERS);
     }
     this.hud.hideEnd = false;
+    this.gpuHeals = 0;
     this.lootVer = -1;
     this.camYaw = 0; // behind the bus as it rolls in
     this.camPitch = -0.15;
@@ -928,6 +931,27 @@ export class Client {
     this.dmgNums.push({ el, x: p.x + (Math.random() - 0.5) * 0.6, y: p.y + 2, z: p.z, t: 0.9 });
   }
 
+  /**
+   * A rare GPU state where most lit draws fail (WebGL logs "Mismatch between texture format and sampler type") and
+   * riders vanish. Rebuilding the shaders clears it: toggling the moon's shadow changes every lit material's program.
+   * Checked every two seconds (reading the GL error stalls the GPU a little), at most three repairs a match.
+   */
+  checkGpu() {
+    if (this.gpuHeal === 'off') {
+      this.moonLight.castShadow = true;
+      this.gpuHeal = null;
+      return;
+    }
+    this.gpuTick = (this.gpuTick || 0) + 1;
+    if (this.gpuTick % 120 || (this.gpuHeals || 0) >= 3) return;
+    const gl = this.renderer.getContext();
+    if (gl.getError() !== gl.INVALID_OPERATION) return;
+    this.gpuHeals = (this.gpuHeals || 0) + 1;
+    console.warn('graphics state repaired (lit draws were failing)');
+    this.moonLight.castShadow = false;
+    this.gpuHeal = 'off';
+  }
+
   /** A word over a fighter: BLOCKED, PARRY, GUARD BROKEN. */
   combatWord(p, text, cls) {
     if (!p) return;
@@ -1010,6 +1034,7 @@ export class Client {
     const rainAmount = 0.75 + Math.sin(this.time * 0.05) * 0.2;
     this.rain.update(dt, this.camera, { amount: rainAmount, flash: this.weather.flash, bus: snap.bus });
     groundRain.time.value = this.time % 1000;
+    windTime.value = this.time % 1000;
     groundRain.amount.value = rainAmount;
     this.rainAmount = rainAmount;
     // only the plants, trees and props in view (and close by, for shadows) get drawn
@@ -1089,6 +1114,7 @@ export class Client {
     else this.post.setDof(10, 0);
 
     this.post.composer.render(dt);
+    this.checkGpu();
   }
 
   updateCharacters(snap, dt) {
