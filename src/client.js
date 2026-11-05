@@ -677,6 +677,7 @@ export class Client {
           ch?.char.event(e, this.time);
           audio.play('block', pos, { broke: e.broke });
           if (pl) this.fx.sparkle(pl.x, pl.y + 1.3, pl.z, '#fff2c0', e.broke ? 20 : 8);
+          this.strikeFx(pl, this.game.players.get(e.by), !!e.broke, true);
           if (e.by === me) {
             this.hud.hitMarker(false);
             this.combatWord(pl, e.broke ? 'GUARD BROKEN' : 'BLOCKED', e.broke ? 'broke' : 'blocked');
@@ -763,8 +764,9 @@ export class Client {
               this.shake = Math.max(this.shake, heavy ? 0.45 : 0.22);
               this.impact(heavy, e.id === me);
             }
-            // blood sprays away from the hit
-            if (pl) for (let k = 0; k < (heavy ? 3 : 1); k++) this.fx.impact(pl.x + (Math.random() - 0.5) * 0.3, pl.y + 1.1 + Math.random() * 0.4, pl.z + (Math.random() - 0.5) * 0.3, 'head');
+            // a white-hot flash where it lands, blood thrown on along the line of the blow
+            const by = this.game.players.get(e.by);
+            this.strikeFx(pl, e.fx != null ? { x: e.fx, z: e.fz } : by, heavy, false);
             // it lands on the ground around them, flung away from the blow
             if (pl && pl.onGround) {
               const a = e.fx != null ? Math.atan2(pl.x - e.fx, pl.z - e.fz) : Math.random() * 6.28;
@@ -776,7 +778,6 @@ export class Client {
             audio.play('impact', e.by === me || e.id === me ? null : pos, { w: e.how, heavy: e.amt > 40 });
             // the one taking the blow cries out (most of the time; a grunt on every hit gets tiring)
             if (pl && e.id !== me && Math.random() < 0.6) audio.play('pain', pos, { female: FEMALE.has(pl.outfit) });
-            if (pl) this.fx.impact(pl.x, pl.y + 1.2, pl.z, e.amt > 40 ? 'head' : 'player');
           } else if (WEAPONS[e.how] && pl) this.fx.impact(pl.x, pl.y + 1.2, pl.z, e.head ? 'head' : 'player');
           if (e.id === me) {
             this.hurt = Math.min(1, this.hurt + e.amt / 50);
@@ -984,6 +985,18 @@ export class Client {
     el.textContent = text;
     this.dmgLayer.appendChild(el);
     this.dmgNums.push({ el, x: p.x, y: p.y + 2.25, z: p.z, t: 1.1 });
+  }
+
+  /** The flash, sparks and blood of a melee blow on p, struck from 'from' (anything with x and z). */
+  strikeFx(p, from, heavy, blocked) {
+    if (!p) return;
+    let dx = from ? p.x - from.x : Math.random() - 0.5;
+    let dz = from ? p.z - from.z : Math.random() - 0.5;
+    const l = Math.hypot(dx, dz) || 1;
+    dx /= l;
+    dz /= l;
+    // contact is on the near side of the body, chest high
+    this.fx.strike(p.x - dx * 0.3, p.y + (heavy ? 1.35 : 1.2), p.z - dz * 0.3, dx, dz, heavy, blocked);
   }
 
   /** The camera jolts toward a blow you land and away from one you take. heavy: a bigger jolt. */

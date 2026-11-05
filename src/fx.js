@@ -111,6 +111,42 @@ class Particles {
 }
 
 const C = (hex) => new THREE.Color(hex);
+
+/** A hit star: a hot round core with a few long, thin spikes of uneven length (drawn once). */
+let starTex = null;
+function hitStar() {
+  if (starTex) return starTex;
+  const n = 128;
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = n;
+  const x = cv.getContext('2d');
+  x.translate(n / 2, n / 2);
+  x.globalCompositeOperation = 'lighter';
+  const core = x.createRadialGradient(0, 0, 0, 0, 0, n * 0.16);
+  core.addColorStop(0, 'rgba(255,255,255,1)');
+  core.addColorStop(0.45, 'rgba(255,255,255,0.7)');
+  core.addColorStop(1, 'rgba(255,255,255,0)');
+  x.fillStyle = core;
+  x.fillRect(-n / 2, -n / 2, n, n);
+  const spikes = [1, 0.55, 0.85, 0.45, 0.95, 0.6, 0.75, 0.5];
+  spikes.forEach((len, i) => {
+    x.save();
+    x.rotate((i / spikes.length) * Math.PI * 2 + (i % 2) * 0.18);
+    const g = x.createLinearGradient(0, 0, (n / 2) * len, 0);
+    g.addColorStop(0, 'rgba(255,255,255,0.95)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    x.fillStyle = g;
+    x.beginPath();
+    x.moveTo(0, -n * 0.022);
+    x.lineTo((n / 2) * len, 0);
+    x.lineTo(0, n * 0.022);
+    x.fill();
+    x.restore();
+  });
+  starTex = new THREE.CanvasTexture(cv);
+  starTex.colorSpace = THREE.SRGBColorSpace;
+  return starTex;
+}
 const rnd = (a = 1) => (Math.random() * 2 - 1) * a;
 
 /** An irregular splash of blood: a main blot with ragged lobes and flicked droplets (alpha only). */
@@ -155,6 +191,7 @@ export class FX {
     this.norm = new Particles(scene, 1200, false);
     this.tracers = [];
     this.flashes = [];
+    this.strikes = [];
     this.rings = [];
     // storm wall
     this.stormMat = new THREE.ShaderMaterial({
@@ -269,6 +306,42 @@ export class FX {
     f.life = 0.05;
   }
 
+  /**
+   * The instant a melee blow lands: a white-hot flash that swells and is gone in a tenth of a second, sparks and
+   * blood thrown on through the target along the line of the blow (dx, dz: unit direction attacker -> target).
+   */
+  strike(x, y, z, dx, dz, heavy = false, blocked = false) {
+    let f = this.strikes.find((q) => q.life <= 0);
+    if (!f) {
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: hitStar(), blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
+      sp.renderOrder = 6;
+      this.scene.add(sp);
+      f = { s: sp, life: 0, max: 0.1, size: 1 };
+      this.strikes.push(f);
+    }
+    f.s.position.set(x, y, z);
+    f.s.material.color.set(blocked ? '#ffd890' : '#fff1e0').multiplyScalar(heavy ? 3 : 2.2);
+    f.s.material.rotation = Math.random() * 6;
+    f.max = f.life = heavy ? 0.11 : 0.075;
+    f.size = heavy ? 0.85 : 0.55;
+    f.s.scale.setScalar(f.size * 0.4);
+    f.s.visible = true;
+    // hot sparks fan out along the blow
+    const n = heavy ? 14 : 8;
+    for (let i = 0; i < n; i++) {
+      const sp = 5 + Math.random() * (heavy ? 9 : 6);
+      const side = rnd(0.9);
+      this.add.spawn(x, y, z, (dx - dz * side) * sp, rnd(1.4) * sp * 0.4 + 1, (dz + dx * side) * sp, C(blocked ? '#ffd27a' : '#ffe6c4'), 0.07 + Math.random() * 0.05, 0.12 + Math.random() * 0.12, 6, 9);
+    }
+    if (blocked) return;
+    // blood carried through: a cone behind the target, not a puff in every direction
+    for (let i = 0; i < (heavy ? 22 : 12); i++) {
+      const sp = 1.6 + Math.random() * (heavy ? 4 : 2.6);
+      const side = rnd(0.8);
+      this.norm.spawn(x + dx * 0.15, y + rnd(0.15), z + dz * 0.15, (dx - dz * side) * sp, Math.random() * 2 + 0.6, (dz + dx * side) * sp, C(Math.random() < 0.5 ? '#6a0808' : '#4a0404'), 0.16 + Math.random() * 0.16, 0.45 + Math.random() * 0.25, 9, 1.5);
+    }
+  }
+
   impact(x, y, z, kind) {
     if (kind === 'player') {
       for (let i = 0; i < 10; i++) this.norm.spawn(x, y, z, rnd(2.5), rnd(2) + 1, rnd(2.5), C('#5a0606'), 0.28, 0.45, 9, 2);
@@ -375,6 +448,15 @@ export class FX {
     for (const f of this.flashes) {
       if (f.life <= 0) continue;
       f.life -= dt;
+      if (f.life <= 0) f.s.visible = false;
+    }
+    for (const f of this.strikes) {
+      if (f.life <= 0) continue;
+      f.life -= dt;
+      // swells fast, fades as it swells
+      const u = 1 - Math.max(0, f.life) / f.max;
+      f.s.scale.setScalar(f.size * (0.6 + Math.sqrt(u) * 0.6));
+      f.s.material.opacity = 1 - u * u * u;
       if (f.life <= 0) f.s.visible = false;
     }
     for (let i = this.rings.length - 1; i >= 0; i--) {
