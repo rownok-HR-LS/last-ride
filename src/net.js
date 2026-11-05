@@ -23,6 +23,40 @@ export function serverUrl() {
   return `ws://${location.hostname || 'localhost'}:8090`;
 }
 
+/**
+ * Knock on the server's door over plain HTTP. A free host puts the server to sleep when nobody plays and wakes it
+ * on the first request, which can take most of a minute: knocking while the title screen loads means it is
+ * usually up by the time you press Ride online. Resolves true once it answers (false after timeoutMs).
+ */
+export async function wakeServer(timeoutMs = 12000) {
+  const http = serverUrl().replace(/^ws/, 'http');
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), timeoutMs);
+  try {
+    const r = await fetch(http, { signal: ctl.signal, cache: 'no-store' });
+    return r.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+/** Open a line, giving up after ms (a sleeping server can hold a connection open for a long time). */
+export async function connect(ms = 8000) {
+  const conn = new Connection(serverUrl());
+  let timer;
+  try {
+    await Promise.race([conn.opened, new Promise((_, no) => (timer = setTimeout(() => no(new Error('slow')), ms)))]);
+    return conn;
+  } catch (err) {
+    conn.close();
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** The line to the server: JSON messages in and out, handlers by message type. */
 export class Connection {
   constructor(url) {
@@ -155,6 +189,18 @@ export class NetGame {
 
   get ready() {
     return !!this.view;
+  }
+
+  /**
+   * Carry on over a new line after the old one dropped. Inputs the old server copy never saw are dropped too (the
+   * bot was steering meanwhile): the next update puts you where the server has you.
+   */
+  rebind(conn) {
+    this.conn = conn;
+    conn.handlers.s = (m) => this.receive(m);
+    this.pending = [];
+    this.outbox = [];
+    this.cmds = [];
   }
 
   // ---------------------------------------------------------------- what the client calls

@@ -855,3 +855,11 @@ body.touch .keys-only { display: none; }
 .foe-bar .fb-sh { height: 3px; margin-top: 2px; background: rgba(10,8,8,0.45); border-radius: 2px; overflow: hidden; }
 .foe-bar .fb-sh div { height: 100%; background: #5cc8ff; box-shadow: 0 0 6px rgba(92,200,255,0.5); }
 body.touch .foe-bar { width: 96px; }
+
+/* ---------------------------------------------------------------- the line to the server dropped */
+.net-banner { position: fixed; left: 50%; top: 14px; transform: translate(-50%, -8px); z-index: 60; padding: 7px 16px; border-radius: 999px;
+  background: rgba(14,10,10,0.78); box-shadow: 0 0 0 1px rgba(255,90,82,0.45), 0 6px 24px rgba(0,0,0,0.5); color: #f1ece2;
+  font: 600 14px/1.2 var(--hud); letter-spacing: 0.06em; text-transform: uppercase; opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s; white-space: nowrap; }
+.net-banner.show { opacity: 1; transform: translate(-50%, 0); animation: net-pulse 1.4s ease-in-out infinite; }
+@keyframes net-pulse { 50% { box-shadow: 0 0 0 1px rgba(255,90,82,0.9), 0 6px 24px rgba(0,0,0,0.5); } }
+@media (max-width: 760px) { .net-banner { font-size: 12px; white-space: normal; text-align: center; width: max-content; max-width: 90vw; } }

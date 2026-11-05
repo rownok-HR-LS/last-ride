@@ -128,6 +128,18 @@ export class Game {
     p.input = blankInput();
   }
 
+  /** A rider who dropped out and came back takes their body back from the bot (online). */
+  toHuman(id) {
+    const p = this.players.get(id);
+    if (!p || !p.bot) return false;
+    p.bot = false;
+    delete p.brain;
+    p.input = blankInput();
+    p.queue = [];
+    p.starved = 0;
+    return true;
+  }
+
   fillBots(count = MAX_PLAYERS) {
     while (this.players.size < count) this.addPlayer({ bot: true });
   }

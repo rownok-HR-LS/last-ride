@@ -8,6 +8,12 @@ import { loadSettings } from './settings.js';
 import { settingsBoard } from './menu.js';
 
 const app = document.getElementById('app');
+// knock on the ride server's door right away: the free host sleeps when nobody plays and takes most of a minute to
+// wake, so by the time you have picked a rider it is usually up (the online sign keeps knocking if it is not)
+{
+  const ws = new URLSearchParams(location.search).get('server') || import.meta.env.VITE_SERVER_URL;
+  if (ws) fetch(ws.replace(/^ws/, 'http'), { cache: 'no-store' }).catch(() => {});
+}
 /** Shown while the park loads. */
 const TIPS = [
   'Hold attack to wind up a heavy swing. Let go to land it.',
@@ -176,7 +182,9 @@ async function title() {
     if (!online) return client.start(profile);
     // wait at the bus stop over the live park, then board when the bus leaves
     const { Online } = await import('./online.js');
-    new Online(app, client, profile).join();
+    const ride = new Online(app, client, profile);
+    if (import.meta.env.DEV) window.__online = ride;
+    ride.join();
   };
   play.addEventListener('click', () => start(true));
   practice.addEventListener('click', () => start(false));

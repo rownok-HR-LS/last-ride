@@ -1,6 +1,11 @@
 // The online ride from the browser's side: the bus stop sign while you wait, boarding when the bus leaves,
 // watching a ride already under way, and back to the stop afterwards.
-import { Connection, NetGame, serverUrl } from './net.js';
+import { NetGame, connect, wakeServer } from './net.js';
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+/** How long a sleeping server gets to wake before we give up, and how long a dropped rider keeps trying. */
+const WAKE_FOR = 100000;
+const RETURN_FOR = 30000;
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const clock = (s) => {
@@ -20,32 +25,122 @@ export class Online {
     app.appendChild(this.sign);
   }
 
-  /** Connect and get in line for the next bus. */
+  /**
+   * Connect and get in line for the next bus. A server that was asleep gets up to WAKE_FOR to wake: we keep knocking
+   * and keep trying, and say so, instead of giving up at the first refusal.
+   */
   async join() {
     this.show('Calling the park…', '', '');
-    try {
-      this.conn = new Connection(serverUrl());
-      await this.conn.opened;
-    } catch {
-      this.lost('The park is not answering', 'The ride server could be asleep or offline. Give it a minute and try again, or take a practice ride.');
-      return;
+    const t0 = Date.now();
+    const waited = () => `${Math.round((Date.now() - t0) / 1000)}s`;
+    // the count keeps ticking while a knock is out (one can take ten seconds against a sleeping host)
+    let waking = false;
+    const ticker = setInterval(() => {
+      if (waking) this.sign.querySelector('.lb-big').textContent = waited();
+    }, 1000);
+    let conn = null;
+    while (!conn) {
+      try {
+        conn = await connect(8000);
+      } catch {
+        if (Date.now() - t0 > WAKE_FOR) {
+          clearInterval(ticker);
+          this.lost('The park is not answering', 'The ride server is offline right now. Try again in a few minutes, or take a practice ride.');
+          return;
+        }
+        waking = true;
+        this.show('Waking the park', waited(), 'The ride server naps when nobody is around. It usually wakes within a minute.');
+        await Promise.all([wakeServer(10000), sleep(1500)]);
+      }
     }
-    const h = this.conn.handlers;
+    clearInterval(ticker);
+    this.wire(conn);
+    conn.send({ t: 'join', name: this.profile.name, outfit: this.profile.outfit });
+    this.client.onAgain = () => this.again();
+    this.render();
+  }
+
+  /** Listen on a (new) line. */
+  wire(conn) {
+    this.conn = conn;
+    const h = conn.handlers;
     h.lobby = (m) => {
       this.status = m;
       this.render();
     };
-    h.start = (m) => this.board(new NetGame(this.conn, m.id, this.profile), 'ride');
-    h.watch = () => this.board(new NetGame(this.conn, null, this.profile), 'watch');
+    h.start = (m) => {
+      if (m.ticket) this.ticket = m.ticket;
+      // back in your own body after a dropped line: the ride never stopped
+      if (m.back && this.net && this.net.myId === m.id) {
+        this.net.rebind(conn);
+        this.mode = 'ride';
+        this.banner(null);
+        return;
+      }
+      this.net = new NetGame(conn, m.id, this.profile);
+      this.board(this.net, 'ride');
+    };
+    h.watch = () => {
+      this.ticket = null;
+      this.banner(null);
+      this.net = new NetGame(conn, null, this.profile);
+      this.board(this.net, 'watch');
+    };
+    h.rejoinFail = () => {
+      // the ride ended while we were away (or the server restarted): back to the stop
+      this.ticket = null;
+      this.banner(null);
+      this.toLobby();
+    };
     h.over = () => {
+      this.ticket = null;
       // watchers go straight back in line; riders read their results first
       if (this.mode === 'watch') this.toLobby();
       else this.mode = 'ended';
     };
-    h.close = () => this.lost('Lost the line to the park', 'The connection dropped. Head back to the menu to ride again.');
-    this.conn.send({ t: 'join', name: this.profile.name, outfit: this.profile.outfit });
-    this.client.onAgain = () => this.again();
-    this.render();
+    h.close = () => this.dropped();
+  }
+
+  /**
+   * The line dropped (a phone changing networks, a Wi-Fi blip, a server restart). Mid-ride a bot keeps your rider
+   * going while we call back for up to RETURN_FOR, then you take it back where it stands.
+   */
+  async dropped() {
+    if (this.calling) return;
+    this.calling = true;
+    const riding = this.mode === 'ride' && this.ticket;
+    const t0 = Date.now();
+    while (Date.now() - t0 < RETURN_FOR) {
+      this.banner(riding ? 'Connection lost · a bot is holding your rider · reconnecting…' : 'Connection lost · reconnecting…');
+      try {
+        const conn = await connect(6000);
+        this.wire(conn);
+        if (riding) conn.send({ t: 'rejoin', ticket: this.ticket, name: this.profile.name, outfit: this.profile.outfit });
+        else {
+          conn.send({ t: 'join', name: this.profile.name, outfit: this.profile.outfit });
+          this.banner(null);
+          if (this.mode !== 'ride') this.toLobby();
+        }
+        this.calling = false;
+        return;
+      } catch {
+        await sleep(1500);
+      }
+    }
+    this.calling = false;
+    this.banner(null);
+    this.lost('Lost the line to the park', 'We could not get back through. Check your connection and ride again from the menu.');
+  }
+
+  /** A slim strip at the top of the screen while the line is down (null hides it). */
+  banner(text) {
+    if (!this.strip) {
+      this.strip = document.createElement('div');
+      this.strip.className = 'net-banner';
+      this.app.appendChild(this.strip);
+    }
+    this.strip.textContent = text || '';
+    this.strip.classList.toggle('show', !!text);
   }
 
   /** The bus left with you on it (or you are watching): start once the first update is in. */

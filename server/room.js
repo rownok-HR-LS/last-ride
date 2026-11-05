@@ -1,5 +1,6 @@
 // The one public ride. Riders wait at the stop; the bus leaves on a timer with everyone waiting aboard and bots in
 // the empty seats. Whoever turns up while a ride is on watches it as a ghost and boards the next bus.
+import { randomUUID } from 'node:crypto';
 import { Game } from '../shared/game.js';
 import { MAX_PLAYERS, OUTFITS, END_SCREEN_SECONDS } from '../shared/constants.js';
 import { TICK, SNAP_EVERY, BUS_WAIT, BUS_AGAIN, pack, unpackInput } from '../shared/net.js';
@@ -9,6 +10,9 @@ const lootView = (l) => ({
   id: l.id, kind: l.kind, x: l.x, y: l.y, z: l.z, rot: l.rot || 0, w: l.w, rarity: l.rarity, dura: l.dura,
   ammo: l.ammo, item: l.item, count: l.count, cursed: !!l.cursed,
 });
+
+/** A rider whose line dropped mid-ride has this long to come back before an empty ride is closed. */
+const COME_BACK_MS = 35000;
 
 /** Online, the results stay up this long before everyone heads back to the bus stop. */
 const RESULTS_FOR = 12;
@@ -32,6 +36,8 @@ export class Room {
     this.lootSent = new Map();
     this.nextConn = 1;
     this.lastStatus = 0;
+    // a private ticket per rider per ride, so a browser that lost its line can take its rider back
+    this.tickets = new Map();
   }
 
   // ---------------------------------------------------------------- connections
@@ -69,6 +75,36 @@ export class Room {
         else this.busIn ??= this.busWait;
         this.status(true);
         break;
+      case 'rejoin': {
+        // back after a dropped line: the ticket gets you your rider back (the bot steering it lets go)
+        if (c.joined) return;
+        const tk = this.tickets.get(String(m.ticket ?? ''));
+        const p = tk && this.game && tk.game === this.game ? this.game.players.get(tk.pid) : null;
+        if (!p) {
+          this.send(c, { t: 'rejoinFail' });
+          this.message(c, { t: 'join', name: m.name, outfit: m.outfit });
+          return;
+        }
+        // the old line may not have noticed it is dead yet
+        for (const o of this.conns) {
+          if (o !== c && o.pid === p.id) {
+            o.pid = null;
+            o.ws.terminate?.();
+          }
+        }
+        c.joined = true;
+        c.ready = false;
+        c.watching = false;
+        c.fullLoot = true;
+        c.name = String(m.name ?? '').slice(0, 16);
+        c.outfit = OUTFITS.some((o) => o.id === m.outfit) ? m.outfit : OUTFITS[0].id;
+        this.game.toHuman(p.id);
+        c.pid = p.id;
+        console.log(`rider ${c.id} (${c.name}) is back as ${p.id}`);
+        this.send(c, { t: 'start', id: p.id, ticket: m.ticket, back: true });
+        this.status(true);
+        break;
+      }
       case 'again':
         // back to the bus stop after a ride
         if (c.joined && c.pid === null) {
@@ -97,7 +133,11 @@ export class Room {
   leave(c) {
     this.conns.delete(c);
     // a rider who walks away mid-ride is taken over by a bot, so the ride goes on as it was
-    if (this.game && c.pid !== null) this.game.toBot(c.pid);
+    if (this.game && c.pid !== null) {
+      this.game.toBot(c.pid);
+      // and the ride is kept going a while in case they are only reconnecting
+      this.graceUntil = Date.now() + COME_BACK_MS;
+    }
     c.pid = null;
     this.status(true);
   }
@@ -143,6 +183,7 @@ export class Room {
     this.tick = 0;
     this.events = [];
     this.lootSent = new Map();
+    this.tickets = new Map();
     for (const c of riders.slice(0, MAX_PLAYERS)) {
       const p = this.game.addPlayer({ name: c.name, outfit: c.outfit });
       // a rider fed by the inputs this connection sends (see Game.feed)
@@ -153,7 +194,9 @@ export class Room {
       c.ready = false;
       c.watching = false;
       c.fullLoot = true;
-      this.send(c, { t: 'start', id: p.id });
+      const ticket = randomUUID();
+      this.tickets.set(ticket, { pid: p.id, game: this.game });
+      this.send(c, { t: 'start', id: p.id, ticket });
     }
     // more riders than seats wait for the next one
     for (const c of riders.slice(MAX_PLAYERS)) this.watch(c);
@@ -163,6 +206,8 @@ export class Room {
 
   endRide() {
     this.game = null;
+    this.graceUntil = 0;
+    this.tickets = new Map();
     console.log('ride over');
     for (const c of this.conns) {
       if (c.pid !== null || c.watching) this.send(c, { t: 'over' });
@@ -198,8 +243,9 @@ export class Room {
     this.tick++;
     if (this.tick % SNAP_EVERY === 0) this.broadcast();
     this.status();
-    // everyone left: stop the ride (the bots would only fight among themselves)
-    const anyone = [...this.conns].some((c) => c.pid !== null || c.watching);
+    // every rider left: stop the ride (the bots would only fight among themselves, and anyone watching would wait
+    // minutes for a bots-only ride to end before boarding). A dropped rider gets a while to come back first.
+    const anyone = [...this.conns].some((c) => c.pid !== null) || Date.now() < (this.graceUntil || 0);
     if ((g.phase === 'end' && g.endT <= END_SCREEN_SECONDS - RESULTS_FOR) || !anyone) this.endRide();
   }
 
