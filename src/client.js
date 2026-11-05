@@ -932,6 +932,25 @@ export class Client {
   }
 
   /**
+   * Camera motion blur: the grade pass smears each pixel back toward where its point was a frame ago. Off in
+   * cinematics, through camera cuts (a jump of more than a few metres), and when the player turns it off.
+   */
+  updateMotionBlur(dt) {
+    const g = this.post.grade;
+    const cam = this.camera;
+    cam.updateMatrixWorld();
+    const vp = (this.mbVP ??= new THREE.Matrix4()).multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse);
+    const moved = this.mbPos ? cam.position.distanceTo(this.mbPos) : 99;
+    const on = this.settings.motionBlur !== false && !this.cine && !this.deathCam && moved < 3 && dt > 0;
+    // a 60 fps shutter: slower frames would otherwise smear more
+    g.blur.value = on ? Math.min(1, (1 / 60) / dt) * 0.6 : 0;
+    g.prevViewProj.value.copy(this.mbPrev ?? vp);
+    g.invViewProj.value.copy(vp).invert();
+    (this.mbPrev ??= new THREE.Matrix4()).copy(vp);
+    (this.mbPos ??= new THREE.Vector3()).copy(cam.position);
+  }
+
+  /**
    * A rare GPU state where most lit draws fail (WebGL logs "Mismatch between texture format and sampler type") and
    * riders vanish. Rebuilding the shaders clears it: toggling the moon's shadow changes every lit material's program.
    * Checked every two seconds (reading the GL error stalls the GPU a little), at most three repairs a match.
@@ -1113,6 +1132,7 @@ export class Client {
     else if (this.deathCam) this.post.setDof(this.deathFocus || 6, 0.45);
     else this.post.setDof(10, 0);
 
+    this.updateMotionBlur(dt);
     this.post.composer.render(dt);
     this.checkGpu();
   }

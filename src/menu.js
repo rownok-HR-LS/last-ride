@@ -36,6 +36,7 @@ export function settingsBoard(settings, { onChange, onBack }) {
     <h3>Camera</h3>
     <label class="row">Field of view<input type="range" min="60" max="95" step="1" data-fov><output></output></label>
     <label class="row">Camera shake<input type="range" min="0" max="1" step="0.05" data-shake><output></output></label>
+    <label class="row">Motion blur<span class="choices"><button class="choice" data-mb="1">On</button><button class="choice" data-mb="0">Off</button></span><span></span></label>
     <h3>Keys</h3>
     <div class="keys">${ACTIONS.map(([id, n]) => `<span>${n}</span><button class="key" data-act="${id}"></button>`).join('')}</div>
     <p class="fine">Click a key, then press the new one. Esc cancels. Number keys pick weapons, items and powers.</p>
@@ -72,6 +73,7 @@ export function settingsBoard(settings, { onChange, onBack }) {
     shake.value = s.shake ?? 1;
     fill(shake);
     shake.nextElementSibling.textContent = `${Math.round(shake.value * 100)}`;
+    board.querySelectorAll('[data-mb]').forEach((b) => b.classList.toggle('on', (b.dataset.mb === '1') === (s.motionBlur !== false)));
     board.querySelectorAll('[data-inv]').forEach((b) => b.classList.toggle('on', (b.dataset.inv === '1') === !!s.invertY));
     board.querySelectorAll('[data-act]').forEach((b) => {
       if (!b.classList.contains('listen')) b.textContent = [...new Set((s.keys[b.dataset.act] || []).map(keyName))].slice(0, 2).join(' / ') || '—';
@@ -82,6 +84,9 @@ export function settingsBoard(settings, { onChange, onBack }) {
     if (!t) return;
     if (t.dataset.q) {
       s.quality = t.dataset.q;
+      changed();
+    } else if (t.dataset.mb) {
+      s.motionBlur = t.dataset.mb === '1';
       changed();
     } else if (t.dataset.inv) {
       s.invertY = t.dataset.inv === '1';

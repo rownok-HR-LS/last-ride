@@ -24,6 +24,10 @@ const GradeShader = {
     hurt: { value: 0 },
     storm: { value: 0 },
     time: { value: 0 },
+    // camera motion blur: where each pixel was last frame (0 strength = off)
+    blur: { value: 0 },
+    invViewProj: { value: new THREE.Matrix4() },
+    prevViewProj: { value: new THREE.Matrix4() },
   },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
   fragmentShader: `
@@ -31,6 +35,7 @@ const GradeShader = {
     uniform sampler2D tDiffuse; uniform sampler2D tDepth; uniform vec2 texel; uniform float near; uniform float far;
     uniform float focus; uniform float aperture; uniform float cine;
     uniform float ghost; uniform float dark; uniform float hurt; uniform float storm; uniform float time;
+    uniform float blur; uniform mat4 invViewProj; uniform mat4 prevViewProj;
     varying vec2 vUv;
 
     float viewDepth(vec2 uv) {
@@ -51,6 +56,23 @@ const GradeShader = {
       // ghost vision wobbles a little
       uv += ghost * 0.0025 * vec2(sin(uv.y*30.0 + time*2.0), cos(uv.x*25.0 + time*1.7));
       vec4 c = texture2D(tDiffuse, uv);
+      if (blur > 0.0) {
+        // camera motion blur: find where this pixel's point was on screen last frame and smear along the way
+        float zd = texture2D(tDepth, uv).x;
+        vec4 wp = invViewProj * vec4(uv * 2.0 - 1.0, zd * 2.0 - 1.0, 1.0);
+        wp /= wp.w;
+        vec4 pp = prevViewProj * wp;
+        vec2 prevUv = pp.xy / pp.w * 0.5 + 0.5;
+        vec2 vel = (uv - prevUv) * blur;
+        float vl = length(vel);
+        // the faster the turn the stronger, capped; tiny motions stay sharp
+        vel *= min(vl, 0.035) / max(vl, 1e-5) * smoothstep(0.0015, 0.006, vl);
+        if (dot(vel, vel) > 0.0) {
+          vec3 acc = c.rgb;
+          for (int i = 1; i < 7; i++) acc += texture2D(tDiffuse, uv - vel * (float(i) / 6.0 - 0.5)).rgb;
+          c.rgb = acc / 7.0;
+        }
+      }
       if (aperture > 0.0) {
         // depth of field: gather a disc of samples, each weighted by its own blur so sharp things don't bleed
         float r = coc(viewDepth(uv));

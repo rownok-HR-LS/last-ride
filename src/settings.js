@@ -32,6 +32,7 @@ export const DEFAULTS = {
   // camera: field of view (degrees) and how much it shakes and punches on hits (0 = steady)
   fov: 72,
   shake: 1,
+  motionBlur: true,
   keys: Object.fromEntries(ACTIONS.map(([id, , keys]) => [id, keys])),
 };
 
