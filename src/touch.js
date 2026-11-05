@@ -144,7 +144,7 @@ export class Touch {
         this.held.set(t.identifier, { what, b, x: t.clientX, y: t.clientY });
         b.classList.add('down');
         this.down(what);
-        navigator.vibrate?.(8);
+        if (navigator.userActivation?.hasBeenActive) navigator.vibrate?.(8);
       }
     }, opts);
     pad.addEventListener('touchmove', (e) => {

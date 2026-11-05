@@ -823,3 +823,21 @@ body.touch .hud-top-right { right: max(14px, env(safe-area-inset-right)); }
 @keyframes elimIn { 0% { opacity: 0; transform: translateX(-50%) scale(1.25); } 12% { opacity: 1; transform: translateX(-50%) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translateX(-50%) translateY(-8px); } }
 .feed-item .how { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #a9a39a; margin: 0 4px; }
 .feed-item .ico { width: 14px; height: 14px; color: var(--ecto); }
+@media (max-height: 500px) {
+  .t-load { margin-top: 10px; }
+  .t-tip { font-size: 12px; }
+  .prize-card { padding: 16px 18px 12px; }
+  .prize-card h2 { font-size: 24px; margin-bottom: 2px; }
+  .prize-card .have { margin-bottom: 6px; }
+  .prize { margin: 4px 0; padding: 6px 30px 6px 12px; font-size: 13px; }
+  .prizes { max-height: calc(100vh - 16px); overflow: auto; }
+}
+
+.prize-card .p-close { display: block; margin: 10px auto 0; min-width: 140px; }
+body:not(.touch) .prize-card .p-close { display: none; }
+@media (max-height: 500px) {
+  .prize-card { width: min(660px, 94vw); display: grid; grid-template-columns: 1fr 1fr; column-gap: 12px; align-items: center; }
+  .prize-card > .bulbs, .prize-card > h2, .prize-card > .have, .prize-card > p, .prize-card > .p-close { grid-column: 1 / -1; }
+  .prize-card > p { margin: 6px 0 0; }
+}
+body.touch .keys-only { display: none; }

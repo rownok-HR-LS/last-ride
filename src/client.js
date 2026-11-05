@@ -104,6 +104,7 @@ export class Client {
     container.appendChild(this.hudRoot);
     this.hud = new Hud(this.hudRoot, {
       onPower: (id) => this.selectPower(id),
+      onClosePrizes: () => this.closePrizes(),
     });
     this.dmgLayer = document.createElement('div');
     this.dmgLayer.className = 'dmg-numbers';

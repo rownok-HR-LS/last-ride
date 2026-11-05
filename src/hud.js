@@ -648,8 +648,11 @@ export class Hud {
     el.innerHTML = `<div class="sign prize-card"><div class="bulbs"></div><h2>Prize Counter</h2>
       <div class="have">${icon('ticket')} <b>${me.tickets}</b> tickets</div>
       ${PRIZES.map((p, i) => `<button class="prize ${me.tickets >= p.cost ? '' : 'off'}" data-prize="${p.id}"><kbd>${i + 1}</kbd><span>${esc(p.label)}</span><b>${p.cost}</b></button>`).join('')}
-      <p class="fine center">Kills give 20 tickets, chests 6 · <kbd>B</kbd> or <kbd>Esc</kbd> to close</p></div>`;
+      <p class="fine center">Kills give 20 tickets, chests 6<span class="keys-only"> · <kbd>B</kbd> or <kbd>Esc</kbd> to close</span></p>
+      <button class="ticket dark p-close">Close</button></div>`;
     el.querySelectorAll('.prize').forEach((b) => b.addEventListener('click', () => onBuy(b.dataset.prize)));
+    // a way out on touch screens, where there is no B or Esc
+    el.querySelector('.p-close').addEventListener('click', () => this.h.onClosePrizes?.());
   }
 
   help(show) {
