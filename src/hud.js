@@ -14,10 +14,6 @@ const fmt = (t) => {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 };
 
-const WEAPON_ICON = {
-  fists: '👊', mallet: '🔨', spike: '🍡', lever: '🎚️', sledge: '⚒️', crowbar: '🔧', machete: '🔪', axe: '🪓', chainsaw: '🪚',
-  darts: '🎯', bow: '🏹', crossbow: '🏹', harpoon: '🔱', fireworks: '🎆',
-};
 const ITEM_ICON = Object.fromEntries(['bandage', 'medkit', 'soda', 'holy', 'flare', 'salt', 'relic'].map((k) => [k, icon(k)]));
 const POWER_ICON = Object.fromEntries(['trap', 'cursed', 'steps', 'blackout', 'scare', 'storm'].map((k) => [k, icon(k)]));
 const HOW = { storm: 'the storm', trap: 'a bear trap', cursed: 'cursed loot', ferris: 'a flying gondola', coaster: 'the coaster', car: 'a bumper car' };
@@ -129,6 +125,7 @@ export class Hud {
       <div class="banner"><div class="big"></div><div class="small"></div></div>
       <div class="final-ride"></div>
       <div class="toast"></div>
+      <div class="elim"></div>
       <div class="living-ui">
         <div class="vitals">
           <div class="revives"></div>
@@ -244,10 +241,19 @@ export class Hud {
     const v = names(ev.victim);
     let html;
     if (!ev.killer) html = `<b class="v">${esc(v)}</b> was taken by ${HOW[ev.how] || ev.how}`;
-    else if (ev.steal) html = `👻 <b class="k">${esc(k)}</b> stole <b class="v">${esc(v)}</b>'s body <span class="how">(${HOW[ev.how] || ev.how})</span>`;
-    else html = `<b class="k">${esc(k)}</b> ${WEAPON_ICON[ev.how] ? `<span class="gunic">${WEAPON_ICON[ev.how]}</span>` : `<span class="how">${HOW[ev.how] || ev.how}</span>`} <b class="v">${esc(v)}</b>`;
+    else if (ev.steal) html = `${icon('ghost')} <b class="k">${esc(k)}</b> stole <b class="v">${esc(v)}</b>'s body <span class="how">${HOW[ev.how] || ev.how}</span>`;
+    else html = `<b class="k">${esc(k)}</b> <span class="how">${WEAPONS[ev.how] ? WEAPONS[ev.how].name.split(' ').pop() : ev.how === 'fists' ? 'Fists' : HOW[ev.how] || ev.how}</span> <b class="v">${esc(v)}</b>`;
     const me = snap.me?.id;
     this.feed(html, ev.killer === me ? 'mine' : ev.victim === me ? 'me-dead' : ev.steal ? 'steal' : '');
+  }
+
+  /** Your kill: a short banner low in the middle with who it was. */
+  eliminated(name) {
+    const el = $('.elim', this.root);
+    el.innerHTML = `<small>Eliminated</small><b>${icon('skull')}${esc(name)}</b>`;
+    el.classList.remove('show');
+    void el.offsetWidth;
+    el.classList.add('show');
   }
 
   hitMarker(head) {

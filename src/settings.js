@@ -29,6 +29,9 @@ export const DEFAULTS = {
   volume: { master: 0.8, music: 0.6, effects: 1, ambience: 0.9 },
   sens: 1,
   invertY: false,
+  // camera: field of view (degrees) and how much it shakes and punches on hits (0 = steady)
+  fov: 72,
+  shake: 1,
   keys: Object.fromEntries(ACTIONS.map(([id, , keys]) => [id, keys])),
 };
 

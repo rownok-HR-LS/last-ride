@@ -819,7 +819,7 @@ export class Client {
               this.hud.banner('BODY STOLEN!', `You are back in ${this.name(e.victim)}'s body. Ghosts can't hurt you for 12s.`, 4, 'alive');
             } else {
               audio.play('kill');
-              this.hud.toast(`Eliminated ${this.name(e.victim)}`);
+              this.hud.eliminated(this.name(e.victim));
             }
           }
           break;
@@ -940,7 +940,7 @@ export class Client {
   /** The camera jolts toward a blow you land and away from one you take. heavy: a bigger jolt. */
   impact(heavy, taken = false) {
     this.punch = Math.max(this.punch || 0, heavy ? 1 : 0.6);
-    this.kick += (taken ? -1 : 1) * (heavy ? 0.035 : 0.02);
+    this.kick += (taken ? -1 : 1) * (heavy ? 0.035 : 0.02) * (this.settings.shake ?? 1);
     this.kickYaw += (Math.random() - 0.5) * (heavy ? 0.05 : 0.025);
   }
 
@@ -1202,14 +1202,16 @@ export class Client {
     const cam = this.camera;
     const p = this.mySnap();
     const me = snap.me;
-    let fov = 72;
+    const baseFov = this.settings.fov || 72;
+    let fov = baseFov;
     this.shake = Math.max(0, this.shake - dt * 1.5);
     this.kick *= Math.exp(-dt * 9);
     this.kickYaw *= Math.exp(-dt * 9);
     this.punch = (this.punch || 0) * Math.exp(-dt * 12);
     this.shotPulse = Math.max(0, this.shotPulse - dt * 6);
     this.muzzleLight.intensity = Math.max(0, this.muzzleLight.intensity - dt * 900);
-    const shake = this.shake * this.shake * 0.4;
+    const shakeK = this.settings.shake ?? 1;
+    const shake = this.shake * this.shake * 0.4 * shakeK;
 
     this.cine = this.intro.update(snap, cam);
     // indoors (the shot up the bus aisle) there is no open sky: the cabin light does the lighting
@@ -1310,8 +1312,8 @@ export class Client {
         side = 0;
         fov = 16;
       } else if (this.aiming) fov = 55;
-      else if (p.slide) fov = 82;
-      else if (p.sprint) fov = 79;
+      else if (p.slide) fov = baseFov + 10;
+      else if (p.sprint) fov = baseFov + 7;
       if (!ghost && !scoped) {
         // keep the camera out of walls
         const dx = -fx * dist + rx * side;
@@ -1341,7 +1343,7 @@ export class Client {
     if (me?.shakeT > 0) cam.rotation.z += Math.sin(this.time * 40) * 0.02;
     this.fov += (fov - this.fov) * Math.min(1, dt * 10);
     // a blow lands: the lens punches in for an instant
-    const punchFov = this.fov - (this.punch || 0) * 4.5;
+    const punchFov = this.fov - (this.punch || 0) * 4.5 * shakeK;
     if (Math.abs(cam.fov - punchFov) > 0.01) {
       cam.fov = punchFov;
       cam.updateProjectionMatrix();

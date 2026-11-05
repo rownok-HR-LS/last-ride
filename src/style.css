@@ -812,3 +812,14 @@ body.touch .hud-top-right { right: max(14px, env(safe-area-inset-right)); }
 .prize.off { opacity: 0.45; filter: grayscale(0.6) drop-shadow(0 3px 0 rgba(0, 0, 0, 0.45)); }
 /* where a hit came from: a thin glowing arc rather than a thick red band */
 .dmg-dir .dir { left: -95px; top: -95px; width: 190px; height: 190px; border-top: 3px solid rgba(255, 86, 76, 0.9); filter: drop-shadow(0 0 6px rgba(255, 40, 30, 0.85)); }
+
+/* your kill: a banner low in the middle */
+.elim { left: 50%; top: 57%; transform: translateX(-50%); text-align: center; opacity: 0; pointer-events: none; }
+.elim.show { animation: elimIn 2.2s ease forwards; }
+.elim small { display: block; font: 600 12px var(--hud); letter-spacing: 0.5em; padding-left: 0.5em; text-transform: uppercase; color: #ff8a7a; }
+.elim b { position: relative; display: flex; align-items: center; gap: 8px; justify-content: center; margin-top: 4px; font: 700 26px var(--hud); letter-spacing: 0.06em; text-transform: uppercase; color: #fff; }
+.elim b .ico { width: 22px; height: 22px; color: #ff8a7a; }
+.elim b::after { content: ''; position: absolute; left: 50%; bottom: -8px; width: 160px; height: 1px; transform: translateX(-50%); background: linear-gradient(90deg, transparent, rgba(255, 138, 122, 0.8), transparent); }
+@keyframes elimIn { 0% { opacity: 0; transform: translateX(-50%) scale(1.25); } 12% { opacity: 1; transform: translateX(-50%) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translateX(-50%) translateY(-8px); } }
+.feed-item .how { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #a9a39a; margin: 0 4px; }
+.feed-item .ico { width: 14px; height: 14px; color: var(--ecto); }

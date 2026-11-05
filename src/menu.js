@@ -33,6 +33,9 @@ export function settingsBoard(settings, { onChange, onBack }) {
     <h3>Mouse</h3>
     <label class="row">Sensitivity<input type="range" min="0.3" max="2.5" step="0.05" data-sens><output></output></label>
     <label class="row">Look<span class="choices"><button class="choice" data-inv="0">Normal</button><button class="choice" data-inv="1">Inverted</button></span><span></span></label>
+    <h3>Camera</h3>
+    <label class="row">Field of view<input type="range" min="60" max="95" step="1" data-fov><output></output></label>
+    <label class="row">Camera shake<input type="range" min="0" max="1" step="0.05" data-shake><output></output></label>
     <h3>Keys</h3>
     <div class="keys">${ACTIONS.map(([id, n]) => `<span>${n}</span><button class="key" data-act="${id}"></button>`).join('')}</div>
     <p class="fine">Click a key, then press the new one. Esc cancels. Number keys pick weapons, items and powers.</p>
@@ -61,6 +64,14 @@ export function settingsBoard(settings, { onChange, onBack }) {
     sens.value = s.sens;
     fill(sens);
     sens.nextElementSibling.textContent = `${Number(s.sens).toFixed(2)}×`;
+    const fov = board.querySelector('[data-fov]');
+    fov.value = s.fov ?? 72;
+    fill(fov);
+    fov.nextElementSibling.textContent = `${fov.value}°`;
+    const shake = board.querySelector('[data-shake]');
+    shake.value = s.shake ?? 1;
+    fill(shake);
+    shake.nextElementSibling.textContent = `${Math.round(shake.value * 100)}`;
     board.querySelectorAll('[data-inv]').forEach((b) => b.classList.toggle('on', (b.dataset.inv === '1') === !!s.invertY));
     board.querySelectorAll('[data-act]').forEach((b) => {
       if (!b.classList.contains('listen')) b.textContent = [...new Set((s.keys[b.dataset.act] || []).map(keyName))].slice(0, 2).join(' / ') || '—';
@@ -103,6 +114,8 @@ export function settingsBoard(settings, { onChange, onBack }) {
     const i = e.target;
     if (i.dataset.vol) s.volume[i.dataset.vol] = Number(i.value);
     else if (i.dataset.sens !== undefined) s.sens = Number(i.value);
+    else if (i.dataset.fov !== undefined) s.fov = Number(i.value);
+    else if (i.dataset.shake !== undefined) s.shake = Number(i.value);
     else return;
     changed();
   });
