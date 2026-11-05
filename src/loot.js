@@ -182,7 +182,14 @@ export class LootView {
     }
     for (const p of this.pools.values()) {
       p.mesh.count = p.n;
-      p.mesh.instanceMatrix.needsUpdate = true;
+      // an empty pool is still a draw call (and a state change) unless it is hidden
+      p.mesh.visible = p.n > 0;
+      if (!p.n) continue;
+      // send only the matrices in use, not all 400 slots
+      const a = p.mesh.instanceMatrix;
+      a.clearUpdateRanges();
+      a.addUpdateRange(0, p.n * 16);
+      a.needsUpdate = true;
     }
   }
 }

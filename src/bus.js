@@ -63,7 +63,24 @@ function beamMesh(x) {
 let busModel = null;
 /** Load the bus model once. The loading screen waits on this, so the intro never shows riders without their bus. */
 export function preloadBus() {
-  return (busModel ||= new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync('./models/bus.glb'));
+  return (busModel ||= new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync('./models/bus.glb').then((g) => {
+    // The model's windows are refracting glass (transmission). Any transmissive material in view makes three.js
+    // draw every solid thing in the scene a second time, every frame, to see through it: the bus is nearly always
+    // on screen, so that doubled the park's draw calls. Plain see-through glass looks the same at night.
+    g.scene.traverse((o) => {
+      const mats = !o.material ? [] : Array.isArray(o.material) ? o.material : [o.material];
+      for (const m of mats) {
+        if (!(m.transmission > 0)) continue;
+        m.transmission = 0;
+        m.transparent = true;
+        m.opacity = 0.32;
+        m.depthWrite = false;
+        m.roughness = Math.min(m.roughness ?? 0.1, 0.12);
+        m.metalness = 0;
+      }
+    });
+    return g;
+  }));
 }
 
 export class Bus {

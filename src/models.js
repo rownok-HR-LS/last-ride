@@ -154,6 +154,10 @@ export async function placeModels(parent, name, list) {
     mesh.receiveShadow = true;
     mesh.computeBoundingSphere();
     parent.add(mesh);
-    cullable(mesh, 260, 25);
+    // how far a piece is drawn goes with its size: a can is a speck long before a booth is (each kind drawn is a
+    // draw call, and there are hundreds of kinds of small things)
+    if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere();
+    const r = o.geometry.boundingSphere.radius * _m.multiplyMatrices(mats[0], o.matrixWorld).getMaxScaleOnAxis();
+    cullable(mesh, r < 0.75 ? 70 : r < 1.5 ? 100 : r < 4 ? 160 : 260, 25);
   });
 }

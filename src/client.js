@@ -176,6 +176,48 @@ export class Client {
       else if (!this.paused) this.frame(this.slowmo > 0 && !this.online ? ((this.slowmo -= dt), dt * 0.35) : dt);
     };
     requestAnimationFrame(loop);
+    // pay for first uses now, under the title, instead of in the first fight
+    setTimeout(() => this.warmUp(), 500);
+  }
+
+  /**
+   * The first hit flash, splash or damage number used to cost a frame of its own (a texture upload, a shader, a
+   * first layout). Set each off once out of sight, upload every texture in the park and compile every material.
+   */
+  warmUp() {
+    const r = this.renderer;
+    this.fx.strike(0, -60, 0, 1, 0, true, false);
+    this.fx.strike(0, -60, 0, 1, 0, false, true);
+    this.fx.footSplash(0, -60, 0, 0, 0, 1, true, true);
+    this.fx.impact(0, -60, 0, 'head');
+    this.fx.sparkle(0, -60, 0);
+    const seen = new Set();
+    this.scene.traverse((o) => {
+      const mats = !o.material ? [] : Array.isArray(o.material) ? o.material : [o.material];
+      for (const m of mats) {
+        for (const k of ['map', 'alphaMap', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap']) {
+          const t = m[k];
+          if (t && !seen.has(t) && t.image) {
+            seen.add(t);
+            r.initTexture(t);
+          }
+        }
+      }
+    });
+    r.compile(this.scene, this.camera);
+    // the fight HUD's first layout
+    const fb = this.foeBar;
+    const was = fb.style.display;
+    fb.style.display = '';
+    fb.getBoundingClientRect();
+    fb.style.display = was;
+    const el = document.createElement('div');
+    el.className = 'dmg big';
+    el.textContent = '0';
+    el.style.visibility = 'hidden';
+    this.dmgLayer.appendChild(el);
+    el.getBoundingClientRect();
+    el.remove();
   }
 
   /**
