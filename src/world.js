@@ -609,7 +609,7 @@ function groundMaterial() {
         vec4 stoneCol = texture2D(mapStone, vMapUv * 1.6) * vec4(0.86, 0.84, 0.8, 1.0);
         // rain water left standing in the dips: sharp-edged pools, more of them on the worn cobbles
         float pn = fbm(vMapUv * 0.33 + 31.0) + fbm(vMapUv * 1.9 + 5.0) * 0.12;
-        puddle = smoothstep(0.66, 0.69, pn + pathK * 0.04) * (0.55 + 0.45 * wet);
+        puddle = smoothstep(0.655, 0.695, pn + pathK * 0.04) * (0.55 + 0.45 * wet);
         vec4 ground = mix(col, stoneCol, pathK);
         // a dark rim where the water soaks into the edges
         ground.rgb *= 1.0 - smoothstep(0.6, 0.67, pn + pathK * 0.04) * 0.35;
@@ -639,7 +639,10 @@ function groundMaterial() {
         }
         normal = normalize(tbn * mapN);`)
       .replace('#include <roughnessmap_fragment>', `// the rain falling now leaves everything with a film of water
-        float roughnessFactor = mix(roughness - wetG * 0.3 - pathK * 0.2 - rainAmt * 0.18, 0.05, puddle);`);
+        float roughnessFactor = mix(roughness - wetG * 0.3 - pathK * 0.2 - rainAmt * 0.18, 0.1, puddle);`)
+      .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
+        // the pools mirror the sky, but the town glow on the horizon is a saturated purple: keep its light, drop most of its colour
+        reflectedLight.indirectSpecular = mix(reflectedLight.indirectSpecular, vec3(dot(reflectedLight.indirectSpecular, vec3(0.3, 0.5, 0.2))) * vec3(0.92, 0.96, 1.05), puddle * 0.7);`);
   };
   return m;
 }
@@ -672,11 +675,13 @@ function mistTex() {
 function buildMist(scene) {
   const rr = rng(909);
   const tex = mistTex();
-  const mat = new THREE.MeshBasicMaterial({ color: '#6c7488', alphaMap: tex, transparent: true, opacity: 0.13, depthWrite: false, fog: true });
+  const mat = new THREE.MeshBasicMaterial({ color: '#5a626e', alphaMap: tex, transparent: true, opacity: 0.1, depthWrite: false, fog: true });
   const geo = new THREE.PlaneGeometry(1, 1);
   geo.rotateX(-Math.PI / 2);
   const banks = [];
-  for (let i = 0; i < 26; i++) {
+  // only along the approach road: inside the park the fog's own ground mist does this, and flat banks right
+  // next to the camera showed as lumpy purple clouds on the grass
+  for (let i = 18; i < 26; i++) {
     const road = i >= 18;
     const x = road ? (rr() - 0.5) * 40 : (rr() * 2 - 1) * (PARK_EDGE + 20);
     const z = road ? PARK_EDGE + 10 + rr() * 260 : (rr() * 2 - 1) * (PARK_EDGE + 20);

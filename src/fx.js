@@ -349,7 +349,8 @@ export class FX {
   }
 
   dust(x, y, z) {
-    for (let i = 0; i < 16; i++) this.norm.spawn(x + rnd(0.6), y + 0.1, z + rnd(0.6), rnd(3), Math.random(), rnd(3), C('#6a5c70'), 1.0, 0.8, 0, 3, 1.5);
+    // wet earth kicked up: a dull grey-brown (a purple-grey here read as lavender clouds on the grass)
+    for (let i = 0; i < 12; i++) this.norm.spawn(x + rnd(0.6), y + 0.1, z + rnd(0.6), rnd(3), Math.random(), rnd(3), C('#4f4a42'), 0.75, 0.7, 0, 3, 1.5);
   }
 
   update(dt, time, zone) {
