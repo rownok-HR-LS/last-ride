@@ -987,6 +987,40 @@ export class Client {
     this.dmgNums.push({ el, x: p.x, y: p.y + 2.25, z: p.z, t: 1.1 });
   }
 
+  /**
+   * Where a rider's eyes go: yours follow the camera; anyone else watches the nearest living rider in front of them
+   * (within 9 m), held for a moment so heads don't flick between people.
+   */
+  lookTarget(p, snap) {
+    if (p.id === this.myId) {
+      const d = this.camera.getWorldDirection(this.tmpLook || (this.tmpLook = new THREE.Vector3()));
+      return { x: p.x + d.x * 20, y: this.camera.position.y + d.y * 20, z: p.z + d.z * 20 };
+    }
+    const c = this.chars.get(p.id);
+    if (!c) return null;
+    if (c.lookUntil > this.time) {
+      const q = snap.players.find((o) => o.id === c.lookId);
+      if (q && q.state === 'alive') return { x: q.x, y: q.y + 1.6, z: q.z };
+    }
+    let best = null;
+    let bd = 81;
+    const fx = -Math.sin(p.yaw);
+    const fz = -Math.cos(p.yaw);
+    for (const q of snap.players) {
+      if (q.id === p.id || q.state !== 'alive') continue;
+      const dx = q.x - p.x;
+      const dz = q.z - p.z;
+      const d2 = dx * dx + dz * dz;
+      if (d2 < bd && d2 > 0.04 && dx * fx + dz * fz > -0.2 * Math.sqrt(d2)) {
+        bd = d2;
+        best = q;
+      }
+    }
+    c.lookId = best ? best.id : null;
+    c.lookUntil = this.time + 0.8 + Math.random() * 0.8;
+    return best ? { x: best.x, y: best.y + 1.6, z: best.z } : null;
+  }
+
   /** The flash, sparks and blood of a melee blow on p, struck from 'from' (anything with x and z). */
   strikeFx(p, from, heavy, blocked) {
     if (!p) return;
@@ -1227,7 +1261,7 @@ export class Client {
       c.adt = (c.adt || 0) + dt;
       c.tick = ((c.tick || 0) + 1) % every;
       if (c.tick !== 0) continue;
-      ch.animate(p, c.adt, this.time, { ghostOpacity, eyes: ghostView || p.flash > 0, lastShotAt: this.time - (snap.time - p.lastShot), seat: seat ? (p.id % 3 ? 'sit' : 'sit2') : null });
+      ch.animate(p, c.adt, this.time, { ghostOpacity, eyes: ghostView || p.flash > 0, lastShotAt: this.time - (snap.time - p.lastShot), seat: seat ? (p.id % 3 ? 'sit' : 'sit2') : null, lookAt: cd < 25 ? this.lookTarget(p, snap) : null });
       c.adt = 0;
       // footsteps: stone on the walkways, softer on dirt and grass
       if (ch.step && cd < 28) {

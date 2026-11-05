@@ -13,6 +13,11 @@ import { grimyStripes, glow } from './textures.js';
 const ARM_HANG = 9 * (Math.PI / 180);
 const _up = new THREE.Vector3(0, 1, 0);
 const _r = new THREE.Vector3();
+const _lkUp = new THREE.Vector3(0, 1, 0);
+const _lkRight = new THREE.Vector3();
+const _lkQ = new THREE.Quaternion();
+const _lkP = new THREE.Quaternion();
+const _lkW = new THREE.Quaternion();
 const _f = new THREE.Vector3();
 const _h = new THREE.Vector3();
 const _a = new THREE.Vector3();
@@ -1079,12 +1084,49 @@ export class Character {
       this.placeWeapon(p.yaw, p.pitch + this.recoil * 0.08);
       this.updateTrail(p, dt, melee && w !== 'fists' && !!p.atk && p.atk.u > 0.22 && p.atk.u < 0.85 && this.hitstop <= 0);
     }
+    this.headLook(p, dt, ghost || p.state !== 'alive' || !!this.over || !!opts.seat ? null : opts.lookAt);
     // the wraith's eyes burn when it uses a power (and always for other ghosts)
     this.eyes.visible = ghost && (opts.eyes ?? true);
     if (this.eyes.visible && this.bones.Head) {
       const s = new THREE.Vector3();
       this.bones.Head.getWorldScale(s);
       this.eyes.scale.setScalar(1 / (s.x || 1));
+    }
+  }
+
+  /**
+   * Turn the head (and a little of the neck) toward a point: someone close by, or where the player is looking.
+   * Eases in and out, and only within what a neck can do; behind the shoulder it gives up and faces front.
+   */
+  headLook(p, dt, at) {
+    const { Neck, Head } = this.bones;
+    if (!Head) return;
+    let gy = 0;
+    let gp = 0;
+    if (at) {
+      const dx = at.x - p.x;
+      const dz = at.z - p.z;
+      const rel = Math.atan2(Math.sin(Math.atan2(-dx, -dz) - p.yaw), Math.cos(Math.atan2(-dx, -dz) - p.yaw));
+      if (Math.abs(rel) < 2) {
+        gy = Math.max(-1.05, Math.min(1.05, rel));
+        gp = Math.max(-0.45, Math.min(0.35, Math.atan2(at.y - (p.y + 1.6), Math.hypot(dx, dz) || 1)));
+      }
+    }
+    const k = 1 - Math.exp(-dt * 7);
+    this.lookYaw = (this.lookYaw || 0) + (gy - (this.lookYaw || 0)) * k;
+    this.lookPitch = (this.lookPitch || 0) + (gp - (this.lookPitch || 0)) * k;
+    if (Math.abs(this.lookYaw) < 0.003 && Math.abs(this.lookPitch) < 0.003) return;
+    // turn about the world's up and the body's right, shared between neck and head
+    _lkRight.set(Math.cos(p.yaw), 0, -Math.sin(p.yaw));
+    for (const [bone, share] of [[Neck, 0.4], [Head, 0.6]]) {
+      if (!bone) continue;
+      _lkQ.setFromAxisAngle(_lkUp, this.lookYaw * share);
+      _lkP.setFromAxisAngle(_lkRight, this.lookPitch * share);
+      _lkQ.multiply(_lkP);
+      // world-space turn into the bone's parent space: local = parent^-1 * turn * parent * local
+      bone.parent.getWorldQuaternion(_lkW);
+      bone.quaternion.premultiply(_lkW).premultiply(_lkQ).premultiply(_lkW.invert());
+      bone.updateMatrixWorld(true);
     }
   }
 
