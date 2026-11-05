@@ -153,9 +153,11 @@ async function title() {
     ['rusty_metal_02', 'damaged_plaster', 'forrest_ground_01', 'cobblestone_floor_08'].forEach((n) => tex.pbr(n));
     return tex.texturesReady();
   });
+  // the trees come baked (growing them here took seconds), and the park is planted from them
+  const trees = import('./trees.js').then((m) => m.preloadTrees());
   const clientModule = import('./client.js');
   // the bus driver is one of the riders, so the park is built once they are all in
-  await Promise.all([fonts, bus, textures, riders]);
+  await Promise.all([fonts, bus, textures, riders, trees]);
   const { Client } = await clientModule;
   client = new Client(app, profile, settings, { attract: true });
   window.__lr = client;

@@ -1,13 +1,13 @@
-// Trees grown with EZ-Tree (MIT, real bark and needle textures), then instanced across the park and the woods:
+// Trees grown with EZ-Tree (MIT, real bark and needle textures), baked ahead of time into models/trees.glb (see
+// src/tools/bake-trees.js; the lists below are what it grows), then instanced across the park and the woods:
 // leafless oaks, ashes and pines (long dead), plus dark pines that still carry their needles to make the woods
 // read as a dense forest. Detailed versions near play, lighter ones for the far woods.
 import * as THREE from 'three';
 import { sway } from './wind.js';
-import { Tree } from '@dgreenheck/ez-tree';
 import { cullable, lodLimit } from './cull.js';
 
 /** [preset, seed, tweak]. Every variant is normalised to 1 m tall and scaled per instance. */
-const DEAD = [
+export const DEAD = [
   ['Oak Large', 11, (o) => { o.branch.angle[1] = 62; o.branch.gnarliness[1] = 0.3; }],
   ['Oak Medium', 23, (o) => { o.branch.gnarliness[2] = 0.25; }],
   ['Ash Large', 37, (o) => { o.branch.children[0] = 7; }],
@@ -16,73 +16,50 @@ const DEAD = [
   ['Pine Medium', 67, (o) => { o.branch.length[1] *= 0.5; }],
 ];
 /** Evergreens: tall, dark, ragged pines. */
-const LIVING = [
+export const LIVING = [
   ['Pine Large', 71, (o) => { o.leaves.size *= 1.1; }],
   ['Pine Large', 83, (o) => { o.branch.children[0] = 80; o.leaves.count = 14; }],
   ['Pine Medium', 97, () => {}],
 ];
 
-const BARK_TINT = { oak: '#6e665e', ash: '#77736c', pine: '#5e5650' };
-
-function grow(name, seed, tweak, lite, needles) {
-  const tree = new Tree();
-  tree.loadPreset(name);
-  const o = tree.options;
-  o.seed = seed;
-  if (!needles) o.leaves.count = 0; // long dead
-  tweak(o);
-  if (lite) {
-    // far away: fewer, chunkier sections, no twigs, sparser needles
-    o.branch.levels = Math.min(o.branch.levels, 2);
-    for (const k of Object.keys(o.branch.sections)) o.branch.sections[k] = Math.max(3, Math.round(o.branch.sections[k] * 0.5));
-    for (const k of Object.keys(o.branch.segments)) o.branch.segments[k] = Math.max(3, Math.round(o.branch.segments[k] * 0.6));
-    if (needles) {
-      o.leaves.count = Math.max(4, Math.round(o.leaves.count * 0.45));
-      o.leaves.size *= 1.35;
-    }
-  }
-  tree.generate();
-  const geo = tree.branchesMesh.geometry;
-  geo.computeBoundingBox();
-  const bb = geo.boundingBox.clone();
-  const h = bb.max.y - bb.min.y || 1;
-  // 1 m tall with the base at y = 0 (the needles move with the branches)
-  const norm = (g) => g.translate(0, -bb.min.y, 0).scale(1 / h, 1 / h, 1 / h);
-  norm(geo);
-  const src = tree.branchesMesh.material;
-  const parts = [{
-    geo,
-    // the crown sways a little more than the trunk (heights here are 0..1 of the tree)
-    mat: sway(new THREE.MeshStandardMaterial({
-      color: BARK_TINT[o.bark.type] || '#6e665e',
-      map: src.map, normalMap: src.normalMap, roughnessMap: src.roughnessMap, aoMap: src.aoMap,
-      roughness: 1, metalness: 0,
-    }), 0.008),
-  }];
-  if (needles && tree.leavesMesh.geometry.attributes.position) {
-    const lsrc = tree.leavesMesh.material;
-    parts.push({
-      geo: norm(tree.leavesMesh.geometry),
-      mat: sway(new THREE.MeshStandardMaterial({
-        color: '#3b4a36', map: lsrc.map, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 1, metalness: 0,
-      }), 0.011),
-    });
-  }
-  const tris = parts.reduce((n, p) => n + (p.geo.index ? p.geo.index.count : p.geo.attributes.position.count) / 3, 0);
-  return { parts, tris };
-}
+export const BARK_TINT = { oak: '#6e665e', ash: '#77736c', pine: '#5e5650' };
 
 let cache = null;
-function variants() {
-  if (!cache) {
-    cache = {};
-    for (const lite of [false, true]) {
-      cache[lite ? 'lite' : 'full'] = {
-        dead: DEAD.map(([n, s, t]) => grow(n, s, t, lite, false)),
-        living: LIVING.map(([n, s, t]) => grow(n, s, t, lite, true)),
-      };
+
+/**
+ * Load the baked trees (public/models/trees.glb, made by src/tools/bake-trees.js from EZ-Tree): every variant,
+ * detailed and light, already normalised to 1 m tall. Call once while loading; plantTrees needs it done.
+ */
+export async function preloadTrees() {
+  if (cache) return cache;
+  const [{ GLTFLoader }, { MeshoptDecoder }] = await Promise.all([
+    import('three/examples/jsm/loaders/GLTFLoader.js'),
+    import('three/examples/jsm/libs/meshopt_decoder.module.js'),
+  ]);
+  const gltf = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync('./models/trees.glb');
+  const swayed = new Map();
+  const out = { full: { dead: [], living: [] }, lite: { dead: [], living: [] } };
+  gltf.scene.traverse((m) => {
+    if (!m.isMesh) return;
+    const [lod, kind, i, j] = m.name.split('_');
+    const mat = m.material;
+    // one swaying copy per baked material: the crown moves a little more than the trunk (heights 0..1)
+    if (!swayed.has(mat)) {
+      mat.roughness = 1;
+      mat.metalness = 0;
+      if (mat.name === 'needles') mat.side = THREE.DoubleSide;
+      swayed.set(mat, sway(mat, mat.name === 'needles' ? 0.011 : 0.008));
     }
-  }
+    const v = (out[lod][kind][+i] ??= { parts: [], tris: 0 });
+    v.parts[+j] = { geo: m.geometry, mat: swayed.get(mat) };
+    v.tris += (m.geometry.index ? m.geometry.index.count : m.geometry.attributes.position.count) / 3;
+  });
+  cache = out;
+  return cache;
+}
+
+function variants() {
+  if (!cache) throw new Error('preloadTrees() first');
   return cache;
 }
 
