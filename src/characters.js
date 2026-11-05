@@ -23,6 +23,29 @@ const _rq1 = new THREE.Quaternion();
 const _rq2 = new THREE.Quaternion();
 const _rq3 = new THREE.Quaternion();
 
+/** Swing trails: how many samples the ribbon keeps and how long each lingers (s). */
+const TRAIL_N = 14;
+const TRAIL_LIFE = 0.12;
+const trailMat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+
+/** A ribbon of light behind a swinging weapon's head (drawn in the character's own space). */
+function makeTrail() {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(TRAIL_N * 2 * 3), 3));
+  g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(TRAIL_N * 2 * 3), 3));
+  const idx = [];
+  for (let i = 0; i < TRAIL_N - 1; i++) {
+    const a = i * 2;
+    idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+  }
+  g.setIndex(idx);
+  const mesh = new THREE.Mesh(g, trailMat);
+  mesh.frustumCulled = false;
+  mesh.visible = false;
+  mesh.renderOrder = 3;
+  return { mesh, samples: [] };
+}
+
 const matCache = new Map();
 function M(color, opts = {}) {
   const key = `${color}:${JSON.stringify(opts)}`;
@@ -522,6 +545,9 @@ const _v5 = new THREE.Vector3();
 const _q1 = new THREE.Quaternion();
 const _q2 = new THREE.Quaternion();
 const _m1 = new THREE.Matrix4();
+const _m2 = new THREE.Matrix4();
+const _v6 = new THREE.Vector3();
+const _v7 = new THREE.Vector3();
 const _e1 = new THREE.Euler();
 
 /** Directional locomotion (strafing in a fight or aiming): walk / run / sprint clips that match those speeds. */
@@ -698,6 +724,8 @@ export class Character {
     this.weapon = null;
     if (!key) return;
     this.weapon = weaponModel(w, rarity);
+    // melee weapons are modelled upright: the head is at the top of their length
+    this.weaponLen = new THREE.Box3().setFromObject(this.weapon).max.y;
     this.weapon.userData.grip = GRIP[w];
     this.root.add(this.weapon);
     if (this.isGhost) this.weapon.visible = false;
@@ -1049,6 +1077,7 @@ export class Character {
       }
       this.model.updateMatrixWorld(true);
       this.placeWeapon(p.yaw, p.pitch + this.recoil * 0.08);
+      this.updateTrail(p, dt, melee && w !== 'fists' && !!p.atk && p.atk.u > 0.22 && p.atk.u < 0.85 && this.hitstop <= 0);
     }
     // the wraith's eyes burn when it uses a power (and always for other ghosts)
     this.eyes.visible = ghost && (opts.eyes ?? true);
@@ -1093,6 +1122,43 @@ export class Character {
       arm.quaternion.premultiply(_rq3);
       arm.updateMatrixWorld(true);
     }
+  }
+
+  /**
+   * The swing trail: while a melee swing is in its fast part, sample the weapon's head and the middle of its
+   * length each frame; the ribbon between them fades out over a few frames, brightest at the newest sample.
+   */
+  updateTrail(p, dt, on) {
+    const T = (this.trail ??= makeTrail());
+    if (!T.mesh.parent) this.root.add(T.mesh);
+    for (const s of T.samples) s.age += dt;
+    if (on && this.weapon && this.weaponLen > 0.3) {
+      this.weapon.updateWorldMatrix(true, false);
+      const L = this.weaponLen;
+      T.samples.unshift({ tip: this.weapon.localToWorld(new THREE.Vector3(0, L, 0)), mid: this.weapon.localToWorld(new THREE.Vector3(0, L * 0.72, 0)), age: 0, heavy: !!p.atk?.heavy });
+    }
+    T.samples = T.samples.filter((s) => s.age < TRAIL_LIFE).slice(0, TRAIL_N);
+    const n = T.samples.length;
+    T.mesh.visible = n >= 2;
+    if (n < 2) return;
+    const pos = T.mesh.geometry.attributes.position;
+    const col = T.mesh.geometry.attributes.color;
+    this.root.updateWorldMatrix(true, false);
+    const inv = _m2.copy(this.root.matrixWorld).invert();
+    for (let i = 0; i < TRAIL_N; i++) {
+      const sm = T.samples[Math.min(i, n - 1)];
+      const a = _v6.copy(sm.tip).applyMatrix4(inv);
+      const b = _v7.copy(sm.mid).applyMatrix4(inv);
+      pos.setXYZ(i * 2, a.x, a.y, a.z);
+      pos.setXYZ(i * 2 + 1, b.x, b.y, b.z);
+      // fades with age and toward the old end; heavy swings burn a little brighter
+      const fade = (1 - sm.age / TRAIL_LIFE) * (1 - i / n);
+      const k = i < n ? fade * fade * (sm.heavy ? 0.32 : 0.22) : 0;
+      col.setXYZ(i * 2, k, k * 0.9, k * 0.78);
+      col.setXYZ(i * 2 + 1, 0, 0, 0);
+    }
+    pos.needsUpdate = true;
+    col.needsUpdate = true;
   }
 
   /** A quick upper-body jerk when hit. */
