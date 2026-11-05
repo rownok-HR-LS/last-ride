@@ -1,5 +1,6 @@
 // Authoritative match simulation. Runs in the browser for offline play and, later, on the game server.
 // Clients send continuous input (setInput) plus one-shot commands (command), and read snapshot(viewerId).
+import { cleanLook, botLook } from './looks.js';
 import {
   MAX_PLAYERS, PLAYER_RADIUS, EYE_HEIGHT, RUN_SPEED, AIM_SPEED, SPRINT_SPEED, COMBAT_SPEED, MAX_HP, MAX_SHIELD, MAX_REVIVES, REVIVE_HP, REVIVE_PROTECT, GHOST_RISE,
   GHOST_SPEED, GHOST_FAST, ECTO_MAX, ECTO_REGEN, ECTO_START, GHOST_FLASH, LAUNCH_SECONDS,
@@ -77,7 +78,7 @@ export class Game {
 
   // ---------------------------------------------------------------- players
 
-  addPlayer({ name, outfit, bot = false }) {
+  addPlayer({ name, outfit, bot = false, look = null }) {
     if (this.players.size >= MAX_PLAYERS) return null;
     const id = this.nextId++;
     if (bot) {
@@ -87,6 +88,8 @@ export class Game {
     }
     const p = {
       id, name: cleanName(name) || `Rider ${id}`, outfit: OUTFITS.some((o) => o.id === outfit) ? outfit : OUTFITS[0].id, bot,
+      // earned looks (cosmetic): trail colour, name tag, clothing dye
+      look: bot ? botLook(this.rand) : cleanLook(look),
       state: 'bus', x: this.bus.x, y: 1.4, z: this.bus.z, vx: 0, vy: 0, vz: 0, onGround: false,
       yaw: this.rand() * Math.PI * 2, pitch: 0,
       hp: MAX_HP, shield: 0,
@@ -492,6 +495,8 @@ export class Game {
   damage(t, amount, by, how, head = false) {
     if (t.state !== 'alive' || amount <= 0 || this.phase === 'end') return;
     if ((t.protT > 0 || t.wardT > 0) && GHOST_HOWS.has(how)) return;
+    // damage dealt counts what the blow actually took (a 999 finisher on someone with 10 left is 10)
+    const took = Math.min(amount, t.hp + t.shield);
     const fromShield = Math.min(t.shield, amount);
     t.shield -= fromShield;
     t.hp -= amount - fromShield;
@@ -499,7 +504,7 @@ export class Game {
       t.lastHitBy = by.id;
       t.lastHitAt = this.time;
     }
-    if (by && by !== t) by.dmg += amount;
+    if (by && by !== t) by.dmg += took;
     this.events.push({
       e: 'hit', id: t.id, by: by ? by.id : null, amt: Math.round(amount), head, shield: fromShield > 0, how,
       fx: by ? by.x : null, fz: by ? by.z : null,
@@ -1674,7 +1679,7 @@ export class Game {
   playerView(p) {
     const g = p.state === 'alive' ? p.slots[p.cur] : null;
     return {
-      id: p.id, name: p.name, outfit: p.outfit, bot: p.bot, state: p.state,
+      id: p.id, name: p.name, outfit: p.outfit, look: p.look, bot: p.bot, state: p.state,
       x: p.x, y: p.y, z: p.z, vx: p.vx, vy: p.vy, vz: p.vz, yaw: p.yaw, pitch: p.pitch, onGround: p.onGround,
       hp: p.hp, shield: p.shield, wpn: p.state === 'alive' ? (g ? g.w : 'fists') : null, rarity: g ? g.rarity : 0,
       lastShot: p.lastShot, reloading: p.reloadT > 0, using: p.use ? p.use.item : null, aim: p.input.aim,

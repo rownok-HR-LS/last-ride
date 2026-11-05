@@ -882,3 +882,23 @@ body.pad .slot kbd, body.pad .item kbd:empty, body.pad .power kbd:empty { displa
 /* touch buttons carry line icons too (the touch layer sits outside .hud) */
 .touch-ui .ico { width: 26px; height: 26px; vertical-align: middle; }
 .touch-ui .t-top .ico { width: 20px; height: 20px; }
+
+/* ---------------------------------------------------------------- progression on the results */
+.end-xp { margin: 12px 0 10px; text-align: left; font: 500 14px/1.35 var(--ui); }
+.end-xp .xp-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.end-xp .xp-head b { font: 700 26px/1 var(--hud); color: #ffe14f; letter-spacing: 0.04em; }
+.end-xp .xp-head span { color: #d8d0c2; font: 600 14px/1 var(--hud); letter-spacing: 0.06em; text-transform: uppercase; }
+.end-xp .xp-bar { height: 6px; margin: 8px 0 10px; border-radius: 3px; background: rgba(255,255,255,0.14); overflow: hidden; }
+.end-xp .xp-bar i { display: block; height: 100%; background: linear-gradient(90deg, #ffb52e, #ffe14f); box-shadow: 0 0 10px rgba(255,210,80,0.6); transition: width 1.2s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.end-xp ul { list-style: none; margin: 0; padding: 0; }
+.end-xp .xp-lines { columns: 2; column-gap: 22px; font-size: 13px; color: #cfc7b9; }
+.end-xp .xp-lines li { display: flex; justify-content: space-between; gap: 8px; break-inside: avoid; }
+.end-xp .xp-lines b { color: #f1ece2; }
+.end-xp .xp-notes { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+.end-xp .xp-notes li { padding: 3px 10px; border-radius: 999px; font: 600 13px/1.4 var(--hud); letter-spacing: 0.05em; text-transform: uppercase; background: rgba(255,255,255,0.08); }
+.end-xp .xp-notes .lvl { background: #ffe14f; color: #20160a; }
+.end-xp .xp-notes .unlock { background: rgba(176,92,255,0.25); color: #e6d2ff; }
+.end-xp .xp-notes .unlock span { opacity: 0.7; text-transform: none; }
+.end-xp .xp-notes .daily { background: rgba(69,199,94,0.22); color: #c8f5d0; }
+.end-xp .xp-notes .record { background: rgba(61,141,255,0.22); color: #cfe2ff; }
+@media (max-width: 760px) { .end-xp .xp-lines { columns: 1; } }

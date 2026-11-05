@@ -31,6 +31,8 @@ import { PauseMenu } from './menu.js';
 import { loadSettings } from './settings.js';
 import { Touch, isTouch } from './touch.js';
 import { Pads } from './gamepad.js';
+import { lookItem } from '../shared/looks.js';
+import { loadProgress, award } from './progress.js';
 import { setBinds } from './prompts.js';
 
 const FEMALE = new Set(OUTFITS.filter((o) => o.voice === 'f').map((o) => o.id));
@@ -314,9 +316,10 @@ export class Client {
   }
 
   /** The rider waiting under the lamp on the title screen. */
-  showcase(outfit) {
+  showcase(outfit, look = null) {
     if (this.showChar) this.scene.remove(this.showChar.root);
     this.showChar = new Character(outfit, 7);
+    this.showChar.wear(look);
     this.showChar.setLook(0.55, 0);
     this.scene.add(this.showChar.root);
   }
@@ -446,12 +449,15 @@ export class Client {
       this.myId = game.myId;
     } else {
       this.game = new Game({ difficulty: this.profile.difficulty });
-      const me = this.game.addPlayer({ name: this.profile.name, outfit: this.profile.outfit });
+      const me = this.game.addPlayer({ name: this.profile.name, outfit: this.profile.outfit, look: this.profile.look });
       this.myId = me.id;
       this.game.fillBots(MAX_PLAYERS);
     }
     this.hud.hideEnd = false;
     this.gpuHeals = 0;
+    // what this ride earns toward progression (the standings carry the rest)
+    this.rideStats = { parries: 0, chests: 0, possessions: 0 };
+    this.rideAward = null;
     this.foeUntil = 0;
     this.foeShow = 0;
     this.foeShownId = null;
@@ -740,6 +746,11 @@ export class Client {
   handleEvents(events) {
     const me = this.myId;
     for (const e of events) {
+      if (e.id === me && this.rideStats) {
+        if (e.e === 'parry') this.rideStats.parries++;
+        else if (e.e === 'chest') this.rideStats.chests++;
+        else if (e.e === 'possess') this.rideStats.possessions++;
+      }
       const ch = e.id !== undefined ? this.chars.get(e.id) : null;
       const pl = e.id !== undefined ? this.game.players.get(e.id) : null;
       const pos = pl ? [pl.x, pl.y + 1, pl.z] : null;
@@ -899,7 +910,7 @@ export class Client {
           if (v) this.fx.ecto(v.x, v.y - 1.2, v.z, 24);
           if (v && !e.steal) {
             const fx = this.bodyFx.get(v.id) || { wet: 0, blood: 0 };
-            this.corpses.push(new Corpse(v.outfit, v.x, v.y - 1.2, v.z, v.yaw, this.scene, { seed: v.id, ...fx }));
+            this.corpses.push(new Corpse(v.outfit, v.x, v.y - 1.2, v.z, v.yaw, this.scene, { seed: v.id, ...fx, wear: v.look }));
             // a pool spreads out under the body
             this.fx.blood(v.x, v.y - 1.2, v.z, 1.9 + Math.random() * 0.6, 0.35);
           }
@@ -1258,7 +1269,12 @@ export class Client {
     this.touch?.update();
     this.hud.scoreboard(snap, this.input.down('Tab'));
     this.guide.update(snap, this);
-    this.hud.endScreen(snap, () => (this.online ? this.onAgain?.() : this.newMatch()), () => location.reload());
+    // the ride is over: add up what it earned, once, for the results sign
+    if (snap.phase === 'end' && snap.standings && !this.rideAward) {
+      const mine = snap.standings.find((s) => s.id === this.myId);
+      if (mine) this.rideAward = award(loadProgress(), { ...this.rideStats, place: mine.place, of: snap.standings.length, kills: mine.kills, ghostKills: mine.ghostKills, revives: mine.revives, dmg: mine.dmg, alive: mine.alive });
+    }
+    this.hud.endScreen(snap, () => (this.online ? this.onAgain?.() : this.newMatch()), () => location.reload(), this.rideAward);
 
     // post
     this.hurt = Math.max(0, this.hurt - dt * 0.8);
@@ -1301,7 +1317,9 @@ export class Client {
       let c = this.chars.get(p.id);
       if (!c) {
         const char = new Character(p.outfit, p.id);
-        const tag = nameTag(p.name, p.id === this.myId ? '#ffe14f' : '#ffffff');
+        char.wear(p.look);
+        const style = lookItem('tag', p.look?.tag);
+        const tag = nameTag(p.name, style.color, style.glow);
         this.scene.add(char.root, tag);
         c = { char, tag, reveal: null };
         this.chars.set(p.id, c);

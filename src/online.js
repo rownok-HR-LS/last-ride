@@ -71,8 +71,8 @@ export class Online {
     clearInterval(ticker);
     this.wire(conn);
     // after a refresh mid-ride the ticket takes your rider back from the bot (or, if the ride is gone, gets in line)
-    if (resume) conn.send({ t: 'rejoin', ticket: resume, name: this.profile.name, outfit: this.profile.outfit });
-    else conn.send({ t: 'join', name: this.profile.name, outfit: this.profile.outfit });
+    if (resume) conn.send({ t: 'rejoin', ticket: resume, name: this.profile.name, outfit: this.profile.outfit, look: this.profile.look });
+    else conn.send({ t: 'join', name: this.profile.name, outfit: this.profile.outfit, look: this.profile.look });
     this.client.onAgain = () => this.again();
     this.render();
   }
@@ -138,9 +138,9 @@ export class Online {
       try {
         const conn = await connect(6000);
         this.wire(conn);
-        if (riding) conn.send({ t: 'rejoin', ticket: this.ticket, name: this.profile.name, outfit: this.profile.outfit });
+        if (riding) conn.send({ t: 'rejoin', ticket: this.ticket, name: this.profile.name, outfit: this.profile.outfit, look: this.profile.look });
         else {
-          conn.send({ t: 'join', name: this.profile.name, outfit: this.profile.outfit });
+          conn.send({ t: 'join', name: this.profile.name, outfit: this.profile.outfit, look: this.profile.look });
           this.banner(null);
           if (this.mode !== 'ride') this.toLobby();
         }

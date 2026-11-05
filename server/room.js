@@ -2,6 +2,7 @@
 // the empty seats. Whoever turns up while a ride is on watches it as a ghost and boards the next bus.
 import { randomUUID } from 'node:crypto';
 import { Game } from '../shared/game.js';
+import { cleanLook } from '../shared/looks.js';
 import { MAX_PLAYERS, OUTFITS, END_SCREEN_SECONDS } from '../shared/constants.js';
 import { TICK, SNAP_EVERY, BUS_WAIT, BUS_AGAIN, pack, unpackInput } from '../shared/net.js';
 
@@ -70,6 +71,7 @@ export class Room {
         c.ready = true;
         c.name = String(m.name ?? '').slice(0, 16);
         c.outfit = OUTFITS.some((o) => o.id === m.outfit) ? m.outfit : OUTFITS[0].id;
+        c.look = cleanLook(m.look);
         console.log(`rider ${c.id} (${c.name}) joined, ${this.game ? 'watching' : 'waiting'}`);
         if (this.game) this.watch(c);
         else this.busIn ??= this.busWait;
@@ -185,7 +187,7 @@ export class Room {
     this.lootSent = new Map();
     this.tickets = new Map();
     for (const c of riders.slice(0, MAX_PLAYERS)) {
-      const p = this.game.addPlayer({ name: c.name, outfit: c.outfit });
+      const p = this.game.addPlayer({ name: c.name, outfit: c.outfit, look: c.look });
       // a rider fed by the inputs this connection sends (see Game.feed)
       p.queue = [];
       p.ack = 0;

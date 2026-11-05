@@ -111,6 +111,25 @@ function renderMapImage(size) {
   return c;
 }
 
+/** The progression part of the results: experience by source, the level bar, level-ups, unlocks, dailies, records. */
+function xpPanel(e) {
+  const pct = (l) => (l.need ? Math.round((l.into / l.need) * 100) : 100);
+  const up = e.after.level > e.before.level;
+  const from = up ? 0 : pct(e.before);
+  const notes = [
+    up ? `<li class="lvl">Level ${e.after.level}!</li>` : '',
+    ...e.unlocks.map((u) => `<li class="unlock">Unlocked: ${esc(u.name)} <span>${{ trail: 'swing trail', tag: 'name tag', dye: 'clothing dye' }[u.kind]}</span></li>`),
+    ...e.finished.map((t) => `<li class="daily">Daily done: ${esc(t)}</li>`),
+    ...e.records.map((t) => `<li class="record">New best · ${esc(t)}</li>`),
+  ].join('');
+  return `<div class="end-xp">
+    <div class="xp-head"><b>+${e.gained} XP</b><span>Level ${e.after.level}${e.after.need ? ` · ${e.after.into} / ${e.after.need}` : ' · max'}</span></div>
+    <div class="xp-bar"><i style="width:${from}%" data-to="${pct(e.after)}%"></i></div>
+    <ul class="xp-lines">${e.lines.map((l) => `<li><span>${esc(l.label)}</span><b>+${l.xp}</b></li>`).join('')}</ul>
+    ${notes ? `<ul class="xp-notes">${notes}</ul>` : ''}
+  </div>`;
+}
+
 export class Hud {
   constructor(root, handlers) {
     this.root = root;
@@ -600,7 +619,7 @@ export class Hud {
    * The end of the ride: the camera circles the winner for a moment, then the results go up on a worn park sign,
    * with your own ticket stub (place, kills, ghost kills, bodies stolen, damage, time survived) and the standings.
    */
-  endScreen(snap, onAgain, onMenu) {
+  endScreen(snap, onAgain, onMenu, earned = null) {
     const el = $('.endscreen', this.root);
     if (snap.phase !== 'end' || !snap.standings || this.hideEnd) {
       el.classList.remove('show');
@@ -631,6 +650,7 @@ export class Hud {
       <div class="end-kicker">${meWon ? 'Midnight Wonderland Tours' : 'The last bus has left'}</div>
       <h2>${meWon ? 'You rode the last bus out' : `${esc(win ? win.name : 'Nobody')} rode it out`}</h2>
       ${stub}
+      ${earned ? xpPanel(earned) : ''}
       <table class="end-board"><tr><th>#</th><th>Rider</th><th>Kills</th><th>Ghost</th><th>Stolen</th><th>Survived</th></tr>${rows}</table>
       <div class="board-buttons"><button class="ticket again">Ride again <small>admit one</small></button><button class="ticket dark menu">Main menu</button></div>
     </div>`;
@@ -640,6 +660,9 @@ export class Hud {
     this.endTimer = setTimeout(() => {
       this.endTimer = null;
       el.classList.add('show');
+      // then the level bar fills
+      const bar = $('.xp-bar i', el);
+      if (bar) setTimeout(() => bar.style.setProperty('width', bar.dataset.to), 400);
     }, 2500);
   }
 

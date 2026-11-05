@@ -6,6 +6,7 @@ import { initAudio } from './audio.js';
 import { CREDITS } from './credits.js';
 import { loadSettings } from './settings.js';
 import { settingsBoard } from './menu.js';
+import { loadProgress } from './progress.js';
 
 const app = document.getElementById('app');
 // knock on the ride server's door right away: the free host sleeps when nobody plays and takes most of a minute to
@@ -47,6 +48,8 @@ function saveProfile(p) {
 
 async function title() {
   const profile = loadProfile();
+  // the looks you have earned and picked ride with you (other riders see them online)
+  profile.look = loadProgress().look;
   const settings = loadSettings();
   if (!OUTFITS.some((o) => o.id === profile.outfit)) profile.outfit = OUTFITS[0].id;
   const el = document.createElement('div');
@@ -100,7 +103,7 @@ async function title() {
     // a rider still loading in the background shows as soon as it is in
     if (ridersReady) {
       const id = profile.outfit;
-      whenRider(id).then(() => profile.outfit === id && client?.showcase(id));
+      whenRider(id).then(() => profile.outfit === id && client?.showcase(id, profile.look));
     }
   };
   const showDiff = () => el.querySelectorAll('[data-d]').forEach((b) => b.classList.toggle('on', b.dataset.d === profile.difficulty));
@@ -169,7 +172,7 @@ async function title() {
   // the canvas goes under the sign
   app.insertBefore(client.renderer.domElement, app.firstChild);
   ridersReady = true;
-  client.showcase(profile.outfit);
+  client.showcase(profile.outfit, profile.look);
   // the still of the park fades into the live one, and the loading line goes
   step('', 1);
   clearInterval(tipTimer);

@@ -1,4 +1,5 @@
 // Realistic characters (Renderpeople scans, CC-BY; rigged on the Mixamo skeleton) with blended animations, weapons and the ghost shimmer.
+import { TRAILS, lookItem } from '../shared/looks.js';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
@@ -147,13 +148,13 @@ export function setCharacterRim(v) {
  */
 function lookShader(sh) {
   const L = this.userData.look;
-  Object.assign(sh.uniforms, { rimAmount, lookWet: L.wet, lookBlood: L.blood, lookGrime: L.grime, lookSeed: L.seed, lookTint: L.tint, lookHit: L.hit || { value: 0 } });
+  Object.assign(sh.uniforms, { rimAmount, lookWet: L.wet, lookBlood: L.blood, lookGrime: L.grime, lookSeed: L.seed, lookTint: L.tint, lookHit: L.hit || { value: 0 }, lookDye: L.dye || { value: new THREE.Vector4() } });
   sh.vertexShader = `attribute vec3 bodyP;\nvarying vec3 vBody;\n${sh.vertexShader}`.replace(
     '#include <begin_vertex>',
     '#include <begin_vertex>\n  vBody = bodyP;',
   );
   sh.fragmentShader = `uniform float rimAmount; uniform float lookWet; uniform float lookBlood; uniform float lookGrime;
-    uniform float lookSeed; uniform vec3 lookTint; uniform float lookHit;
+    uniform float lookSeed; uniform vec3 lookTint; uniform float lookHit; uniform vec4 lookDye;
     varying vec3 vBody;
     float lkH(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
     float lkN(vec3 p) {
@@ -187,6 +188,8 @@ function lookShader(sh) {
         vec3 tone = vec3(1.0) + vec3(cos(lookTint.x), cos(lookTint.x + 2.1), cos(lookTint.x + 4.2)) * 0.22;
         t = mix(t, vec3(lum) * lookTint.y * tone, 1.0 - smoothstep(0.08, 0.3, sat));
         c = mix(c, max(t, 0.0), (1.0 - lkSkin) * lookTint.z);
+        // an earned dye: the clothes take one colour, keeping their light and shade (skin stays)
+        if (lookDye.w > 0.0) c = mix(c, lookDye.rgb * (0.3 + lum * 1.7), (1.0 - lkSkin) * lookDye.w);
         vec3 q = vBody + lookSeed;
         // mud: splashed up from the shoes, patchy, thinning out by the knees
         float n1 = lkF(q * 5.0);
@@ -666,7 +669,10 @@ export class Character {
       hit: { value: 0 },
       // hue turn, value scale, how much of the cloth it applies to (some riders keep their scan's colours)
       tint: { value: new THREE.Vector3((r() - 0.5) * 3.2, 0.62 + r() * 0.55, r() < 0.15 ? 0 : 0.6 + r() * 0.4) },
+      // an earned clothing dye (rgb linear, w how much): set by wear()
+      dye: { value: new THREE.Vector4(0, 0, 0, 0) },
     };
+    this.trailRGB = TRAILS[0].rgb;
     wearLook(this.model, this.look);
     this.model.rotation.y = Math.PI; // Mixamo faces +z, the game faces -z
     this.root.add(this.model);
@@ -891,6 +897,14 @@ export class Character {
     this.staggerAt = null;
     if (guard) return { name: guard, t: time % this.clips[guard].duration };
     return null;
+  }
+
+  /** Put on earned looks ({ trail, tag, dye } ids from shared/looks.js): the dye and the swing-trail colour. */
+  wear(look) {
+    const dye = lookItem('dye', look?.dye);
+    if (dye.rgb) this.look.dye.value.set(dye.rgb[0] ** 2.2, dye.rgb[1] ** 2.2, dye.rgb[2] ** 2.2, 0.85);
+    else this.look.dye.value.set(0, 0, 0, 0);
+    this.trailRGB = lookItem('trail', look?.trail).rgb;
   }
 
   /**
@@ -1256,7 +1270,7 @@ export class Character {
       // fades with age and toward the old end; heavy swings burn a little brighter
       const fade = (1 - sm.age / TRAIL_LIFE) * (1 - i / n);
       const k = i < n ? fade * fade * (sm.heavy ? 0.32 : 0.22) : 0;
-      col.setXYZ(i * 2, k, k * 0.9, k * 0.78);
+      col.setXYZ(i * 2, k * this.trailRGB[0], k * this.trailRGB[1], k * this.trailRGB[2]);
       col.setXYZ(i * 2 + 1, 0, 0, 0);
     }
     pos.needsUpdate = true;
@@ -1283,10 +1297,11 @@ export class Character {
 
 /** A body left behind where a survivor died (when nobody stole it). Plays a death animation, then sinks away. */
 export class Corpse {
-  /** look: { seed, wet, blood } of the rider who fell, so the body keeps their clothes, dirt and blood. */
+  /** look: { seed, wet, blood, wear } of the rider who fell, so the body keeps their clothes, dye, dirt and blood. */
   constructor(outfit, x, y, z, yaw, scene, look = null) {
     this.char = new Character(outfit, look?.seed);
     if (look) this.char.setLook(look.wet, Math.min(1, look.blood + 0.25));
+    if (look?.wear) this.char.wear(look.wear);
     this.char.root.position.set(x, y, z);
     this.char.root.rotation.y = yaw;
     const deaths = ['death_from_the_front', 'death_from_the_back', 'death_from_front_headshot'];
@@ -1311,7 +1326,7 @@ export class Corpse {
 
 // ------------------------------------------------------------------ name tags
 
-export function nameTag(text, color = '#ffffff') {
+export function nameTag(text, color = '#ffffff', glow = null) {
   const c = document.createElement('canvas');
   c.width = 256;
   c.height = 64;
@@ -1326,6 +1341,12 @@ export function nameTag(text, color = '#ffffff') {
   ctx.shadowBlur = 6;
   ctx.fillStyle = color;
   ctx.fillText(text, 128, 32);
+  // an earned style glows in its own colour
+  if (glow) {
+    ctx.shadowColor = glow;
+    ctx.shadowBlur = 14;
+    ctx.fillText(text, 128, 32);
+  }
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
