@@ -466,18 +466,37 @@ function mergeSkinned(scene) {
 }
 
 /** Load every character and the shared animation set. Call once before creating any Character. */
-export async function loadCharacters(onProgress) {
+/** Each rider's model, loading or loaded (outfit id -> promise). */
+const riderLoads = {};
+let allRiders = null;
+
+/** Resolves once this rider's model is in (at once for one that already is). */
+export function whenRider(id) {
+  return riderLoads[id] || Promise.resolve();
+}
+
+/** Resolves once every rider is in: a ride needs them all (bots wear any of them). */
+export function whenAllRiders() {
+  return allRiders || Promise.resolve();
+}
+
+/**
+ * Load the animations and the riders in first (the one you picked and the bus driver) and resolve; the rest keep
+ * loading in the background (see whenAllRiders), so the menu is up after a fraction of the download.
+ * onProgress(0..1) covers what this waits for.
+ */
+export async function loadCharacters(onProgress, first = OUTFITS.map((o) => o.id)) {
   if (animSrc) return;
   const loader = new GLTFLoader();
   loader.setMeshoptDecoder(MeshoptDecoder);
   let done = 0;
-  const total = OUTFITS.length + 1;
-  const load = async (url) => {
+  const total = new Set(first).size + 1;
+  const load = async (url, counts) => {
     const g = await loader.loadAsync(url);
-    onProgress?.(++done / total);
+    if (counts) onProgress?.(++done / total);
     return g;
   };
-  const anims = await load('./models/anims.glb');
+  const anims = await load('./models/anims.glb', true);
   // merged clips target suffixed copies of the skeleton (mixamorigHips_3); point them back at the real bones
   const clips = anims.animations.map((c) => {
     c.tracks.forEach((t) => {
@@ -494,8 +513,8 @@ export async function loadCharacters(onProgress) {
   }
   animSrc = { clips, rig: sourceRig(anims.scene) };
 
-  await Promise.all(OUTFITS.map(async (o) => {
-    const g = await load(`./models/${o.model}.glb`);
+  const loadRider = async (o, counts) => {
+    const g = await load(`./models/${o.model}.glb`, counts);
     const scene = g.scene;
     scene.traverse((n) => {
       n.name = normBone(n.name);
@@ -536,7 +555,19 @@ export async function loadCharacters(onProgress) {
     }
     // feet on the ground, whatever the author used as the origin
     T[o.id] = { scene, scale: PLAYER_HEIGHT / h, footY: -box.min.y, clips: own };
-  }));
+  };
+  const firstSet = new Set(first);
+  for (const o of OUTFITS) if (firstSet.has(o.id)) riderLoads[o.id] = loadRider(o, true);
+  await Promise.all(Object.values(riderLoads));
+  // the others, a few at a time so they don't fight the first frames of the park for the network
+  const rest = OUTFITS.filter((o) => !firstSet.has(o.id));
+  // (one that fails to arrive is drawn as the first rider instead; it never holds up the bus)
+  const lanes = [0, 1, 2].map(() => Promise.resolve());
+  rest.forEach((o, i) => {
+    lanes[i % 3] = lanes[i % 3].then(() => loadRider(o, false)).catch((e) => console.warn('rider', o.id, e));
+    riderLoads[o.id] = lanes[i % 3];
+  });
+  allRiders = Promise.all(lanes);
 }
 
 // ------------------------------------------------------------------ character
@@ -616,7 +647,9 @@ function seeded(seed) {
 export class Character {
   /** seed: anything numeric that identifies the rider (a player id); it picks their clothing colour, size and dirt. */
   constructor(outfit, seed = Math.random() * 1e6) {
-    const tpl = T[outfit] || T[OUTFITS[0].id];
+    // a rider whose model never arrived is drawn as the first one
+    this.outfit = T[outfit] ? outfit : OUTFITS[0].id;
+    const tpl = T[this.outfit];
     const r = seeded(seed + 1);
     this.root = new THREE.Group();
     this.model = SkeletonUtils.clone(tpl.scene);

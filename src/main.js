@@ -1,7 +1,7 @@
 // Title screen: the park itself, live in the rain behind a worn ticket-booth sign where you pick your rider.
 // The world is built while you choose, so boarding the bus starts the ride straight away.
 import { OUTFITS } from '../shared/constants.js';
-import { loadCharacters } from './characters.js';
+import { loadCharacters, whenAllRiders, whenRider } from './characters.js';
 import { initAudio } from './audio.js';
 import { CREDITS } from './credits.js';
 import { loadSettings } from './settings.js';
@@ -97,7 +97,11 @@ async function title() {
     el.querySelectorAll('[data-id]').forEach((b) => b.classList.toggle('on', b.dataset.id === profile.outfit));
     riderName.textContent = o.name;
     riderBlurb.textContent = o.blurb;
-    if (ridersReady) client?.showcase(profile.outfit);
+    // a rider still loading in the background shows as soon as it is in
+    if (ridersReady) {
+      const id = profile.outfit;
+      whenRider(id).then(() => profile.outfit === id && client?.showcase(id));
+    }
   };
   const showDiff = () => el.querySelectorAll('[data-d]').forEach((b) => b.classList.toggle('on', b.dataset.d === profile.difficulty));
   el.querySelector('.t-outfits').addEventListener('click', (e) => {
@@ -142,7 +146,8 @@ async function title() {
   const tipTimer = setInterval(nextTip, 4500);
   // the riders, the fonts, the bus and the ground textures all download at once
   step('Loading the park…', 0);
-  const riders = loadCharacters((u) => step(`Loading the park… ${Math.round(u * 100)}%`, u * 0.9));
+  // your rider and the bus driver first; the other riders load while you are on the menu
+  const riders = loadCharacters((u) => step(`Loading the park… ${Math.round(u * 100)}%`, u * 0.9), [profile.outfit, 'eric']);
   const fonts = Promise.all([document.fonts.load('80px Rye'), document.fonts.load('900 80px Cinzel'), document.fonts.load('600 20px "Barlow Condensed"')]).catch(() => {
     /* fall back to Impact */
   });
@@ -179,6 +184,9 @@ async function title() {
     practice.disabled = true;
     profile.name = nick.value.trim().slice(0, 16) || 'Rider';
     saveProfile(profile);
+    // everyone on the bus needs their model (usually long in by now)
+    (online ? play : practice).textContent = 'Boarding…';
+    await whenAllRiders();
     initAudio();
     el.remove();
     if (!online) return client.start(profile);
