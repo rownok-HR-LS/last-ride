@@ -1234,6 +1234,14 @@ export class Client {
         const surface = pathDistance(p.x, p.z) < 0 ? 'stone' : 'dirt';
         const wet = sheltered(p.x, p.y + 1.6, p.z, snap.bus) ? 0 : this.rainAmount || 0;
         audio.play('step', p.id === this.myId ? null : [p.x, p.y, p.z], { surface, run: Math.hypot(p.vx, p.vz) > 4, self: p.id === this.myId, wet });
+        // and you can see it: water kicked up from the foot coming down (left, right, left...)
+        if (wet > 0.1 && cd < 18 && p.state !== 'ghost') {
+          c.foot = -(c.foot || 1);
+          const side = c.foot * 0.12;
+          const fx = Math.cos(p.yaw) * side;
+          const fz = -Math.sin(p.yaw) * side;
+          this.fx.footSplash(p.x + fx, p.y, p.z + fz, p.vx, p.vz, wet, Math.hypot(p.vx, p.vz) > 4, surface === 'stone');
+        }
       }
       ch.root.updateMatrixWorld();
       // name tags

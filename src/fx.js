@@ -192,6 +192,7 @@ export class FX {
     this.tracers = [];
     this.flashes = [];
     this.strikes = [];
+    this.ripples = [];
     this.rings = [];
     // storm wall
     this.stormMat = new THREE.ShaderMaterial({
@@ -342,6 +343,38 @@ export class FX {
     }
   }
 
+  /**
+   * A wet footfall: a low kick of spray (or a flick of mud on dirt) and, on stone, a ring spreading on the film of
+   * water. wet: how hard it rains here (0..1); run: a running stride kicks up more. vx, vz: the walker's velocity.
+   */
+  footSplash(x, y, z, vx, vz, wet, run, stone) {
+    const n = Math.round((run ? 7 : 4) * wet);
+    for (let i = 0; i < n; i++) {
+      const up = 0.9 + Math.random() * (run ? 1.6 : 0.9);
+      this.norm.spawn(x + rnd(0.08), y + 0.03, z + rnd(0.08), rnd(0.7) - vx * 0.08, up, rnd(0.7) - vz * 0.08,
+        C(stone ? (Math.random() < 0.5 ? '#c2ccd8' : '#9aa5b2') : '#463b30'), 0.06 + Math.random() * 0.05, 0.22 + Math.random() * 0.15, 9, 0.5);
+    }
+    if (!stone || wet < 0.25) return;
+    let r = this.ripples.find((q) => q.life <= 0);
+    if (!r) {
+      if (!this.rippleGeo) {
+        this.rippleGeo = new THREE.RingGeometry(0.9, 1, 28);
+        this.rippleGeo.rotateX(-Math.PI / 2);
+      }
+      if (this.ripples.length >= 32) return;
+      const m = new THREE.Mesh(this.rippleGeo, new THREE.MeshBasicMaterial({ color: '#c8d4e2', transparent: true, depthWrite: false, opacity: 0, polygonOffset: true, polygonOffsetFactor: -2 }));
+      m.renderOrder = 4;
+      this.scene.add(m);
+      r = { m, life: 0, max: 0.5, size: 0.3 };
+      this.ripples.push(r);
+    }
+    r.m.position.set(x, y + 0.02, z);
+    r.max = r.life = 0.45 + Math.random() * 0.15;
+    r.size = (run ? 0.3 : 0.22) * (0.8 + wet * 0.4);
+    r.peak = 0.22 * wet;
+    r.m.visible = true;
+  }
+
   impact(x, y, z, kind) {
     if (kind === 'player') {
       for (let i = 0; i < 10; i++) this.norm.spawn(x, y, z, rnd(2.5), rnd(2) + 1, rnd(2.5), C('#5a0606'), 0.28, 0.45, 9, 2);
@@ -449,6 +482,14 @@ export class FX {
       if (f.life <= 0) continue;
       f.life -= dt;
       if (f.life <= 0) f.s.visible = false;
+    }
+    for (const r of this.ripples) {
+      if (r.life <= 0) continue;
+      r.life -= dt;
+      const u = 1 - Math.max(0, r.life) / r.max;
+      r.m.scale.setScalar(0.08 + r.size * Math.sqrt(u));
+      r.m.material.opacity = r.peak * (1 - u);
+      if (r.life <= 0) r.m.visible = false;
     }
     for (const f of this.strikes) {
       if (f.life <= 0) continue;
