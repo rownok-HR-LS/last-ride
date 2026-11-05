@@ -6,6 +6,17 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 /** How long a sleeping server gets to wake before we give up, and how long a dropped rider keeps trying. */
 const WAKE_FOR = 100000;
 const RETURN_FOR = 30000;
+/** This tab's ticket, kept through a page refresh (sessionStorage is per tab; main.js reads it on load). */
+const TICKET_KEY = 'last-ride-ticket';
+
+function keepTicket(ticket) {
+  try {
+    if (ticket) sessionStorage.setItem(TICKET_KEY, JSON.stringify({ ticket, at: Date.now() }));
+    else sessionStorage.removeItem(TICKET_KEY);
+  } catch {
+    /* private mode: no refresh-proofing */
+  }
+}
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const clock = (s) => {
@@ -23,14 +34,18 @@ export class Online {
     this.sign = document.createElement('div');
     this.sign.className = 'lobby-layer';
     app.appendChild(this.sign);
+    // leaving the page mid-ride (a refresh): the clock for coming back starts now
+    addEventListener('pagehide', () => {
+      if (this.mode === 'ride' && this.ticket) keepTicket(this.ticket);
+    });
   }
 
   /**
    * Connect and get in line for the next bus. A server that was asleep gets up to WAKE_FOR to wake: we keep knocking
    * and keep trying, and say so, instead of giving up at the first refusal.
    */
-  async join() {
-    this.show('Calling the park…', '', '');
+  async join(resume = null) {
+    this.show(resume ? 'Back to your ride…' : 'Calling the park…', '', '');
     const t0 = Date.now();
     const waited = () => `${Math.round((Date.now() - t0) / 1000)}s`;
     // the count keeps ticking while a knock is out (one can take ten seconds against a sleeping host)
@@ -55,7 +70,9 @@ export class Online {
     }
     clearInterval(ticker);
     this.wire(conn);
-    conn.send({ t: 'join', name: this.profile.name, outfit: this.profile.outfit });
+    // after a refresh mid-ride the ticket takes your rider back from the bot (or, if the ride is gone, gets in line)
+    if (resume) conn.send({ t: 'rejoin', ticket: resume, name: this.profile.name, outfit: this.profile.outfit });
+    else conn.send({ t: 'join', name: this.profile.name, outfit: this.profile.outfit });
     this.client.onAgain = () => this.again();
     this.render();
   }
@@ -69,7 +86,10 @@ export class Online {
       this.render();
     };
     h.start = (m) => {
-      if (m.ticket) this.ticket = m.ticket;
+      if (m.ticket) {
+        this.ticket = m.ticket;
+        keepTicket(m.ticket);
+      }
       // back in your own body after a dropped line: the ride never stopped
       if (m.back && this.net && this.net.myId === m.id) {
         this.net.rebind(conn);
@@ -82,6 +102,7 @@ export class Online {
     };
     h.watch = () => {
       this.ticket = null;
+      keepTicket(null);
       this.banner(null);
       this.net = new NetGame(conn, null, this.profile);
       this.board(this.net, 'watch');
@@ -89,11 +110,13 @@ export class Online {
     h.rejoinFail = () => {
       // the ride ended while we were away (or the server restarted): back to the stop
       this.ticket = null;
+      keepTicket(null);
       this.banner(null);
       this.toLobby();
     };
     h.over = () => {
       this.ticket = null;
+      keepTicket(null);
       // watchers go straight back in line; riders read their results first
       if (this.mode === 'watch') this.toLobby();
       else this.mode = 'ended';

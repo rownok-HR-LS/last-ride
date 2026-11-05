@@ -171,13 +171,51 @@ export class Client {
       requestAnimationFrame(loop);
       const dt = Math.min(0.05, (now - this.last) / 1000);
       this.last = now;
+      // the graphics card was reset: nothing can be drawn until the browser hands the context back
+      if (this.gpuLost) return;
       if (!this.paused && !document.hidden) this.adaptQuality(dt);
       if (this.attract) this.attractFrame(dt);
       else if (!this.paused) this.frame(this.slowmo > 0 && !this.online ? ((this.slowmo -= dt), dt * 0.35) : dt);
     };
     requestAnimationFrame(loop);
+    this.watchContext();
     // pay for first uses now, under the title, instead of in the first fight
     setTimeout(() => this.warmUp(), 500);
+  }
+
+  /**
+   * A graphics driver can reset the WebGL context (a laptop switching GPUs, a phone reclaiming memory, a driver
+   * update). Ask the browser to give it back, keep the sim waiting, and draw again once it does: three.js uploads
+   * every texture and shader again on its own. If it never comes back, offer a reload (an online rider's ticket is
+   * kept through it, so they land back in their own body).
+   */
+  watchContext() {
+    const canvas = this.renderer.domElement;
+    const note = document.createElement('div');
+    note.className = 'gpu-reset';
+    note.innerHTML = '<b>The picture went out</b><span>Your graphics card reset. Getting the park back…</span><button class="ticket" hidden>Reload the park</button>';
+    note.querySelector('button').addEventListener('click', () => location.reload());
+    this.container.appendChild(note);
+    let timer = 0;
+    canvas.addEventListener('webglcontextlost', (e) => {
+      e.preventDefault();
+      this.gpuLost = true;
+      note.classList.add('show');
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        note.querySelector('span').textContent = 'It is not coming back by itself.';
+        note.querySelector('button').hidden = false;
+      }, 6000);
+    });
+    canvas.addEventListener('webglcontextrestored', () => {
+      clearTimeout(timer);
+      this.gpuLost = false;
+      this.last = performance.now();
+      note.classList.remove('show');
+      note.querySelector('button').hidden = true;
+      note.querySelector('span').textContent = 'Your graphics card reset. Getting the park back…';
+      this.warmUp();
+    });
   }
 
   /**

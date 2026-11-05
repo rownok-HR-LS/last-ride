@@ -178,7 +178,7 @@ async function title() {
   practice.disabled = false;
   play.innerHTML = 'Ride online <small>admit one</small>';
 
-  const start = async (online) => {
+  const start = async (online, resume = null) => {
     if (play.disabled) return;
     play.disabled = true;
     practice.disabled = true;
@@ -194,9 +194,16 @@ async function title() {
     const { Online } = await import('./online.js');
     const ride = new Online(app, client, profile);
     if (import.meta.env.DEV) window.__online = ride;
-    ride.join();
+    ride.join(resume);
   };
   play.addEventListener('click', () => start(true));
+  // came back from a refresh in the middle of a ride: straight back to your rider
+  try {
+    const t = JSON.parse(sessionStorage.getItem('last-ride-ticket') || 'null');
+    if (t && Date.now() - t.at < 30000) start(true, t.ticket);
+  } catch {
+    /* no session storage */
+  }
   practice.addEventListener('click', () => start(false));
   nick.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') start(true);

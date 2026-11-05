@@ -863,3 +863,11 @@ body.touch .foe-bar { width: 96px; }
 .net-banner.show { opacity: 1; transform: translate(-50%, 0); animation: net-pulse 1.4s ease-in-out infinite; }
 @keyframes net-pulse { 50% { box-shadow: 0 0 0 1px rgba(255,90,82,0.9), 0 6px 24px rgba(0,0,0,0.5); } }
 @media (max-width: 760px) { .net-banner { font-size: 12px; white-space: normal; text-align: center; width: max-content; max-width: 90vw; } }
+
+/* ---------------------------------------------------------------- the graphics card reset */
+.gpu-reset { position: absolute; inset: 0; z-index: 70; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  background: rgba(8,6,8,0.86); color: #f1ece2; text-align: center; padding: 16px; font: 500 16px/1.4 var(--ui); }
+.gpu-reset.show { display: flex; }
+.gpu-reset b { font: 600 28px/1.1 var(--hud); letter-spacing: 0.08em; text-transform: uppercase; }
+.gpu-reset span { color: #c9c2b6; }
+.gpu-reset button[hidden] { display: none; }
