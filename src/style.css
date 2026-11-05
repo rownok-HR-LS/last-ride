@@ -841,3 +841,17 @@ body:not(.touch) .prize-card .p-close { display: none; }
   .prize-card > p { margin: 6px 0 0; }
 }
 body.touch .keys-only { display: none; }
+
+/* ---------------------------------------------------------------- the one you are fighting */
+.foe-bar { position: absolute; left: 0; top: 0; width: 112px; pointer-events: none; }
+.foe-bar .fb-name { display: flex; align-items: center; justify-content: center; gap: 5px; margin-bottom: 4px;
+  font: 600 13px/1 var(--hud); letter-spacing: 0.08em; text-transform: uppercase; color: #f1ece2; text-shadow: 0 1px 3px #000, 0 0 10px rgba(0,0,0,0.7); white-space: nowrap; }
+.foe-bar .fb-lock { display: none; width: 7px; height: 7px; border: 1.5px solid #ff5a52; transform: rotate(45deg); box-shadow: 0 0 6px rgba(255,90,82,0.8); }
+.foe-bar.locked .fb-lock { display: block; }
+.foe-bar .fb-track { position: relative; height: 5px; background: rgba(10,8,8,0.55); border-radius: 3px; box-shadow: 0 0 0 1px rgba(0,0,0,0.35); overflow: hidden; }
+.foe-bar .fb-track div { position: absolute; left: 0; top: 0; bottom: 0; }
+.foe-bar .fb-chip { background: #ffe2c8; opacity: 0.85; }
+.foe-bar .fb-hp { background: linear-gradient(90deg, #c8302a, #ff5a52); box-shadow: 0 0 8px rgba(255,80,70,0.55); transition: width 0.08s; }
+.foe-bar .fb-sh { height: 3px; margin-top: 2px; background: rgba(10,8,8,0.45); border-radius: 2px; overflow: hidden; }
+.foe-bar .fb-sh div { height: 100%; background: #5cc8ff; box-shadow: 0 0 6px rgba(92,200,255,0.5); }
+body.touch .foe-bar { width: 96px; }

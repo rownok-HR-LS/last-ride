@@ -114,6 +114,12 @@ export class Client {
     this.dmgLayer.className = 'dmg-numbers';
     this.hudRoot.appendChild(this.dmgLayer);
     this.dmgNums = [];
+    // the one you are fighting: their name and a slim health bar over their head
+    this.foeBar = document.createElement('div');
+    this.foeBar.className = 'foe-bar';
+    this.foeBar.style.display = 'none';
+    this.foeBar.innerHTML = '<div class="fb-name"><i class="fb-lock"></i><span></span></div><div class="fb-track"><div class="fb-chip"></div><div class="fb-hp"></div></div><div class="fb-sh"><div></div></div>';
+    this.dmgLayer.appendChild(this.foeBar);
 
     this.input = new Input(renderer.domElement);
     this.guide = new Guide(this.hudRoot);
@@ -361,6 +367,11 @@ export class Client {
     }
     this.hud.hideEnd = false;
     this.gpuHeals = 0;
+    this.foeUntil = 0;
+    this.foeShow = 0;
+    this.foeShownId = null;
+    this.foeLast = null;
+    this.foeBar.style.display = 'none';
     this.lootVer = -1;
     this.camYaw = 0; // behind the bus as it rolls in
     this.camPitch = -0.15;
@@ -789,6 +800,8 @@ export class Client {
           }
           if (e.by === me && e.id !== me) {
             this.hud.hitMarker(e.head);
+            this.foeId = e.id;
+            this.foeUntil = this.time + 3;
             audio.play('hit', null, { head: e.head });
             this.damageNumber(pl, e.amt, e.head, e.shield);
           }
@@ -1123,6 +1136,7 @@ export class Client {
     this.updateTargeting(snap);
     this.updateAudio(snap);
     this.updateDamageNumbers(dt);
+    this.updateFoeBar(snap, dt);
 
     // HUD
     const p = this.mySnap();
@@ -1293,7 +1307,7 @@ export class Client {
       ch.root.updateMatrixWorld();
       // name tags
       const dist = meP ? Math.hypot(p.x - meP.x, p.z - meP.z) : 0;
-      const showTag = p.id !== this.myId && !hidden && !seat && (p.state === 'ghost' ? (ghostView || p.exposed) && dist < 40 : dist < (ghostView ? 35 : 22));
+      const showTag = p.id !== this.myId && !hidden && !seat && !(p.id === this.foeShownId && this.foeShow > 0.3) && (p.state === 'ghost' ? (ghostView || p.exposed) && dist < 40 : dist < (ghostView ? 35 : 22));
       c.tag.visible = showTag;
       c.tag.material.depthTest = !ghostView;
       // names fade in as people come close (ghosts read them from further off)
@@ -1616,6 +1630,49 @@ export class Client {
       w.flash *= b.k;
       if (b.t > 1.5) w.bolt = null;
     }
+  }
+
+  /**
+   * The bar over whoever you are fighting: shown while you are locked on to them, or for 3 s after you hit them.
+   * Damage shows as a pale chip that drains a moment later, so each blow reads as a bite out of the bar.
+   */
+  updateFoeBar(snap, dt) {
+    const bar = this.foeBar;
+    const meP = this.mySnap();
+    const id = this.lockOn ? this.lockOn.id : this.time < (this.foeUntil || 0) ? this.foeId : null;
+    const p = id != null && meP && meP.state === 'alive' ? snap.players.find((q) => q.id === id) : null;
+    const show = !!p && p.state === 'alive' && Math.hypot(p.x - meP.x, p.z - meP.z) < 30;
+    this.foeShow = Math.max(0, Math.min(1, (this.foeShow || 0) + (show ? dt * 8 : -dt * 4)));
+    if (!show) {
+      bar.style.opacity = this.foeShow;
+      if (this.foeShow <= 0) bar.style.display = 'none';
+      if (this.foeShow <= 0 || !this.foeLast) return;
+    }
+    const q = show ? p : this.foeLast;
+    if (show) {
+      if (this.foeShownId !== p.id) {
+        this.foeShownId = p.id;
+        this.foeChip = p.hp;
+        bar.querySelector('.fb-name span').textContent = p.name;
+      }
+      if (p.hp > this.foeChip) this.foeChip = p.hp;
+      if (p.hp < (this.foeLast?.id === p.id ? this.foeLast.hp : p.hp)) this.foeDropAt = this.time;
+      if (this.time - (this.foeDropAt || 0) > 0.45) this.foeChip += (p.hp - this.foeChip) * Math.min(1, dt * 7);
+      this.foeLast = { id: p.id, x: p.x, y: p.y, z: p.z, hp: p.hp, shield: p.shield };
+      bar.style.display = '';
+      bar.style.opacity = this.foeShow;
+      bar.classList.toggle('locked', !!this.lockOn && this.lockOn.id === p.id);
+      bar.querySelector('.fb-hp').style.width = `${Math.max(0, p.hp)}%`;
+      bar.querySelector('.fb-chip').style.width = `${Math.max(0, this.foeChip)}%`;
+      bar.querySelector('.fb-sh div').style.width = `${Math.max(0, p.shield)}%`;
+      bar.querySelector('.fb-sh').style.display = p.shield > 0 ? '' : 'none';
+    }
+    tmpV.set(q.x, q.y + 2.1, q.z).project(this.camera);
+    if (tmpV.z > 1) {
+      bar.style.display = 'none';
+      return;
+    }
+    bar.style.transform = `translate(${((tmpV.x + 1) / 2) * window.innerWidth}px, ${((1 - tmpV.y) / 2) * window.innerHeight}px) translate(-50%, -100%)`;
   }
 
   updateDamageNumbers(dt) {
