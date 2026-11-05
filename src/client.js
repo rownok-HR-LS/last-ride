@@ -26,6 +26,7 @@ import { Projectiles } from './projectiles.js';
 import { weaponModel, projectileModel, itemModel } from './weapons.js';
 import * as audio from './audio.js';
 import { windTime } from './wind.js';
+import { sceneWet } from './wet.js';
 import { PauseMenu } from './menu.js';
 import { loadSettings } from './settings.js';
 import { Touch, isTouch } from './touch.js';
@@ -259,6 +260,7 @@ export class Client {
     groundRain.time.value = t % 1000;
     windTime.value = t % 1000;
     groundRain.amount.value = 0.85;
+    sceneWet.value = 0.85;
     this.lamps.update([], t, cam.position.x, cam.position.z, 1);
     if (this.showChar) {
       const x = 2.5;
@@ -1058,6 +1060,7 @@ export class Client {
     groundRain.time.value = this.time % 1000;
     windTime.value = this.time % 1000;
     groundRain.amount.value = rainAmount;
+    sceneWet.value = rainAmount;
     this.rainAmount = rainAmount;
     // only the plants, trees and props in view (and close by, for shadows) get drawn
     cullInstances(this.camera);

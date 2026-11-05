@@ -2,6 +2,7 @@
 // Static geometry is merged per material to keep draw calls low.
 import * as THREE from 'three';
 import { softShaft, nightAir } from './shafts.js';
+import { wetten } from './wet.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
 import { PROPS, LAMPS, LAMP_HEAD, PARK_EDGE, PRIZE_BOOTHS, DECOR, LANDMARKS_OUT, rotXZ } from '../shared/map.js';
@@ -94,6 +95,8 @@ export function initMaterials() {
   bulb('bulbCyan', '#1a2222', 0.2);
   bulb('bulbRed', '#ff2a1a', 1.6);
   bulb('bulbGreen', '#9aff9a', 0.9);
+  // everything built from these gets wet in the rain (the glowing bulbs are left alone)
+  for (const [k, e] of Object.entries(MATS)) if (!k.startsWith('bulb')) wetten(e.mat);
   return MATS;
 }
 

@@ -2,6 +2,7 @@
 // them into the footprints the map reserves (so they match the colliders the simulation uses).
 // Copies of the same model are drawn as one instanced mesh per part, so dozens of booths cost a few draw calls.
 import * as THREE from 'three';
+import { wetten } from './wet.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -23,6 +24,8 @@ export function loadModel(name) {
           // old, damp and dirty: nothing shiny
           m.roughness = Math.max(m.roughness ?? 0.8, 0.55);
           if (m.map) m.map.anisotropy = 4;
+          // ...until it rains on it
+          if (!m.transparent && !(m.emissiveIntensity > 0.5 && m.emissiveMap)) wetten(m);
         }
       });
       g.scene.updateMatrixWorld(true);
