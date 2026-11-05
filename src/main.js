@@ -1,4 +1,5 @@
-// Title screen: the park itself, live in the rain behind a worn ticket-booth sign where you pick your rider.
+// Title screen: the park itself, live in the rain, your rider standing under a lamp, and a clean panel to ride
+// from: your name and level, Ride online, Practice, your earned looks, settings, and today's challenges.
 // The world is built while you choose, so boarding the bus starts the ride straight away.
 import { OUTFITS } from '../shared/constants.js';
 import { loadCharacters, whenAllRiders, whenRider } from './characters.js';
@@ -6,14 +7,16 @@ import { initAudio } from './audio.js';
 import { CREDITS } from './credits.js';
 import { loadSettings } from './settings.js';
 import { settingsBoard } from './menu.js';
-import { loadProgress } from './progress.js';
+import { loadProgress, saveProgress, levelOf, dailies, looksFor } from './progress.js';
 
 const app = document.getElementById('app');
+let parkInfo = Promise.resolve(null);
 // knock on the ride server's door right away: the free host sleeps when nobody plays and takes most of a minute to
 // wake, so by the time you have picked a rider it is usually up (the online sign keeps knocking if it is not)
 {
   const ws = new URLSearchParams(location.search).get('server') || import.meta.env.VITE_SERVER_URL;
-  if (ws) fetch(ws.replace(/^ws/, 'http'), { cache: 'no-store' }).catch(() => {});
+  // (its answer says how many are in the park, for the Ride online button)
+  if (ws) parkInfo = fetch(ws.replace(/^ws/, 'http'), { cache: 'no-store' }).then((r) => r.json()).catch(() => null);
 }
 /** Shown while the park loads. */
 const TIPS = [
@@ -52,8 +55,9 @@ async function title() {
   profile.look = loadProgress().look;
   const settings = loadSettings();
   if (!OUTFITS.some((o) => o.id === profile.outfit)) profile.outfit = OUTFITS[0].id;
+  const progress = loadProgress();
   const el = document.createElement('div');
-  el.className = 'title2';
+  el.className = 'title2 modern';
   el.innerHTML = `
     <div class="t-still"></div>
     <div class="t-logo">
@@ -61,27 +65,30 @@ async function title() {
       <div class="t-sub">Midnight Wonderland Tours · closed 1987</div>
       <div class="t-load"><div class="t-bar"><i></i></div><span class="t-tip"></span></div>
     </div>
-    <div class="t-rider"><b class="t-rider-name"></b><span class="t-rider-blurb"></span></div>
-    <div class="sign t-panel">
-      <div class="bulbs"></div>
-      <h3>Name on your ticket</h3>
-      <input class="t-nick" maxlength="16" placeholder="Rider" />
-      <h3>Who rides tonight</h3>
-      <div class="choices t-outfits">${OUTFITS.map((o) => `<button class="choice" data-id="${o.id}">${o.name}</button>`).join('')}</div>
-      <h3>Practice riders</h3>
-      <div class="choices t-diff">${['easy', 'normal', 'hard'].map((d) => `<button class="choice" data-d="${d}">${d[0].toUpperCase()}${d.slice(1)}</button>`).join('')}</div>
-      <div class="stack">
-        <button class="ticket t-play" disabled>Loading the park…</button>
-        <button class="ticket cream t-practice" disabled>Practice <small>offline vs bots</small></button>
-        <button class="ticket cream t-settings">Settings</button>
+    <div class="tm-rider">
+      <div class="tm-rider-pick">
+        <button class="tm-arrow tm-prev" aria-label="Previous rider">‹</button>
+        <div><b class="t-rider-name"></b><small class="tm-count"></small></div>
+        <button class="tm-arrow tm-next" aria-label="Next rider">›</button>
       </div>
-      <p class="fine center">Online: one public ride. The bus leaves every half minute with everyone waiting, and bots take the empty seats.</p>
-      <details class="t-more"><summary>How the ride works · credits</summary>
-        <p>Survivors loot bats, axes and crossbows and fight; the last one standing leaves on the last bus.
-        The dead come back as ghosts, haunt with rides, traps and blackouts, and a ghost who lands the killing blow
-        steals that body (twice at most).</p>
-        <ul>${CREDITS.map((c) => `<li><a href="${c.url}" target="_blank" rel="noopener">${c.what}</a> by ${c.by} (${c.license})</li>`).join('')}</ul>
-      </details>
+      <span class="t-rider-blurb"></span>
+    </div>
+    <div class="tm-panel">
+      <div class="tm-who">
+        <input class="t-nick" maxlength="16" placeholder="Your name" aria-label="Your name" />
+        <div class="tm-level"><b class="tm-lv"></b><div class="tm-xp"><i></i></div><small class="tm-xp-n"></small></div>
+      </div>
+      <button class="tm-play t-play" disabled>Loading the park…</button>
+      <div class="tm-practice-row">
+        <button class="tm-btn t-practice" disabled>Practice</button>
+        <div class="tm-seg t-diff">${['easy', 'normal', 'hard'].map((d) => `<button data-d="${d}">${d[0].toUpperCase()}${d.slice(1)}</button>`).join('')}</div>
+      </div>
+      <div class="tm-row">
+        <button class="tm-btn tm-looks">Looks</button>
+        <button class="tm-btn t-settings">Settings</button>
+        <button class="tm-btn tm-how">How to play</button>
+      </div>
+      <div class="tm-daily"><h4>Today</h4><ul></ul></div>
     </div>
     <div class="menu-layer t-settings-layer"></div>`;
   app.appendChild(el);
@@ -92,27 +99,48 @@ async function title() {
   const practice = el.querySelector('.t-practice');
   const riderName = el.querySelector('.t-rider-name');
   const riderBlurb = el.querySelector('.t-rider-blurb');
+  const layer = el.querySelector('.t-settings-layer');
   let client = null;
   let ridersReady = false;
 
+  // your level and today's challenges
+  const showProgress = () => {
+    const l = levelOf(progress.xp);
+    el.querySelector('.tm-lv').textContent = `Level ${l.level}`;
+    el.querySelector('.tm-xp i').style.width = `${l.need ? Math.round((l.into / l.need) * 100) : 100}%`;
+    el.querySelector('.tm-xp-n').textContent = l.need ? `${l.into} / ${l.need} XP` : 'Max level';
+    el.querySelector('.tm-daily ul').innerHTML = dailies(progress).map((d) => `<li class="${d.done ? 'done' : ''}">
+      <span>${d.text}</span><b>${d.done ? 'Done' : d.unit === 's' ? `${Math.floor(d.have / 60)} / ${d.goal / 60} min` : `${d.have} / ${d.goal}`}</b>
+      <i style="width:${Math.round((d.have / d.goal) * 100)}%"></i></li>`).join('');
+  };
+  showProgress();
+
+  // the rider carousel
   const showRider = () => {
-    const o = OUTFITS.find((x) => x.id === profile.outfit);
-    el.querySelectorAll('[data-id]').forEach((b) => b.classList.toggle('on', b.dataset.id === profile.outfit));
+    const i = OUTFITS.findIndex((x) => x.id === profile.outfit);
+    const o = OUTFITS[i];
     riderName.textContent = o.name;
     riderBlurb.textContent = o.blurb;
+    el.querySelector('.tm-count').textContent = `${i + 1} / ${OUTFITS.length}`;
     // a rider still loading in the background shows as soon as it is in
     if (ridersReady) {
       const id = profile.outfit;
       whenRider(id).then(() => profile.outfit === id && client?.showcase(id, profile.look));
     }
   };
-  const showDiff = () => el.querySelectorAll('[data-d]').forEach((b) => b.classList.toggle('on', b.dataset.d === profile.difficulty));
-  el.querySelector('.t-outfits').addEventListener('click', (e) => {
-    const b = e.target.closest('[data-id]');
-    if (!b) return;
-    profile.outfit = b.dataset.id;
+  const turn = (d) => {
+    const i = OUTFITS.findIndex((x) => x.id === profile.outfit);
+    profile.outfit = OUTFITS[(i + d + OUTFITS.length) % OUTFITS.length].id;
     showRider();
+  };
+  el.querySelector('.tm-prev').addEventListener('click', () => turn(-1));
+  el.querySelector('.tm-next').addEventListener('click', () => turn(1));
+  addEventListener('keydown', (e) => {
+    if (!el.isConnected || e.target === nick || layer.classList.contains('show')) return;
+    if (e.code === 'ArrowLeft') turn(-1);
+    else if (e.code === 'ArrowRight') turn(1);
   });
+  const showDiff = () => el.querySelectorAll('[data-d]').forEach((b) => b.classList.toggle('on', b.dataset.d === profile.difficulty));
   el.querySelector('.t-diff').addEventListener('click', (e) => {
     const b = e.target.closest('[data-d]');
     if (!b) return;
@@ -122,12 +150,59 @@ async function title() {
   showRider();
   showDiff();
 
-  const layer = el.querySelector('.t-settings-layer');
+  const closeLayer = () => layer.classList.remove('show');
   el.querySelector('.t-settings').addEventListener('click', () => {
     layer.replaceChildren(settingsBoard(settings, {
       onChange: (s) => client?.applySettings(s),
-      onBack: () => layer.classList.remove('show'),
+      onBack: closeLayer,
     }));
+    layer.classList.add('show');
+  });
+
+  // the locker: earned looks, picked here, worn on the ride (and shown on your rider right away)
+  const KIND = { trail: 'Swing trail', tag: 'Name tag', dye: 'Clothing dye' };
+  const swatch = (kind, x) => {
+    if (kind === 'trail') return `rgb(${x.rgb.map((v) => Math.round(Math.pow(v, 1 / 2.2) * 255)).join(',')})`;
+    if (kind === 'tag') return x.color;
+    return x.rgb ? `rgb(${x.rgb.map((v) => Math.round(v * 255)).join(',')})` : 'linear-gradient(135deg, #6b5a4a, #3a4a5a)';
+  };
+  const openLooks = () => {
+    const all = looksFor(progress);
+    const panel = document.createElement('div');
+    panel.className = 'tm-sheet';
+    panel.innerHTML = `<h2>Looks</h2><p class="tm-fine">Earned by levelling up. Only how you look: no look makes you stronger.</p>
+      ${Object.entries(all).map(([kind, list]) => `<h4>${KIND[kind]}</h4><div class="tm-tiles">${list.map((x) => `<button class="tm-tile ${progress.look[kind] === x.id ? 'on' : ''}" data-kind="${kind}" data-look="${x.id}" ${x.earned ? '' : 'disabled'}>
+          <i style="background:${swatch(kind, x)}"></i><span>${x.name}</span><small>${x.earned ? (progress.look[kind] === x.id ? 'Wearing' : 'Wear') : `Level ${x.level}`}</small></button>`).join('')}</div>`).join('')}
+      <button class="tm-btn tm-done">Done</button>`;
+    panel.addEventListener('click', (e) => {
+      const t = e.target.closest('[data-look]');
+      if (t && !t.disabled) {
+        progress.look[t.dataset.kind] = t.dataset.look;
+        profile.look = { ...progress.look };
+        saveProgress(progress);
+        client?.showChar?.wear(profile.look);
+        openLooks();
+      } else if (e.target.closest('.tm-done')) closeLayer();
+    });
+    layer.replaceChildren(panel);
+    layer.classList.add('show');
+  };
+  el.querySelector('.tm-looks').addEventListener('click', openLooks);
+
+  // how to play, and the credits
+  el.querySelector('.tm-how').addEventListener('click', () => {
+    const panel = document.createElement('div');
+    panel.className = 'tm-sheet';
+    panel.innerHTML = `<h2>How the ride works</h2>
+      <p>Twenty riders get off the bus in a park that closed in 1987. Loot bats, axes and crossbows from the stalls
+      and chests and fight. The storm closes in around the big top; the last one standing leaves on the last bus.</p>
+      <p>The dead come back as ghosts. They haunt with the rides, traps and blackouts, and a ghost who lands the
+      killing blow steals that body and rides again (twice at most).</p>
+      <p>Every ride earns experience. Levels unlock looks; three challenges change every day.</p>
+      <h4>Credits</h4><ul class="tm-credits">${CREDITS.map((c) => `<li><a href="${c.url}" target="_blank" rel="noopener">${c.what}</a> by ${c.by} (${c.license})</li>`).join('')}</ul>
+      <button class="tm-btn tm-done">Done</button>`;
+    panel.querySelector('.tm-done').addEventListener('click', closeLayer);
+    layer.replaceChildren(panel);
     layer.classList.add('show');
   });
 
@@ -179,7 +254,13 @@ async function title() {
   requestAnimationFrame(() => el.classList.add('ready'));
   play.disabled = false;
   practice.disabled = false;
-  play.innerHTML = 'Ride online <small>admit one</small>';
+  play.innerHTML = 'Ride online <small>Public ride · the bus leaves every half minute</small>';
+  // how many are in the park right now (from the server's wake-up answer)
+  parkInfo.then((info) => {
+    if (info && typeof info.online === 'number' && !play.disabled) {
+      play.querySelector('small').textContent = info.online ? `${info.online} in the park · the bus leaves every half minute` : 'Nobody in the park yet · bots fill the seats';
+    }
+  });
 
   const start = async (online, resume = null) => {
     if (play.disabled) return;

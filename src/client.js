@@ -334,10 +334,13 @@ export class Client {
     const cam = this.camera;
     // a slow handheld sway, never far enough to lose the rider
     const sway = Math.sin(t * 0.07);
-    cam.position.set(4.6 + sway * 0.5, 1.75 + Math.sin(t * 0.11) * 0.08, 104 + Math.sin(t * 0.045) * 1.2);
-    cam.lookAt(1.6 + sway * 0.3, 1.5, 88);
-    if (Math.abs(cam.fov - 48) > 0.01) {
-      cam.fov = 48;
+    // on a tall (phone) screen the menu fills the bottom: turn toward the rider, step back, and keep them high
+    const narrow = Math.min(1, Math.max(0, (1.1 - cam.aspect) / 0.6));
+    cam.position.set(4.6 + sway * 0.5 - narrow * 1.1, 1.75 + Math.sin(t * 0.11) * 0.08 + narrow * 0.35, 104 + Math.sin(t * 0.045) * 1.2 + narrow * 2.2);
+    cam.lookAt(1.6 + sway * 0.3 + narrow * 1.0, 1.5 - narrow * 1.1, 88 + narrow * 8);
+    const fov = 48 + narrow * 14;
+    if (Math.abs(cam.fov - fov) > 0.01) {
+      cam.fov = fov;
       cam.updateProjectionMatrix();
     }
     this.updateWeather(dt);
