@@ -1,6 +1,7 @@
 // Phone and tablet controls: a stick that appears under the left thumb, drag anywhere on the right to look,
 // and a fan of buttons for the right thumb. Buttons press the same keys the keyboard does, so everything else
 // (bindings, the HUD, online play) works unchanged. Weapon slots, items and ghost powers in the HUD can be tapped.
+import { icon } from './icons.js';
 
 /** Does this device have a touch screen as its main pointer? */
 export const isTouch = () => matchMedia('(pointer: coarse)').matches || (navigator.maxTouchPoints > 0 && !matchMedia('(pointer: fine)').matches);
@@ -10,16 +11,16 @@ const LOOK_GAIN = 1.7;
 
 // [id, label, what it presses, which states show it]
 const BUTTONS = [
-  ['attack', '⚔', 'lmb', 'alive'],
-  ['block', '🛡', 'rmb', 'alive'],
+  ['attack', icon('weapon'), 'lmb', 'alive'],
+  ['block', icon('shield'), 'rmb', 'alive'],
   ['jump', '⤒', 'jump', 'alive'],
   ['dodge', '↯', 'dodge', 'alive'],
   ['slide', '⤓', 'slide', 'alive'],
   ['use', 'E', 'interact', 'alive'],
   ['reload', 'R', 'reload', 'alive'],
   ['swap', '⇄', 'wheel', 'alive'],
-  ['prizes', '🎟', 'prizes', 'booth'],
-  ['cast', '✦', 'lmb', 'ghost'],
+  ['prizes', icon('ticket'), 'prizes', 'booth'],
+  ['cast', icon('spark'), 'lmb', 'ghost'],
   ['up', '⤒', 'jump', 'ghost'],
   ['down', '⤓', 'slide', 'ghost'],
   ['fast', '»', 'sprint', 'ghost'],
@@ -37,7 +38,7 @@ export class Touch {
     this.el.className = 'touch-ui hidden';
     this.el.innerHTML = `
       <div class="t-stick"><i></i></div>
-      <div class="t-top"><button data-t="menu">☰</button><button data-t="map">Map</button></div>
+      <div class="t-top"><button data-t="menu" aria-label="Menu">${icon('menu')}</button><button data-t="map">Map</button></div>
       <div class="t-pad">${BUTTONS.map(([id, label, , when]) => `<button class="tb tb-${id}" data-b="${id}" data-when="${when}">${label}</button>`).join('')}</div>
       <div class="t-turn">Turn your phone sideways to ride</div>`;
     root.appendChild(this.el);

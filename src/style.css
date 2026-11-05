@@ -875,3 +875,7 @@ body.touch .foe-bar { width: 96px; }
 /* ---------------------------------------------------------------- playing with a controller */
 /* weapon slots cycle with Y: their number keys mean nothing; an item with no D-pad direction shows no cap */
 body.pad .slot kbd, body.pad .item kbd:empty, body.pad .power kbd:empty { display: none; }
+
+/* ---------------------------------------------------------------- the death camera: one card, nothing else */
+.hud.dying .ghost-ui, .hud.dying .objective, .hud.dying .prompt, .hud.dying .keys-card, .hud.dying .vitals, .hud.dying .weapons,
+.hud.dying .items, .hud.dying .markers, .hud.dying .crosshair, .hud.dying .banner { visibility: hidden; }

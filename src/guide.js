@@ -164,7 +164,7 @@ export class Guide {
         const near = this.nearestLoot(client, p, (l) => l.kind === 'chest' || l.kind === 'weapon');
         if (near) this.place(n++, cam, near.x, near.y + 1, near.z, near.kind === 'chest' ? 'chest' : 'weapon', `${dist(near.x, near.z)} m`, near.kind === 'weapon' ? `r${near.rarity}` : 'chest');
       } else if (me.tickets >= 30 && booth) {
-        this.setObjective(`Spend your tickets · 🎟 ${me.tickets}`, `A Prize Counter sells chainsaws, crossbows and blessed relics. Walk up and press ${keyOf('prizes')}.`);
+        this.setObjective(`Spend your tickets · ${svgIcon('ticket')} ${me.tickets}`, `A Prize Counter sells chainsaws, crossbows and blessed relics. Walk up and press ${keyOf('prizes')}.`);
         this.place(n++, cam, booth.x, 4.5, booth.z, 'ticket', `Prize Counter · ${dist(booth.x, booth.z)} m`, 'chest');
       } else if (p.hp < 60 && (me.items.bandage || me.items.medkit)) {
         this.setObjective('Heal up', `Press ${me.items.medkit ? '5 for a medkit' : '4 for a bandage'} somewhere safe`);
@@ -243,16 +243,21 @@ export class Guide {
       if (this.tut === 2 && me.possess) this.tut = 3;
       if (this.tut === 3 && !me.possess) this.finishTut();
     }
+    // keys and buttons named for whatever the player is holding (see prompts.js)
+    const gh = svgIcon('ghost');
+    const trap = usingPad() ? '↑' : '1';
+    const use = usingPad() ? `press ${keyOf('attack')} on` : 'click';
+    const lets = `${keyOf('interact')} lets go.`;
     const step = {
-      0: ['👻 You are a ghost now', 'Fly with WASD. Space goes up, Ctrl goes down, Shift flies fast. Walls can\'t stop you.'],
+      0: [`${gh} Fly as a ghost`, `Fly with ${keyOf('move')}. ${keyOf('up')} goes up, ${keyOf('down')} goes down, ${keyOf('fast')} flies fast. Walls can't stop you.`],
       1: me.riseT > 0
-        ? [`👻 Rising from the grave… ${Math.ceil(me.riseT)}s`, 'Then press 1 for a Bear Trap and click the ground in front of a survivor.']
-        : ['👻 Use a power', 'Press 1 (Bear Trap), then click the ground in front of a survivor (🎯 markers).'],
-      2: ['👻 Possess a ride', 'Rides hit hardest. Fly to a 🎡 🎢 🚗 marker and press E.'],
-      3: ['👻 You control the ride!', me.possess?.kind === 'ferris' ? 'Aim at a survivor and click to fling a gondola. E lets go.' : me.possess?.kind === 'car' ? 'Drive into survivors. E lets go.' : 'Hold on. Anyone on the track gets hit.'],
+        ? [`${gh} Rising from the grave… ${Math.ceil(me.riseT)}s`, `Then pick the Bear Trap (${trap}) and ${use} the ground in front of a survivor.`]
+        : [`${gh} Use a power`, `Pick the Bear Trap (${trap}), then ${use} the ground in front of a survivor (${svgIcon('target')} markers).`],
+      2: [`${gh} Possess a ride`, `Rides hit hardest. Fly to a ${svgIcon('ferris')} ${svgIcon('coaster')} ${svgIcon('car')} marker and press ${keyOf('interact')}.`],
+      3: [`${gh} You control the ride!`, me.possess?.kind === 'ferris' ? `Aim at a survivor and ${use} to fling a gondola. ${lets}` : me.possess?.kind === 'car' ? `Drive into survivors. ${lets}` : 'Hold on. Anyone on the track gets hit.'],
     }[this.tut];
     if (step) this.setObjective(step[0], step[1]);
-    else this.setObjective(`👻 Steal a body · ${revives}`, me.revivesLeft > 0 ? 'Land the final hit on a survivor (🎯) with a power or a ride to come back in their body.' : 'Lost soul: you can still haunt the survivors.');
+    else this.setObjective(`${gh} Steal a body · ${revives}`, me.revivesLeft > 0 ? `Land the final hit on a survivor (${svgIcon('target')}) with a power or a ride to come back in their body.` : 'Lost soul: you can still haunt the survivors.');
   }
 
   finishTut() {

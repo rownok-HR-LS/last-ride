@@ -118,7 +118,7 @@ export class Hud {
     root.innerHTML = `
       <div class="hud-top-left"><canvas class="minimap" width="190" height="190"></canvas><div class="mini-zone"></div></div>
       <div class="hud-top-right">
-        <div class="counts"><span class="c-alive" title="Survivors">👤 0</span><span class="c-ghosts" title="Ghosts">👻 0</span><span class="c-kills" title="Kills">💀 0</span></div>
+        <div class="counts"><span class="c-alive" title="Survivors"></span><span class="c-ghosts" title="Ghosts"></span><span class="c-kills" title="Kills"></span></div>
         <div class="zone-info"></div>
         <div class="feed"></div>
       </div>
@@ -143,7 +143,7 @@ export class Hud {
         <div class="items"></div>
       </div>
       <div class="ghost-ui">
-        <div class="ghost-title">👻 GHOST <span class="g-revives"></span></div>
+        <div class="ghost-title">${icon('ghost')} GHOST <span class="g-revives"></span></div>
         <div class="ecto"><div></div><span></span></div>
         <div class="powers"></div>
         <div class="ghost-hint"></div>
@@ -551,9 +551,12 @@ export class Hud {
       ctx.stroke();
       ctx.setLineDash([]);
       ctx.fillStyle = '#ffe14f';
-      ctx.font = 'bold 15px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('🚌', tx(snap.bus.x), tz(snap.bus.z) + 5);
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(tx(snap.bus.x) - 9, tz(snap.bus.z) - 5, 18, 10, 3);
+      else ctx.rect(tx(snap.bus.x) - 9, tz(snap.bus.z) - 5, 18, 10);
+      ctx.fill();
+      ctx.fillStyle = '#20232a';
+      ctx.fillRect(tx(snap.bus.x) - 6, tz(snap.bus.z) - 3, 12, 3);
     }
     if (me) {
       ctx.save();

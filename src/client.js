@@ -918,7 +918,7 @@ export class Client {
             });
             this.afterDeath = e.steal
               ? ['YOUR BODY WAS STOLEN', `${this.name(e.killer)} took it. Haunt them back!`, 4]
-              : ['YOU DIED', 'You are a ghost now. Land a killing blow to steal a body.', 4.5];
+              : ['YOU DIED', 'Now haunt them. Land a killing blow to steal a body and come back.', 4.5];
             this.power = null;
           } else if (e.killer === me) {
             if (e.steal) {
@@ -988,7 +988,7 @@ export class Client {
           break;
         case 'storm':
           audio.play('storm');
-          this.hud.feed('🌀 The ghosts dragged the storm!', 'steal');
+          this.hud.feed('The ghosts dragged the storm!', 'steal');
           break;
         case 'bump':
           audio.play('honk', [e.x, 1, e.z]);
@@ -1252,6 +1252,8 @@ export class Client {
     };
     this.view.scoped = false;
     this.hudRoot.classList.toggle('cinematic', this.intro.active);
+    // while the death camera runs, the card saying who did it is the only thing on screen
+    this.hudRoot.classList.toggle('dying', !!this.deathCam);
     this.hud.update(snap, dt, this.view);
     this.touch?.update();
     this.hud.scoreboard(snap, this.input.down('Tab'));

@@ -24,6 +24,8 @@ const P = {
   ferris: '<circle cx="12" cy="10" r="7"/><circle cx="12" cy="10" r="1.5"/><path d="M12 3v14M5 10h14M7 5l10 10M17 5L7 15M8 21l4-9 4 9"/>',
   coaster: '<path d="M2 18c3 0 3-10 6-10s3 8 6 8 3-12 8-12"/><path d="M2 21h20"/>',
   car: '<path d="M4 16v-4l2-4h12l2 4v4zM3 16h18v2H3z"/><circle cx="7.5" cy="18.5" r="1.5"/><circle cx="16.5" cy="18.5" r="1.5"/>',
+  menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
+  spark: '<path d="M12 3v5M12 16v5M3 12h5M16 12h5M6 6l3 3M15 15l3 3M18 6l-3 3M9 15l-3 3"/>',
 };
 
 /** An inline SVG icon by name (falls back to the name itself as text). */
