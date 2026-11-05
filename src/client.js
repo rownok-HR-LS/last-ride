@@ -70,7 +70,9 @@ export class Client {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    // PCF from the start: three swaps the removed soft mode for PCF only at the first shadow pass, and any shader
+    // built before that expected the wrong kind of shadow texture (those draws failed and riders vanished)
+    renderer.shadowMap.type = THREE.PCFShadowMap;
     // neutral tone mapping keeps the sodium lamps orange and the night deep instead of washing everything out
     renderer.toneMapping = THREE.NeutralToneMapping;
     renderer.toneMappingExposure = 1.15;
@@ -951,8 +953,9 @@ export class Client {
   }
 
   /**
-   * A rare GPU state where most lit draws fail (WebGL logs "Mismatch between texture format and sampler type") and
-   * riders vanish. Rebuilding the shaders clears it: toggling the moon's shadow changes every lit material's program.
+   * Safety net for lit draws failing (WebGL logs "Mismatch between texture format and sampler type"; riders vanish).
+   * The known cause, shaders built for the removed soft shadow mode, is fixed by asking for PCF from the start; if it
+   * ever happens again, rebuilding the shaders clears it: toggling the moon's shadow changes every lit program.
    * Checked every two seconds (reading the GL error stalls the GPU a little), at most three repairs a match.
    */
   checkGpu() {
