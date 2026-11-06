@@ -538,6 +538,171 @@ def flag(K, mat, pts):
     K._take(mat, bm, recalc=False)
 
 
+def rod(K, mat, a, b, r, segs=6):
+    """A round bar from point a to point b."""
+    a, b = Vector(a), Vector(b)
+    d = b - a
+    q = Vector((0, 1, 0)).rotation_difference(d.normalized()).to_euler('YXZ')
+    K.cyl(mat, tuple((a + b) / 2), r, d.length, axis='y', segs=segs, rot=(q.x, q.y, q.z))
+
+
+# ------------------------------------------------------------------ the park's iron fence (12 m panels along x)
+
+def fence(seed):
+    K = Kit()
+    rr = random.Random(seed)
+    half = 6.0
+    for x in (-half, half):
+        K.box('plinth', (x, 0.2, 0), (0.42, 0.4, 0.42), bevel=0.03)
+        K.box('iron', (x, 1.9, 0), (0.13, 3.1, 0.13), bevel=0.015)
+        K.box('iron', (x, 3.48, 0), (0.2, 0.06, 0.2), bevel=0.01)
+        K.ball('iron', (x, 3.6, 0), 0.09, segs=8)
+    for y in (0.4, 2.62, 2.84):
+        K.box('iron', (0, y, 0), (2 * half, 0.05, 0.03), bevel=0.0)
+    n = int(2 * half / 0.22)
+    for k in range(1, n):
+        x = -half + k * 2 * half / n
+        if rr.random() < 0.03:
+            continue  # a picket long gone
+        lean = (rr.random() - 0.5) * 0.12 if rr.random() < 0.08 else 0.0
+        K.box('iron', (x, 1.62, 0), (0.024, 2.95, 0.024), rot=(0, 0, lean), bevel=0.0)
+        # a spear tip on every picket, a collar between the top rails
+        tip = bmesh.new()
+        bmesh.ops.create_cone(tip, cap_ends=True, segments=4, radius1=0.035, radius2=0.0, depth=0.12)
+        M = Matrix.Translation(Vector((x - math.sin(lean) * 1.47, 3.15, 0))) @ Euler((-math.pi / 2, math.pi / 4, 0), 'YXZ').to_matrix().to_4x4()
+        K._take('iron', tip, M)
+        K.box('iron', (x, 2.73, 0), (0.05, 0.05, 0.05), bevel=0.0)
+    return K
+
+
+# ------------------------------------------------------------------ food carts (1.4 x 2.4, long along z)
+
+def cart(kind):
+    K = Kit()
+    main = {'popcorn': '#c8392b', 'candy': '#d96aa8', 'hotdog': '#e8b23a'}[kind]
+    K.box(main, (0, 0.78, 0.05), (1.15, 0.85, 2.0), bevel=0.06, segs=2)
+    for y in (0.4, 1.16):
+        K.box(CREAM, (0, y, 0.05), (1.18, 0.07, 2.03), bevel=0.02)
+    K.box('woodDark', (0, 1.24, 0.05), (1.3, 0.06, 2.2), bevel=0.02)
+    # two big spoked wheels at the back, a pair of legs at the front, a push bar
+    for x in (-0.66, 0.66):
+        K.cyl('rubber', (x, 0.44, -0.55), 0.44, 0.06, axis='x', segs=20)
+        K.cyl('iron', (x * 1.02, 0.44, -0.55), 0.06, 0.1, axis='x', segs=8)
+        for s in range(6):
+            K.box('iron', (x, 0.44, -0.55), (0.02, 0.8, 0.025), rot=(s * math.pi / 6, 0, 0), bevel=0.0)
+        K.box('iron', (x * 0.8, 0.2, 0.85), (0.05, 0.4, 0.05), bevel=0.0)
+    K.cyl('iron', (0, 0.44, -0.55), 0.03, 1.36, axis='x', segs=6)
+    for x in (-0.5, 0.5):
+        rod(K, 'iron', (x, 1.1, -0.95), (x, 1.05, -1.3), 0.025)
+    K.cyl('rubber', (0, 1.05, -1.3), 0.035, 1.05, axis='x', segs=8)
+    # the striped umbrella
+    K.cyl('iron', (0.3, 1.9, 0.6), 0.025, 1.4, segs=6)
+    apex = Vector((0.3, 2.95, 0.6))
+    n = 8
+    for i in range(n):
+        a0, a1 = i * 2 * math.pi / n, (i + 1) * 2 * math.pi / n
+        p0 = apex + Vector((math.cos(a0) * 1.25, -0.55, math.sin(a0) * 1.25))
+        p1 = apex + Vector((math.cos(a1) * 1.25, -0.55, math.sin(a1) * 1.25))
+        flag(K, main if i % 2 == 0 else CREAM, [tuple(apex), tuple(p1), tuple(p0)])
+    K.ball('gold', tuple(apex + Vector((0, 0.06, 0))), 0.05, segs=8)
+    # what it sold
+    if kind == 'popcorn':
+        # a glass case on thin corner posts
+        K.box('dark', (0, 1.75, 0.15), (0.76, 0.86, 0.66), bevel=0.0)
+        for x in (-0.39, 0.39):
+            for z in (-0.19, 0.49):
+                K.box('iron', (x, 1.75, z), (0.04, 0.9, 0.04), bevel=0.0)
+        K.box('iron', (0, 1.31, 0.15), (0.82, 0.04, 0.72), bevel=0.0)
+        K.box('#fff4c4', (0, 1.42, 0.15), (0.7, 0.18, 0.62), bevel=0.06, segs=2)
+        K.box(main, (0, 2.26, 0.15), (0.86, 0.12, 0.76), bevel=0.03)
+    elif kind == 'candy':
+        K.cyl('metal', (0, 1.5, 0.3), 0.38, 0.45, segs=16, r2=0.3)
+        K.cyl('dark', (0, 1.72, 0.3), 0.36, 0.02, segs=16)
+        for k in range(6):
+            x = -0.4 + (k % 3) * 0.4
+            z = -0.45 + (k // 3) * 0.25
+            K.cyl('woodDark', (x, 1.45, z), 0.012, 0.4, segs=4)
+            K.ball('#f2a8c8' if k % 2 else '#a8d8f0', (x, 1.72, z), 0.13, segs=8)
+    else:
+        K.box('metal', (0, 1.45, 0.25), (0.9, 0.36, 0.9), bevel=0.04, segs=2)
+        K.box('metal', (0, 1.66, 0.25), (0.86, 0.06, 0.86), rot=(-0.25, 0, 0), bevel=0.02)
+        for k, col in enumerate(('#c8392b', '#e8b23a', '#c8392b')):
+            K.cyl(col, (-0.35 + k * 0.3, 1.38, -0.5), 0.05, 0.22, segs=8)
+            K.cyl(col, (-0.35 + k * 0.3, 1.53, -0.5), 0.02, 0.08, segs=6, r2=0.008)
+    return K
+
+
+# ------------------------------------------------------------------ ticket kiosks by the gate (2.6 x 2.4, window to +z)
+
+def kiosk():
+    K = Kit()
+    rr = random.Random(9)
+    K.box('plinth', (0, 0.15, 0), (2.6, 0.3, 2.4), bevel=0.04, segs=2)
+    K.box('#c8392b', (0, 1.4, 0), (2.4, 2.2, 2.2), bevel=0.05, segs=2)
+    K.box(CREAM, (0, 0.62, 0), (2.44, 0.12, 2.24), bevel=0.03)
+    # the window: a dark pane behind a brass grille, a little counter and a speak-through
+    K.box('dark', (0, 1.55, 1.1), (1.5, 0.9, 0.04), bevel=0.0)
+    K.box('gold', (0, 1.55, 1.12), (1.62, 1.02, 0.03), bevel=0.01)
+    for k in range(7):
+        K.box('gold', (-0.6 + k * 0.2, 1.55, 1.14), (0.025, 0.88, 0.025), bevel=0.0)
+    K.box('woodDark', (0, 1.05, 1.25), (1.6, 0.06, 0.32), bevel=0.02)
+    K.cyl('iron', (0, 1.2, 1.15), 0.1, 0.03, axis='z', segs=12)
+    # price board on the side
+    K.box('dark', (1.21, 1.6, 0.3), (0.03, 0.9, 1.1), bevel=0.0)
+    K.box('gold', (1.22, 1.6, 0.3), (0.02, 1.0, 1.2), bevel=0.0)
+    # roof: an overhang and a marquee box for the TICKETS sign, bulbs round it
+    K.box('woodDark', (0, 2.56, 0.1), (2.9, 0.12, 2.7), bevel=0.03)
+    K.box('dark', (0, 3.02, 0.6), (2.2, 0.66, 0.2), bevel=0.03)
+    K.box('gold', (0, 3.02, 0.59), (2.34, 0.78, 0.16), bevel=0.02)
+    for k in range(8):
+        for y in (2.64, 3.4):
+            K.ball('bulb' if rr.random() < 0.5 else 'bulbPink', (-1.05 + k * 0.3, y, 0.72), 0.055)
+    return K
+
+
+# ------------------------------------------------------------------ the backlot water tower
+
+def watertower():
+    K = Kit()
+    legs = [(sx * 2.6, sz * 2.6) for sx in (-1, 1) for sz in (-1, 1)]
+    for x, z in legs:
+        K.box('plinth', (x, 0.25, z), (0.8, 0.5, 0.8), bevel=0.04, segs=2)
+        K.cyl('iron', (x, 6.25, z), 0.2, 11.6, segs=10)
+    # cross bracing between the legs, two storeys of it, and rings of struts
+    ring = [legs[0], legs[1], legs[3], legs[2]]
+    for (ax, az), (bx, bz) in zip(ring, ring[1:] + ring[:1]):
+        for y0, y1 in ((0.6, 6.0), (6.0, 11.8)):
+            rod(K, 'iron', (ax, y0, az), (bx, y1, bz), 0.045)
+            rod(K, 'iron', (bx, y0, bz), (ax, y1, az), 0.045)
+        for y in (6.0, 11.8):
+            rod(K, 'iron', (ax, y, az), (bx, y, bz), 0.06)
+    # the tank: bands of rivets, a painted stripe, a dished bottom, a cone roof and a finial
+    K.cyl('tank', (0, 14.5, 0), 4.0, 5.0, segs=28)
+    for y in (12.3, 13.9, 15.6, 16.8):
+        K.cyl('iron', (0, y, 0), 4.04, 0.08, segs=28)
+    K.cyl('#c8392b', (0, 15.0, 0), 4.03, 0.55, segs=28)
+    K.cyl(CREAM, (0, 15.42, 0), 4.03, 0.14, segs=28)
+    K.cyl('tank', (0, 11.6, 0), 1.2, 0.8, segs=28, r2=4.0)
+    K.cyl('roof', (0, 18.2, 0), 4.35, 2.4, segs=28, r2=0.2)
+    K.ball('gold', (0, 19.5, 0), 0.3, segs=10)
+    # a catwalk round the tank's foot with a railing, and a ladder up one leg
+    K.cyl('iron', (0, 12.02, 0), 4.85, 0.06, segs=28)
+    for k in range(16):
+        a = k * 2 * math.pi / 16
+        a1 = (k + 1) * 2 * math.pi / 16
+        K.box('iron', (math.cos(a) * 4.75, 12.55, math.sin(a) * 4.75), (0.04, 1.0, 0.04), bevel=0.0)
+        for y in (12.6, 13.05):
+            rod(K, 'iron', (math.cos(a) * 4.75, y, math.sin(a) * 4.75), (math.cos(a1) * 4.75, y, math.sin(a1) * 4.75), 0.02, segs=4)
+    lx, lz = 2.6, 2.6 + 0.35
+    for e in (-0.2, 0.2):
+        K.box('iron', (lx + e, 6.1, lz), (0.04, 11.8, 0.04), bevel=0.0)
+    y = 0.6
+    while y < 12.0:
+        K.box('iron', (lx, y, lz), (0.4, 0.03, 0.03), bevel=0.0)
+        y += 0.32
+    return K
+
+
 for b in layout['buildings']:
     building(b).export(f"{OUT}/kit_{b['style']}.glb")
 trailer().export(f'{OUT}/kit_trailer.glb')
@@ -545,3 +710,9 @@ gate().export(f'{OUT}/kit_arch.glb')
 for v in ('ringtoss', 'darts', 'milk', 'gallery', 'prize'):
     booth(v).export(f'{OUT}/kit_booth_{v}.glb')
 tentdress().export(f'{OUT}/kit_tentdress.glb')
+fence(1).export(f'{OUT}/kit_fence_a.glb')
+fence(2).export(f'{OUT}/kit_fence_b.glb')
+for k in ('popcorn', 'candy', 'hotdog'):
+    cart(k).export(f'{OUT}/kit_cart_{k}.glb')
+kiosk().export(f'{OUT}/kit_kiosk.glb')
+watertower().export(f'{OUT}/kit_watertower.glb')

@@ -54,6 +54,20 @@ export async function buildKit(Builder, hasMaterial) {
   // game tents keep their scanned canvas; this adds bunting, guy ropes and stakes round each
   const tents = PROPS.filter((p) => p.type === 'gametent');
   if (tents.length) jobs.push(load('tentdress').then((g) => tents.forEach((p) => place(g, { x: p.x, z: p.z, rot: (p.x + p.z) % 6.28 }))));
+  // the perimeter fence in two panel patterns, the food carts, the ticket kiosks, the backlot water tower
+  const fences = PROPS.filter((p) => p.type === 'fence');
+  for (const [k, v] of [[0, 'a'], [1, 'b']]) {
+    const mine = fences.filter((p, i) => i % 2 === k);
+    if (mine.length) jobs.push(load(`fence_${v}`).then((g) => mine.forEach((p) => place(g, { x: p.x, z: p.z, rot: p.rot || 0 }))));
+  }
+  const carts = PROPS.filter((p) => p.type === 'cart');
+  for (const kind of new Set(carts.map((p) => p.kind))) {
+    jobs.push(load(`cart_${kind}`).then((g) => carts.filter((p) => p.kind === kind).forEach((p) => place(g, { x: p.x, z: p.z, rot: p.rot || 0 }))));
+  }
+  const kiosks = PROPS.filter((p) => p.type === 'ticket');
+  if (kiosks.length) jobs.push(load('kiosk').then((g) => kiosks.forEach((p) => place(g, { x: p.x, z: p.z, rot: p.rot || 0 }))));
+  const towers = PROPS.filter((p) => p.type === 'watertower');
+  if (towers.length) jobs.push(load('watertower').then((g) => towers.forEach((p) => place(g, { x: p.x, z: p.z, rot: 0 }))));
   await Promise.all(jobs);
   const group = new THREE.Group();
   group.name = 'kit';
@@ -69,7 +83,7 @@ export function boothVariant(p, i) {
 
 /** Is this map prop one the kit draws (the walk-in buildings' walls and roofs, the booths, trailers, the gate)? */
 export function kitDraws(p) {
-  if (p.type === 'trailer' || p.type === 'arch' || p.type === 'booth') return true;
+  if (['trailer', 'arch', 'booth', 'fence', 'cart', 'ticket', 'watertower'].includes(p.type)) return true;
   if (p.type !== 'wall' && p.type !== 'roof') return false;
   return BUILDINGS.some((b) => b.style === p.style && Math.abs(p.x - b.cx) <= b.w / 2 + 0.5 && Math.abs(p.z - b.cz) <= b.d / 2 + 0.5);
 }

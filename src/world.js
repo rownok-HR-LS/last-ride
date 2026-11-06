@@ -372,8 +372,8 @@ function arch(B) {
   for (let i = 0; i < 22; i++) B.sphere(i % 2 ? 'bulb' : 'bulbPink', P, -7.5 + i * 0.72, 7.55, 0.75, 0.1, 6);
 }
 
-function ticket(B, p) {
-  modelSpots.push(['kiosk', { x: p.x, z: p.z, rot: p.rot || 0, w: 2.8, d: 2.6 }]);
+function ticket(B, p, spots = modelSpots) {
+  spots.push(['kiosk', { x: p.x, z: p.z, rot: p.rot || 0, w: 2.8, d: 2.6 }]);
 }
 
 function freefall(B, p) {
@@ -658,6 +658,14 @@ function dressBooths(parent) {
     }
   });
   for (const [name, list] of groupSpots(bears)) placeModels(parent, name, list).catch((e) => console.warn(name, e));
+  // the ticket kiosks by the gate: TICKETS in neon on their marquees
+  for (const p of PROPS.filter((q) => q.type === 'ticket')) {
+    const sign = neonSign('TICKETS', '#d9b45a', 2.0);
+    const [ox, oz] = rotXZ(0, 0.71, p.rot || 0);
+    sign.position.set(p.x + ox, 3.02, p.z + oz);
+    sign.rotation.y = p.rot || 0;
+    parent.add(sign);
+  }
 }
 
 /** A plane whose UVs repeat every `tiles` units, so tiling photo textures stay sharp. */
