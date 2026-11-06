@@ -1090,3 +1090,12 @@ body.pad .slot kbd, body.pad .item kbd:empty, body.pad .power kbd:empty { displa
 .captions div i { display: inline-block; width: 16px; color: #ffe14f; font-style: normal; }
 .captions div span { color: #a9a092; font-weight: 500; text-transform: uppercase; font-size: 12px; letter-spacing: 0.12em; margin-left: 4px; }
 .captions div.fade { opacity: 0; }
+
+/* the results' placing stub, in the same style */
+.end-stub { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; color: #e6dfd2; -webkit-mask: none; mask: none; filter: none; box-shadow: none; }
+.end-stub::before, .end-stub::after { display: none; }
+.stub-place { border-right: 1px solid rgba(255,255,255,0.1); font-family: var(--ui); }
+.stub-place b { font: 700 54px/1 var(--hud); color: #ffe14f; }
+.stub-place small { font: 700 11px/1.2 var(--hud); letter-spacing: 0.2em; color: #a9a092; }
+.stub-stats { font: 400 14px var(--ui); color: #cfc7b9; }
+.stub-stats b { font: 700 20px var(--hud); color: #f1ece2; }
