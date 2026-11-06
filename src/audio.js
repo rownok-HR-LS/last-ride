@@ -265,7 +265,14 @@ function tone(dest, t, dur, { type = 'sine', freq = 440, to = null, vol = 0.5, a
 }
 
 
+/** Called with (name, pos, opt) for every sound that has a place in the park, even when muted: sound captions. */
+let cueHook = null;
+export function onCue(fn) {
+  cueHook = fn;
+}
+
 export function play(name, pos = null, opt = {}) {
+  if (pos && cueHook) cueHook(name, pos, opt);
   if (!ctx || muted) return;
   const t = ctx.currentTime;
   switch (name) {

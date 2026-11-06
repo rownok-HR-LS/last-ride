@@ -1022,3 +1022,71 @@ body.pad .slot kbd, body.pad .item kbd:empty, body.pad .power kbd:empty { displa
 .lb-names span { padding: 3px 10px; border-radius: 999px; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.15); font: 600 13px/1.4 var(--hud, sans-serif); letter-spacing: 0.06em; text-transform: uppercase; color: #f1ece2; }
 .lb-names span.you { border-color: #ffe14f; color: #ffe14f; }
 .lb-buttons { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 8px; }
+
+/* ================================================================ every sign in the style of the menu and the HUD */
+/* (the pause sign, settings, the results, the bus stop, the prize counter and the death card: dark glass panels,
+   Barlow type, a gold main button and quiet secondary ones, instead of rusted metal, bulbs and torn tickets) */
+.sign { background: rgba(12,10,14,0.88); border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; backdrop-filter: blur(16px);
+  box-shadow: 0 24px 80px rgba(0,0,0,0.6); padding: 24px 26px 22px; color: #e6dfd2; font: 400 14px/1.5 var(--ui); }
+.sign::before, .sign .bulbs { display: none; }
+.sign h2, .sign .sign-title { margin: 0 0 14px; font: 700 clamp(26px, 3.4vw, 38px)/1 var(--hud); letter-spacing: 0.08em; color: #f1ece2; text-shadow: none; }
+.sign h3 { margin: 16px 0 8px; font: 700 12px/1 var(--hud); letter-spacing: 0.2em; color: #a9a092; text-transform: uppercase; }
+.sign .fine { font: 400 13px/1.45 var(--ui); color: #a9a092; }
+.sign label.row { font: 500 14px var(--ui); color: #e6dfd2; }
+.sign label.row output { color: #ffe14f; font: 600 14px var(--hud); }
+.sign input[type=range] { height: 4px; background: linear-gradient(90deg, #ffb52e, #ffe14f var(--fill, 50%), rgba(255,255,255,0.15) var(--fill, 50%)); box-shadow: none; }
+.sign input[type=range]::-webkit-slider-thumb { width: 16px; height: 16px; background: #f1ece2; box-shadow: 0 0 0 3px rgba(255,225,79,0.35); }
+.sign input[type=range]::-moz-range-thumb { width: 16px; height: 16px; background: #f1ece2; box-shadow: 0 0 0 3px rgba(255,225,79,0.35); }
+.sign .choice { font: 600 13px/1 var(--hud); letter-spacing: 0.08em; text-transform: uppercase; padding: 8px 12px; border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.05); color: #a9a092; border-radius: 8px; }
+.sign .choice.on { background: rgba(255,225,79,0.16); color: #ffe14f; border-color: rgba(255,225,79,0.45); box-shadow: none; }
+.sign .keys { font: 400 14px var(--ui); }
+.sign .key { font: 600 13px/1 var(--hud); letter-spacing: 0.06em; padding: 7px 10px; background: rgba(255,255,255,0.08); color: #f1ece2;
+  border: 1px solid rgba(255,255,255,0.14); border-radius: 6px; box-shadow: none; }
+.sign .key.listen { background: rgba(255,225,79,0.2); color: #ffe14f; border-color: #ffe14f; animation: none; }
+
+/* buttons: the main action gold, the rest glass */
+.ticket { -webkit-mask: none; mask: none; filter: none; min-width: 200px; padding: 13px 22px; border-radius: 10px;
+  background: linear-gradient(180deg, #ffe46a, #f2b62e); color: #1a1206; font: 700 18px/1 var(--hud); letter-spacing: 0.1em;
+  box-shadow: 0 8px 24px rgba(242,182,46,0.22); flex-direction: column; gap: 3px; }
+.ticket::before { display: none; }
+.ticket small { font: 500 11px/1.2 var(--ui); letter-spacing: 0; text-transform: none; opacity: 0.7; }
+.ticket:hover { transform: translateY(-1px); filter: none; box-shadow: 0 12px 30px rgba(242,182,46,0.32); }
+.ticket:active { transform: translateY(1px); filter: none; }
+.ticket.cream, .ticket.dark { background: rgba(255,255,255,0.08); color: #f1ece2; border: 1px solid rgba(255,255,255,0.14); box-shadow: none; }
+.ticket.cream:hover, .ticket.dark:hover { background: rgba(255,255,255,0.14); box-shadow: none; }
+.ticket.dark { color: #cfc7b9; }
+.ticket:focus-visible, .sign button:focus-visible { outline: 2px solid #ffe14f; outline-offset: 2px; }
+
+/* the results */
+.end-sign .end-kicker { font: 700 12px/1 var(--hud); letter-spacing: 0.24em; text-transform: uppercase; color: #a9a092; }
+.end-sign h2 { margin-top: 6px; }
+.end-board { font: 400 13px var(--ui); color: #d8d0c2; }
+.end-board th { font: 700 11px var(--hud); letter-spacing: 0.16em; color: #a9a092; border-bottom-color: rgba(255,255,255,0.12); }
+.end-board td { border-bottom: 1px solid rgba(255,255,255,0.05); }
+.end-board tr.me td { color: #ffe14f; background: rgba(255,225,79,0.08); }
+.endscreen.show .end-sign { animation: none; }
+
+/* the bus stop */
+.lobby-sign .lb-kicker { font: 700 12px/1 var(--hud); letter-spacing: 0.24em; color: #a9a092; opacity: 1; }
+.lobby-sign h3 { margin-top: 10px; }
+.lobby-sign .lb-big { font: 700 64px/1.05 var(--hud); color: #ffe14f; text-shadow: none; letter-spacing: 0.04em; }
+
+/* the death card */
+.death-card .dc-label { font: 700 12px/1 var(--hud); letter-spacing: 0.24em; color: #a9a092; }
+.death-card .dc-name { font: 700 clamp(32px, 4.6vw, 48px)/1.05 var(--hud); letter-spacing: 0.06em; color: #f1ece2; text-shadow: none; text-transform: uppercase; }
+.death-card .dc-how { font: 400 15px var(--ui); color: #d8d0c2; }
+.death-card .dc-how b { color: #ff6a5a; }
+
+/* the prize counter */
+.prize-card .have { font: 600 15px var(--hud); letter-spacing: 0.06em; color: #ffe14f; }
+
+/* ---------------------------------------------------------------- accessibility: HUD size, sound captions */
+.hud .vitals, .hud .weapons, .hud .items, .hud .ghost-ui, .hud .objective, .hud .hud-top-right, .hud .hud-top-left, .hud .prompt,
+.hud .chat-wheel, .hud .captions, .hud .keys-card { zoom: var(--hud-zoom, 1); }
+.captions { position: absolute; left: 16px; top: 46%; display: flex; flex-direction: column; gap: 4px; pointer-events: none; }
+.captions div { padding: 4px 10px; border-radius: 6px; background: rgba(10,9,12,0.72); color: #f1ece2; font: 600 15px/1.3 var(--hud);
+  letter-spacing: 0.04em; transition: opacity 0.4s; }
+.captions div i { display: inline-block; width: 16px; color: #ffe14f; font-style: normal; }
+.captions div span { color: #a9a092; font-weight: 500; text-transform: uppercase; font-size: 12px; letter-spacing: 0.12em; margin-left: 4px; }
+.captions div.fade { opacity: 0; }

@@ -173,6 +173,8 @@ export class Client {
     this.running = true;
     this.paused = false;
     this.pads = new Pads(this);
+    // sound captions: important sounds near you, written on screen with where they come from
+    audio.onCue((name, pos, opt) => this.caption(name, pos, opt));
     const loop = (now) => {
       if (!this.running) return;
       requestAnimationFrame(loop);
@@ -403,6 +405,7 @@ export class Client {
    */
   applySettings(s) {
     this.settings = s;
+    document.documentElement.style.setProperty('--hud-zoom', { small: 0.85, large: 1.22 }[s.uiSize] ?? 1);
     this.input.binds = s.keys;
     setBinds(s.keys);
     audio.setVolumes(s.volume);
@@ -676,6 +679,27 @@ export class Client {
     }
     g.setInput(this.myId, input);
     void dt;
+  }
+
+  /** A sound caption, when they are on (settings.captions): what it was and which way, for important sounds nearby. */
+  caption(name, pos, opt) {
+    if (!this.settings.captions || this.attract) return;
+    const LABEL = {
+      step: 'Footsteps', fire: 'Shot', impact: 'Fighting', swing: 'Swing', pain: 'A cry', boom: 'Explosion', chest: 'Chest opened',
+      possess: 'A ride wakes up', fling: 'Gondola flung', scare: 'Scream', trapSet: 'Trap set', reload: 'Reloading', land: 'Landing',
+      block: 'Blocked blow', splash: 'Holy water', burn: 'Burning',
+    };
+    const label = LABEL[name];
+    if (!label) return;
+    const cam = this.camera.position;
+    const dx = pos[0] - cam.x;
+    const dz = pos[2] - cam.z;
+    const d = Math.hypot(dx, dz);
+    if (d > (name === 'step' ? 24 : name === 'boom' || name === 'fire' ? 60 : 36)) return;
+    // which way, from where the camera looks
+    const a = Math.atan2(Math.sin(Math.atan2(-dx, -dz) - this.camYaw), Math.cos(Math.atan2(-dx, -dz) - this.camYaw));
+    const dir = d < 3 ? 'close' : Math.abs(a) < 0.6 ? 'ahead' : Math.abs(a) > 2.5 ? 'behind' : a > 0 ? 'left' : 'right';
+    this.hud.caption(label, dir);
   }
 
   /** Say a quick-chat line (CHAT_LINES[i]) and close the list. */

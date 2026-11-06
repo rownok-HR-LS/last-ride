@@ -34,6 +34,9 @@ export const DEFAULTS = {
   fov: 72,
   shake: 1,
   motionBlur: true,
+  // accessibility: how big the HUD panels are, and on-screen captions for important sounds nearby
+  uiSize: 'normal',
+  captions: false,
   keys: Object.fromEntries(ACTIONS.map(([id, , keys]) => [id, keys])),
 };
 

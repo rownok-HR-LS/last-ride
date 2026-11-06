@@ -37,6 +37,10 @@ export function settingsBoard(settings, { onChange, onBack }) {
     <label class="row">Field of view<input type="range" min="60" max="95" step="1" data-fov><output></output></label>
     <label class="row">Camera shake<input type="range" min="0" max="1" step="0.05" data-shake><output></output></label>
     <label class="row">Motion blur<span class="choices"><button class="choice" data-mb="1">On</button><button class="choice" data-mb="0">Off</button></span><span></span></label>
+    <h3>Accessibility</h3>
+    <label class="row">HUD size<span class="choices">${[['small', 'Small'], ['normal', 'Normal'], ['large', 'Large']].map(([id, n]) => `<button class="choice" data-ui="${id}">${n}</button>`).join('')}</span><span></span></label>
+    <label class="row">Sound captions<span class="choices"><button class="choice" data-cap="1">On</button><button class="choice" data-cap="0">Off</button></span><span></span></label>
+    <p class="fine">Captions show important sounds nearby on screen (footsteps, shots, fighting, the rides) and where they come from.</p>
     <h3>Keys</h3>
     <div class="keys">${ACTIONS.map(([id, n]) => `<span>${n}</span><button class="key" data-act="${id}"></button>`).join('')}</div>
     <p class="fine">Click a key, then press the new one. Esc cancels. Number keys pick weapons, items and powers.</p>
@@ -74,6 +78,8 @@ export function settingsBoard(settings, { onChange, onBack }) {
     fill(shake);
     shake.nextElementSibling.textContent = `${Math.round(shake.value * 100)}`;
     board.querySelectorAll('[data-mb]').forEach((b) => b.classList.toggle('on', (b.dataset.mb === '1') === (s.motionBlur !== false)));
+    board.querySelectorAll('[data-ui]').forEach((b) => b.classList.toggle('on', b.dataset.ui === (s.uiSize || 'normal')));
+    board.querySelectorAll('[data-cap]').forEach((b) => b.classList.toggle('on', (b.dataset.cap === '1') === !!s.captions));
     board.querySelectorAll('[data-inv]').forEach((b) => b.classList.toggle('on', (b.dataset.inv === '1') === !!s.invertY));
     board.querySelectorAll('[data-act]').forEach((b) => {
       if (!b.classList.contains('listen')) b.textContent = [...new Set((s.keys[b.dataset.act] || []).map(keyName))].slice(0, 2).join(' / ') || '—';
@@ -87,6 +93,12 @@ export function settingsBoard(settings, { onChange, onBack }) {
       changed();
     } else if (t.dataset.mb) {
       s.motionBlur = t.dataset.mb === '1';
+      changed();
+    } else if (t.dataset.ui) {
+      s.uiSize = t.dataset.ui;
+      changed();
+    } else if (t.dataset.cap) {
+      s.captions = t.dataset.cap === '1';
       changed();
     } else if (t.dataset.inv) {
       s.invertY = t.dataset.inv === '1';
@@ -111,7 +123,7 @@ export function settingsBoard(settings, { onChange, onBack }) {
       window.addEventListener('keydown', take, true);
     } else if (t.classList.contains('reset')) {
       const d = structuredClone(DEFAULTS);
-      Object.assign(s, { quality: d.quality, volume: d.volume, sens: d.sens, invertY: d.invertY, keys: d.keys });
+      Object.assign(s, d);
       changed();
     } else if (t.classList.contains('back')) onBack();
   });
@@ -158,7 +170,7 @@ export class PauseMenu {
       <h2>${this.online ? 'Menu' : 'Ride Paused'}</h2>
       <p class="fine center">${this.online ? 'The ride goes on without you. Stay sharp.' : 'The park waits. It always has.'}</p>
       <div class="stack">
-        <button class="ticket resume">Back on the ride <small>admit one</small></button>
+        <button class="ticket resume">Back on the ride</button>
         <button class="ticket cream settings">Settings</button>
         <button class="ticket dark quit">Leave the park</button>
       </div>

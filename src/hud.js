@@ -668,7 +668,7 @@ export class Hud {
       ${stub}
       ${earned ? xpPanel(earned) : ''}
       <table class="end-board"><tr><th>#</th><th>Rider</th><th>Kills</th><th>Ghost</th><th>Stolen</th><th>Survived</th></tr>${rows}</table>
-      <div class="board-buttons"><button class="ticket again">Ride again <small>admit one</small></button><button class="ticket dark menu">Main menu</button></div>
+      <div class="board-buttons"><button class="ticket again">Ride again</button><button class="ticket dark menu">Main menu</button></div>
     </div>`;
     $('.again', el).addEventListener('click', onAgain);
     $('.menu', el).addEventListener('click', onMenu);
@@ -680,6 +680,37 @@ export class Hud {
       const bar = $('.xp-bar i', el);
       if (bar) setTimeout(() => bar.style.setProperty('width', bar.dataset.to), 400);
     }, 2500);
+  }
+
+  /** A sound caption ('Footsteps', 'left'); the same one again just refreshes it. */
+  caption(label, dir) {
+    let box = $('.captions', this.root);
+    if (!box) {
+      box = document.createElement('div');
+      box.className = 'captions';
+      this.root.appendChild(box);
+      this.caps = [];
+    }
+    const key = `${label}|${dir}`;
+    const ARROW = { left: '◂', right: '▸', ahead: '▴', behind: '▾', close: '•' };
+    let c = this.caps.find((x) => x.key === key);
+    if (!c) {
+      c = { key, el: document.createElement('div') };
+      c.el.innerHTML = `<i>${ARROW[dir]}</i>${esc(label)} <span>${dir}</span>`;
+      box.prepend(c.el);
+      this.caps.unshift(c);
+      // four at most
+      for (const old of this.caps.splice(4)) old.el.remove();
+    }
+    clearTimeout(c.timer);
+    c.el.classList.remove('fade');
+    c.timer = setTimeout(() => {
+      c.el.classList.add('fade');
+      c.timer = setTimeout(() => {
+        c.el.remove();
+        this.caps = this.caps.filter((x) => x !== c);
+      }, 400);
+    }, 2200);
   }
 
   /** The quick-chat list (open: show it; pick(i) says line i). */
