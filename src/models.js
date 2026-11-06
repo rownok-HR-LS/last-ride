@@ -6,7 +6,7 @@ import { wetten } from './wet.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { cullable } from './cull.js';
+import { cullable, lodLimit } from './cull.js';
 
 const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 const cache = new Map();
@@ -137,15 +137,17 @@ function within(o, part) {
 }
 
 /**
- * Many placements of the same model as instanced meshes: [{ x, z, rot, w, d, ... }].
- * name may pick one piece of a model: 'light_poles#LightPole_01_2'.
+ * Models with a far version (public/models/env/<name>_far.glb, Blender's Decimate via scripts/bake-atlases.mjs):
+ * name -> metres from the camera where the far version takes over (measured flat).
  */
-export async function placeModels(parent, name, list) {
-  if (!list.length) return;
-  const [file, part] = name.split('#');
-  const src = part ? await loadModel(file) : await loadMerged(file);
-  const keep = (o) => within(o, part);
-  const mats = list.map((o) => fitMatrix(src, o, keep));
+export const FAR_MODELS = {
+  popcorn_cart: 30, tent_small: 40, crates_barrels: 28, trash_bags: 26, boxes: 26, bench: 24, rocket_kiddie: 28,
+  clown_statue: 26, shed_worn: 40, vending_news: 24, ice_freezer: 24,
+};
+
+/** Instanced copies of every mesh in src at mats; returns the meshes and how far each may be drawn. */
+function instance(parent, src, mats, keep) {
+  const out = [];
   src.traverse((o) => {
     if (!o.isMesh || !keep(o)) return;
     const mesh = new THREE.InstancedMesh(o.geometry, o.material, mats.length);
@@ -158,6 +160,33 @@ export async function placeModels(parent, name, list) {
     // draw call, and there are hundreds of kinds of small things)
     if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere();
     const r = o.geometry.boundingSphere.radius * _m.multiplyMatrices(mats[0], o.matrixWorld).getMaxScaleOnAxis();
-    cullable(mesh, r < 0.75 ? 70 : r < 1.5 ? 100 : r < 4 ? 160 : 260, 25);
+    out.push([mesh, r < 0.75 ? 70 : r < 1.5 ? 100 : r < 4 ? 160 : 260]);
   });
+  return out;
+}
+
+/**
+ * Many placements of the same model as instanced meshes: [{ x, z, rot, w, d, ... }].
+ * name may pick one piece of a model: 'light_poles#LightPole_01_2'.
+ */
+export async function placeModels(parent, name, list) {
+  if (!list.length) return;
+  const [file, part] = name.split('#');
+  const src = part ? await loadModel(file) : await loadMerged(file);
+  const keep = (o) => within(o, part);
+  const mats = list.map((o) => fitMatrix(src, o, keep));
+  const lod = !part && FAR_MODELS[file];
+  const near = instance(parent, src, mats, keep);
+  for (const [mesh, max] of near) {
+    cullable(mesh, max, 25);
+    if (lod) lodLimit(mesh, lod);
+  }
+  if (!lod) return;
+  // the far version sits in the same frame as the full one, so the same placements fit it
+  const far = await loadMerged(file + '_far').catch(() => null);
+  if (!far) {
+    for (const [mesh] of near) lodLimit(mesh, Infinity);
+    return;
+  }
+  for (const [mesh, max] of instance(parent, far, mats, () => true)) cullable(mesh, max, 0, lod);
 }

@@ -178,15 +178,25 @@ export class Rides {
     // long along z like the game's cars; about 2.7 m nose to tail
     const k = 2.7 / Math.max(size.x, size.z);
     const turn = size.x > size.z ? Math.PI / 2 : 0;
-    for (const car of this.cars) {
-      for (const ch of [...car.children]) if (ch !== car.userData.eyes) car.remove(ch);
-      const m2 = src.clone(true);
+    // a far version (Blender Decimate, about an eighth of the triangles) for cars seen from across the park
+    const far = await loadModel('dodgem_far').catch(() => null);
+    const place = (from) => {
+      const m2 = from.clone(true);
       m2.scale.setScalar(k);
       m2.rotation.y = turn;
       const off = new THREE.Vector3(-c.x * k, -box.min.y * k, -c.z * k).applyAxisAngle(new THREE.Vector3(0, 1, 0), turn);
       m2.position.copy(off);
       mergeStatic(m2);
-      car.add(m2);
+      return m2;
+    };
+    for (const car of this.cars) {
+      for (const ch of [...car.children]) if (ch !== car.userData.eyes) car.remove(ch);
+      if (far) {
+        const lod = new THREE.LOD();
+        lod.addLevel(place(src), 0);
+        lod.addLevel(place(far), 26);
+        car.add(lod);
+      } else car.add(place(src));
       car.userData.eyes.position.set(0, 0.45, -1.38);
     }
   }

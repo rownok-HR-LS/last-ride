@@ -1431,6 +1431,7 @@ export class Client {
       const behind = !seat && cd > 8 && (cdx * fwdX + cdz * fwdZ) / cd < -0.35;
       const culled = cd > 130 || behind;
       ch.root.visible = !hidden && !culled;
+      ch.detail(Math.hypot(cd, p.y - this.camera.position.y));
       if (culled) {
         c.tag.visible = false;
         if (c.reveal) c.reveal.visible = false;

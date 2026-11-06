@@ -468,6 +468,57 @@ function mergeSkinned(scene) {
   }
 }
 
+/**
+ * Distance versions of the riders: a rider further than FAR_LOD metres is drawn with about a quarter of its
+ * triangles (meshoptimizer, the same simplifier the scenery goes through). The far mesh shares every vertex
+ * buffer with the near one and only has its own, shorter index list, so it costs no memory to speak of.
+ * near geometry -> far geometry, filled in after a rider loads (the simplifier is fetched then, not up front).
+ */
+const FAR = new WeakMap();
+const FAR_LOD = 24;
+let simplifier = null;
+async function makeFar(scene) {
+  simplifier ??= import('meshoptimizer/simplifier').then(async (m) => {
+    await m.MeshoptSimplifier.ready;
+    return m.MeshoptSimplifier;
+  });
+  const S = await simplifier;
+  const meshes = [];
+  scene.traverse((o) => {
+    if (o.isSkinnedMesh && o.geometry.index && !FAR.has(o.geometry)) meshes.push(o);
+  });
+  for (const o of meshes) {
+    const g = o.geometry;
+    const tris = g.index.count / 3;
+    if (tris < 1500) continue;
+    const pos = g.attributes.position;
+    const p = new Float32Array(pos.count * 3);
+    for (let i = 0; i < pos.count; i++) {
+      p[i * 3] = pos.getX(i);
+      p[i * 3 + 1] = pos.getY(i);
+      p[i * 3 + 2] = pos.getZ(i);
+    }
+    // see-through cards (hair, lashes) only lose what they can: their edges are the shape
+    const clear = o.material.transparent || o.material.alphaTest > 0;
+    const [idx] = S.simplify(Uint32Array.from(g.index.array), p, 3, Math.floor(g.index.count * (clear ? 0.5 : 0.25) / 3) * 3, 0.03, clear ? ['LockBorder'] : []);
+    if (idx.length >= g.index.count * 0.9) continue;
+    const far = new THREE.BufferGeometry();
+    for (const [n, a] of Object.entries(g.attributes)) far.setAttribute(n, a);
+    far.setIndex(new THREE.BufferAttribute(pos.count > 65535 ? idx : Uint16Array.from(idx), 1));
+    far.boundingSphere = g.boundingSphere;
+    far.boundingBox = g.boundingBox;
+    FAR.set(g, far);
+    // let the GPU take it between frames rather than on the first frame it is needed
+    await new Promise((r) => setTimeout(r, 0));
+  }
+}
+
+/** The far version of a rider's geometry, once it has been made (otherwise the geometry itself). */
+export function farOf(geo) {
+  return FAR.get(geo) || geo;
+}
+export { FAR_LOD };
+
 /** Load every character and the shared animation set. Call once before creating any Character. */
 /** Each rider's model, loading or loaded (outfit id -> promise). */
 const riderLoads = {};
@@ -558,6 +609,7 @@ export async function loadCharacters(onProgress, first = OUTFITS.map((o) => o.id
     }
     // feet on the ground, whatever the author used as the origin
     T[o.id] = { scene, scale: PLAYER_HEIGHT / h, footY: -box.min.y, clips: own };
+    makeFar(scene).catch((e) => console.warn('rider lod', o.id, e));
   };
   const firstSet = new Set(first);
   for (const o of OUTFITS) if (firstSet.has(o.id)) riderLoads[o.id] = loadRider(o, true);
@@ -715,6 +767,12 @@ export class Character {
     this.root.add(chute);
     this.chute = chute;
 
+    // body parts with their full-detail geometry (detail() swaps in the far version)
+    this.skins = [];
+    this.model.traverse((o) => {
+      if (o.isSkinnedMesh) this.skins.push([o, o.geometry]);
+    });
+    this.far = false;
     this.solidMats = new Map();
     this.model.traverse((o) => {
       if (o.isMesh) this.solidMats.set(o, o.material);
@@ -811,6 +869,14 @@ export class Character {
     const q = _q2.setFromEuler(_e1.set(pitch, yaw, 0, 'YXZ'));
     const pos = _v1.setFromMatrixPosition(hand.matrixWorld).add(_v2.set(0, -0.02, 0.02).applyQuaternion(q));
     this.setWeaponWorld(q, pos);
+  }
+
+  /** Draw the rider in full or in its far version for a camera d metres away (a little give stops flicker). */
+  detail(d) {
+    const far = this.far ? d > FAR_LOD - 3 : d > FAR_LOD;
+    if (far === this.far && !far) return;
+    this.far = far;
+    for (const [m, near] of this.skins) m.geometry = far ? farOf(near) : near;
   }
 
   /** How soaked (0..1) and how bloodied (0..1) the rider is now. */
