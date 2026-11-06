@@ -21,6 +21,11 @@ export function initAudio() {
     return;
   }
   ctx = new (window.AudioContext || window.webkitAudioContext)();
+  // if the browser held the sound back (or paused it with the tab), the next click, tap or key press wakes it
+  const wake = () => {
+    if (ctx.state === 'suspended') ctx.resume();
+  };
+  for (const ev of ['pointerdown', 'keydown', 'touchend']) addEventListener(ev, wake, { capture: true });
   master = ctx.createGain();
   master.gain.value = 0.8;
   master.connect(ctx.destination);

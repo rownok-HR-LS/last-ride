@@ -264,6 +264,9 @@ async function title() {
 
   const start = async (online, resume = null) => {
     if (play.disabled) return;
+    // sound (and the music box) starts right here, on the press itself: a browser only lets a page start audio
+    // during a click or key press, and waiting for the riders first could take longer than it allows
+    initAudio();
     play.disabled = true;
     practice.disabled = true;
     profile.name = nick.value.trim().slice(0, 16) || 'Rider';
@@ -271,7 +274,6 @@ async function title() {
     // everyone on the bus needs their model (usually long in by now)
     (online ? play : practice).textContent = 'Boarding…';
     await whenAllRiders();
-    initAudio();
     el.remove();
     if (!online) return client.start(profile);
     // wait at the bus stop over the live park, then board when the bus leaves
