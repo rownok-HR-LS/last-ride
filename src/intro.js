@@ -1,17 +1,21 @@
-// The opening cinematic: the tour bus drives through the woods to the park while captions tell the story.
+// The opening cinematic: the tour bus drives through the woods to the park while a narrator tells the story
+// (voice: Cedric from the ElevenLabs voice library), with captions.
 // Shot like film: long lenses, slow eased moves, a handheld drift, depth of field and a sound bed of engine
 // and wildlife. It runs during the sim's 'launch' phase (the bus reaches the gate as it ends) and can be skipped.
 import * as THREE from 'three';
 import { LAUNCH_SECONDS } from '../shared/constants.js';
 import * as audio from './audio.js';
 
-/** [start time (s), line]. Times are seconds into the intro. */
+/**
+ * [start time (s), line]. Times are seconds into the intro; each line is spoken by the narrator from that moment
+ * (public/sfx/narration_<n>_0.mp3, 6.9 / 3.7 / 8.3 / 5.0 / 4.5 s long), so the gaps between them are short.
+ */
 const LINES = [
-  [1.5, 'Nineteen eighty-seven. Wonderland Park closed its gates for good, after its final night.'],
-  [7.5, 'Twenty visitors went in that night. None of them came out.'],
-  [13, 'Nobody bought the land. Nobody tore it down. And every year, on the same night, the lights come back on.'],
-  [20.5, 'Tonight, Midnight Wonderland Tours sold exactly twenty tickets.'],
-  [25.5, 'Only one rider leaves on the last bus. The rest stay. Forever.'],
+  [0.6, 'Nineteen eighty-seven. Wonderland Park closed its gates… after one last night.'],
+  [7.75, 'Twenty visitors went in. Not one of them came out.'],
+  [11.75, 'Nobody bought the land. Nobody tore it down. And every year, on the same night… the lights come back on.'],
+  [20.3, 'Tonight, Midnight Wonderland Tours has sold exactly… twenty tickets.'],
+  [25.5, 'Only one rider leaves on the last bus. The rest… stay.'],
 ];
 
 /** One-off sounds: [time, name]. */
@@ -97,6 +101,7 @@ export class Intro {
     this.done = true;
     this.el.classList.remove('show');
     audio.loop('introPad', 0);
+    audio.stopNarration();
   }
 
   /**
@@ -127,6 +132,9 @@ export class Intro {
         this.sub.classList.add('in');
       }
     }
+    // the narrator speaks each line as it comes up (a line still loading gets a moment; one we only reach late,
+    // say from a tab that was in the background, stays a caption)
+    if (line >= 0 && this.voiced !== line && elapsed - LINES[line][0] < 1.5 && audio.narrate(line + 1)) this.voiced = line;
     this.title.classList.toggle('show', elapsed > 26.5);
     // sound bed: a low drone, swelling as the park wakes up
     audio.loop('introPad', 0.1 + Math.min(1, Math.max(0, (elapsed - 18) / 8)) * 0.12);

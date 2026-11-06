@@ -6,6 +6,8 @@ let master;
 let sfx;
 let amb;
 let musicBus;
+/** The music bus level the volume settings ask for. */
+const musicLevel = () => 0.32 * (volumes.music / 0.6);
 let verb;
 let verbSend;
 let noiseBuf;
@@ -60,6 +62,50 @@ export function initAudio() {
   for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
   loadSamples();
   startMusic();
+}
+
+// ------------------------------------------------------------------ the narrator
+
+let voice = null;
+/**
+ * Speak narration line n (public/sfx/narration_<n>_0.mp3); the music steps back while the narrator talks.
+ * Returns false if the line has not loaded yet (the caller tries again for a moment).
+ */
+export function narrate(n) {
+  if (!ctx) return false;
+  const buf = bank[`narration_${n}`]?.[0];
+  if (!buf) return false;
+  if (muted) return true;
+  stopNarration();
+  const s = ctx.createBufferSource();
+  s.buffer = buf;
+  const g = ctx.createGain();
+  g.gain.value = 1.15;
+  s.connect(g);
+  g.connect(sfx);
+  const t = ctx.currentTime;
+  musicBus.gain.setTargetAtTime(musicLevel() * 0.4, t, 0.15);
+  s.onended = () => {
+    if (voice === s) {
+      voice = null;
+      musicBus.gain.setTargetAtTime(musicLevel(), ctx.currentTime, 0.6);
+    }
+  };
+  s.start(t);
+  voice = s;
+  return true;
+}
+
+export function stopNarration() {
+  if (!voice) return;
+  const v = voice;
+  voice = null;
+  try {
+    v.stop();
+  } catch {
+    /* already ended */
+  }
+  musicBus?.gain.setTargetAtTime(musicLevel(), ctx.currentTime, 0.4);
 }
 
 // ------------------------------------------------------------------ recorded samples
@@ -133,7 +179,7 @@ function applyVolumes() {
   sfx.gain.value = volumes.effects;
   amb.gain.value = volumes.ambience;
   // the music box was mixed at 0.32 when everything was at full; keep that balance
-  musicBus.gain.value = 0.32 * (volumes.music / 0.6);
+  musicBus.gain.value = musicLevel();
 }
 
 export function setMuted(m) {
