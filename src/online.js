@@ -197,28 +197,45 @@ export class Online {
     if (this.mode !== 'lobby' || !m) return;
     const others = Math.max(0, m.waiting - 1);
     if (m.busIn != null) {
-      this.show('The bus leaves in', clock(m.busIn), `${others ? `${others} other rider${others > 1 ? 's' : ''} waiting` : 'You are first in line'} · bots fill the empty seats · ${m.online} in the park`);
+      this.show('The bus leaves in', clock(m.busIn), `${others ? `${others} other rider${others > 1 ? 's' : ''} waiting` : 'You are first in line'} · bots fill the empty seats · ${m.online} in the park`, m.names);
     } else if (m.ride) {
       // a ride is under way (you just finished yours, or you will board after it)
       this.show(m.ride.phase === 'end' ? 'The ride is over' : 'A ride is under way', m.ride.phase === 'end' ? '…' : `${m.ride.alive} alive`, `The next bus leaves when it is over · ${m.online} in the park`);
     } else this.show('Waiting for the bus', '…', `${m.online} in the park`);
   }
 
-  show(title, big, info) {
+  /** names: who is in line for this bus (from the server), shown as a row of tickets. */
+  show(title, big, info, names = null) {
     if (!this.sign.querySelector('.lobby-sign')) {
       this.sign.innerHTML = `<div class="sign lobby-sign">
         <div class="bulbs"></div>
         <div class="lb-kicker">Midnight Wonderland Tours · bus stop</div>
         <h3 class="lb-title"></h3>
         <div class="lb-big"></div>
+        <div class="lb-names"></div>
         <p class="fine center lb-info"></p>
-        <button class="ticket dark lb-leave">Leave the stop</button>
+        <div class="lb-buttons"><button class="ticket cream lb-invite">Copy invite link</button><button class="ticket dark lb-leave">Leave the stop</button></div>
       </div>`;
       this.sign.querySelector('.lb-leave').addEventListener('click', () => location.reload());
+      // ride with a friend: one public ride, so a link that heads straight for the stop is all it takes
+      this.sign.querySelector('.lb-invite').addEventListener('click', (e) => {
+        const url = `${location.origin}${location.pathname}?ride`;
+        const b = e.currentTarget;
+        const done = (ok) => {
+          b.textContent = ok ? 'Link copied · send it to a friend' : url;
+          setTimeout(() => (b.textContent = 'Copy invite link'), 3500);
+        };
+        if (navigator.clipboard?.writeText) navigator.clipboard.writeText(url).then(() => done(true), () => done(false));
+        else done(false);
+      });
     }
     this.sign.querySelector('.lb-title').textContent = title;
     this.sign.querySelector('.lb-big').textContent = big;
     this.sign.querySelector('.lb-info').innerHTML = esc(info);
+    const you = this.profile.name;
+    this.sign.querySelector('.lb-names').innerHTML = names?.length
+      ? names.map((n, i) => `<span class="${n === you && i === names.indexOf(you) ? 'you' : ''}">${esc(n)}</span>`).join('')
+      : '';
     this.sign.classList.add('show');
   }
 

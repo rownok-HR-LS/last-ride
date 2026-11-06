@@ -998,3 +998,27 @@ body.pad .slot kbd, body.pad .item kbd:empty, body.pad .power kbd:empty { displa
 /* a ghost power not unlocked yet: dim, with the seconds left */
 .power.locked { opacity: 0.55; filter: grayscale(1); border-style: dashed; }
 .power .pcd.lock { font: 700 14px/1 var(--hud); letter-spacing: 0.04em; background: rgba(0,0,0,0.6); border-radius: 50%; }
+
+/* ---------------------------------------------------------------- quick chat */
+.chat-wheel { position: absolute; left: 50%; bottom: 140px; transform: translateX(-50%); display: none; flex-direction: column; gap: 4px; min-width: 220px;
+  padding: 12px; border-radius: 12px; background: rgba(10,9,12,0.78); border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(10px); pointer-events: auto; z-index: 12; }
+.chat-wheel.show { display: flex; }
+.chat-wheel h4 { margin: 0 0 4px; font: 700 12px/1 var(--hud); letter-spacing: 0.2em; text-transform: uppercase; color: #a9a092; }
+.chat-wheel button { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border: 0; border-radius: 6px; background: none; color: #f1ece2;
+  font: 600 16px/1.2 var(--hud); letter-spacing: 0.04em; text-align: left; cursor: pointer; }
+.chat-wheel button:hover { background: rgba(255,255,255,0.08); }
+.chat-wheel kbd { min-width: 22px; text-align: center; }
+.say-bubble { position: absolute; left: 0; top: 0; padding: 5px 10px; border-radius: 10px; background: rgba(250,246,238,0.94); color: #1a1410;
+  font: 700 15px/1.2 var(--hud); letter-spacing: 0.04em; white-space: nowrap; pointer-events: none; box-shadow: 0 4px 14px rgba(0,0,0,0.4); }
+.say-bubble::after { content: ''; position: absolute; left: 50%; bottom: -5px; margin-left: -5px; border: 5px solid transparent; border-bottom: 0; border-top-color: rgba(250,246,238,0.94); }
+.say-bubble.mine { background: rgba(255,225,79,0.95); }
+.say-bubble.mine::after { border-top-color: rgba(255,225,79,0.95); }
+.feed .say b { color: #ffe14f; }
+/* quick chat on touch: a small button up out of the thumb fan */
+.tb-chat { right: 24px; bottom: 236px; width: 44px; height: 44px; font-size: 17px; }
+
+/* the bus stop: who is in line, and the invite button */
+.lb-names { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin: 6px 0 2px; }
+.lb-names span { padding: 3px 10px; border-radius: 999px; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.15); font: 600 13px/1.4 var(--hud, sans-serif); letter-spacing: 0.06em; text-transform: uppercase; color: #f1ece2; }
+.lb-names span.you { border-color: #ffe14f; color: #ffe14f; }
+.lb-buttons { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 8px; }

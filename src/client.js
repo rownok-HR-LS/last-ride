@@ -32,6 +32,7 @@ import { loadSettings } from './settings.js';
 import { Touch, isTouch } from './touch.js';
 import { Pads } from './gamepad.js';
 import { lookItem } from '../shared/looks.js';
+import { CHAT_LINES } from '../shared/constants.js';
 import { loadProgress, award } from './progress.js';
 import { setBinds } from './prompts.js';
 
@@ -40,6 +41,7 @@ const FEMALE = new Set(OUTFITS.filter((o) => o.voice === 'f').map((o) => o.id));
 const STEP = 1 / 60;
 const PRIZE_KEYS = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7'];
 const tmpV = new THREE.Vector3();
+const esc = (t) => String(t).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
 const tmpV2 = new THREE.Vector3();
 
 function nearestRegion(x, z) {
@@ -554,6 +556,21 @@ export class Client {
     if (inp.actHit('help')) this.guide.showKeys = !this.guide.showKeys;
     if (inp.actHit('map') && g.phase !== 'launch') this.hud.showMap(!this.hud.mapOpen, 'Map');
     if (inp.actHit('mute')) audio.setMuted(!audio.isMuted());
+    // quick chat: open the list, pick a line by its number
+    const canChat = this.game?.phase !== 'end' && (this.snap?.me?.state === 'alive' || this.snap?.me?.state === 'ghost') && !this.snap?.me?.spectator;
+    if (canChat && inp.actHit('chat')) this.chatOpen = !this.chatOpen;
+    if (!canChat || this.pauseMenu.open) this.chatOpen = false;
+    if (this.chatOpen) {
+      if (inp.hit('Escape')) this.chatOpen = false;
+      for (let i = 0; i < CHAT_LINES.length; i++) {
+        if (inp.hit(`Digit${i + 1}`)) {
+          this.say(i);
+          // the number was for the chat, not for a weapon or a power
+          inp.pressed.delete(`Digit${i + 1}`);
+        }
+      }
+    }
+    this.hud.chatWheel(this.chatOpen, (i) => this.say(i));
     // online, the pause sign does not stop the ride: let go of everything while it is up
     if (this.pauseMenu.open) {
       g.setInput(this.myId, { yaw: this.camYaw, pitch: this.camPitch });
@@ -659,6 +676,13 @@ export class Client {
     }
     g.setInput(this.myId, input);
     void dt;
+  }
+
+  /** Say a quick-chat line (CHAT_LINES[i]) and close the list. */
+  say(i) {
+    this.game.command(this.myId, { c: 'say', line: i });
+    this.chatOpen = false;
+    this.hud.chatWheel(false);
   }
 
   buy(id) {
@@ -863,6 +887,25 @@ export class Client {
             this.hud.toast(`Won: ${e.label}`);
           }
           break;
+        case 'say': {
+          const text = CHAT_LINES[e.line];
+          if (!text || !pl) break;
+          audio.play('click', e.id === me ? null : pos);
+          const el = document.createElement('div');
+          el.className = `say-bubble ${e.id === me ? 'mine' : ''}`;
+          el.textContent = text;
+          this.dmgLayer.appendChild(el);
+          // (removes any earlier bubble of theirs still showing)
+          this.bubbles = (this.bubbles || []).filter((b) => {
+            if (b.id !== e.id) return true;
+            b.el.remove();
+            return false;
+          });
+          this.bubbles.push({ id: e.id, el, t: 3.2 });
+          const meP = this.game.players.get(me);
+          if (e.id !== me && (!meP || Math.hypot(pl.x - meP.x, pl.z - meP.z) > 35)) this.hud.feed(`<b>${esc(pl.name)}</b>: ${esc(text)}`, 'say');
+          break;
+        }
         case 'hit':
           this.chars.get(e.id)?.char.hit();
           if (e.id === me || e.by === me) this.lastCombat = this.time;
@@ -1243,6 +1286,7 @@ export class Client {
     this.updateAudio(snap);
     this.updateDamageNumbers(dt);
     this.updateFoeBar(snap, dt);
+    this.updateBubbles(snap, dt);
 
     // HUD
     const p = this.mySnap();
@@ -1788,6 +1832,26 @@ export class Client {
       return;
     }
     bar.style.transform = `translate(${((tmpV.x + 1) / 2) * window.innerWidth}px, ${((1 - tmpV.y) / 2) * window.innerHeight}px) translate(-50%, -100%)`;
+  }
+
+  updateBubbles(snap, dt) {
+    if (!this.bubbles?.length) return;
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    this.bubbles = this.bubbles.filter((b) => {
+      b.t -= dt;
+      const p = snap.players.find((q) => q.id === b.id);
+      if (b.t <= 0 || !p) {
+        b.el.remove();
+        return false;
+      }
+      tmpV.set(p.x, p.y + (p.state === 'ghost' ? 2.5 : 2.35), p.z).project(this.camera);
+      const off = tmpV.z > 1;
+      b.el.style.display = off ? 'none' : '';
+      if (!off) b.el.style.transform = `translate(${((tmpV.x + 1) / 2) * w}px, ${((1 - tmpV.y) / 2) * h}px) translate(-50%, -100%)`;
+      b.el.style.opacity = Math.min(1, b.t * 2);
+      return true;
+    });
   }
 
   updateDamageNumbers(dt) {

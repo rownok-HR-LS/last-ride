@@ -4,7 +4,7 @@
 // and A presses one. Hits rumble.
 //
 //   A jump · B slide / fly down · X pick up / open (at a booth: prize counter) · Y next weapon · LB dodge · RB reload
-//   RT attack · LT aim / block · L3 sprint · R3 swap shoulder · View map · Start pause
+//   RT attack · LT aim / block · L3 sprint · R3 quick chat (then D-pad, LB, RB, Y, X pick a line) · View map · Start pause
 //   D-pad: medkit, bandage, shield soda, holy water (as a ghost: powers 1-4; LB, RB powers 5-6)
 
 import { setPad } from './prompts.js';
@@ -90,12 +90,14 @@ export class Pads {
       [key('dodge'), now[B.LB]],
       [key('reload'), now[B.RB]],
       [key('sprint'), now[B.L3]],
-      [key('shoulder'), now[B.R3]],
+      [key('chat'), now[B.R3]],
       [key('map'), now[B.VIEW]],
     ]);
-    // the D-pad picks items alive, powers as a ghost
+    // the D-pad picks items alive, powers as a ghost (and chat lines while the chat list is open)
     const ghost = c.snap?.me?.state === 'ghost';
-    const pad = ghost
+    const pad = c.chatOpen
+      ? [[B.UP, 'Digit1'], [B.RIGHT, 'Digit2'], [B.DOWN, 'Digit3'], [B.LEFT, 'Digit4'], [B.LB, 'Digit5'], [B.RB, 'Digit6'], [B.Y, 'Digit7'], [B.X, 'Digit8'], [B.B, 'Escape']]
+      : ghost
       ? [[B.UP, 'Digit1'], [B.RIGHT, 'Digit2'], [B.DOWN, 'Digit3'], [B.LEFT, 'Digit4'], [B.LB, 'Digit5'], [B.RB, 'Digit6']]
       : [[B.UP, 'Digit5'], [B.DOWN, 'Digit4'], [B.LEFT, 'Digit6'], [B.RIGHT, 'Digit7']];
     for (const [b, code] of pad) want.set(code, (want.get(code) || false) || now[b]);
@@ -110,7 +112,7 @@ export class Pads {
         inp.keys.delete(code);
       }
     }
-    if (hit(B.Y)) inp.wheel += 1;
+    if (hit(B.Y) && !c.chatOpen) inp.wheel += 1;
     if (hit(B.START)) inp.onEscape?.();
     // triggers are the mouse buttons
     const rt = (p.buttons[B.RT]?.value ?? 0) > 0.35;

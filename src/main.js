@@ -282,11 +282,20 @@ async function title() {
   };
   play.addEventListener('click', () => start(true));
   // came back from a refresh in the middle of a ride: straight back to your rider
+  let resumed = false;
   try {
     const t = JSON.parse(sessionStorage.getItem('last-ride-ticket') || 'null');
-    if (t && Date.now() - t.at < 30000) start(true, t.ticket);
+    if (t && Date.now() - t.at < 30000) {
+      resumed = true;
+      start(true, t.ticket);
+    }
   } catch {
     /* no session storage */
+  }
+  // an invite link (?ride): straight to the bus stop, where the friend who sent it is waiting
+  if (!resumed && new URLSearchParams(location.search).has('ride')) {
+    history.replaceState(null, '', location.pathname + location.search.replace(/[?&]ride(=[^&]*)?/, '').replace(/^&/, '?'));
+    start(true);
   }
   practice.addEventListener('click', () => start(false));
   nick.addEventListener('keydown', (e) => {

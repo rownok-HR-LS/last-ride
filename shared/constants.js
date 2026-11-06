@@ -71,3 +71,8 @@ export const BOT_NAMES = [
   'Calliope', 'Midway Max', 'Lucky Duck', 'Corn Dog', 'Bumper Bob', 'Haunted Hal',
   'Taffy', 'Sideshow Sam', 'Madame Fortuna', 'Whack-a-Mole', 'Jester', 'Teacup Tina',
 ];
+
+/** Quick chat: the only things riders can say to each other (no free text, so nothing to moderate). */
+export const CHAT_LINES = ['Over here!', 'Truce?', 'Behind you!', 'Run!', 'Thanks!', 'Ghost nearby!', 'Nice one.', 'Good game.'];
+/** Seconds between two lines from one rider. */
+export const CHAT_GAP = 2.5;

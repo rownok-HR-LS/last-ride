@@ -1,5 +1,6 @@
 // DOM heads-up display: vitals, weapons, ghost powers, minimap, landing map, kill feed, banners, end screen.
 import { kbd, usingPad } from './prompts.js';
+import { CHAT_LINES } from '../shared/constants.js';
 
 /** With a controller, items and ghost powers sit on the D-pad (and the bumpers): see gamepad.js. */
 const PAD_ITEM = { medkit: '↑', bandage: '↓', soda: '←', holy: '→' };
@@ -679,6 +680,28 @@ export class Hud {
       const bar = $('.xp-bar i', el);
       if (bar) setTimeout(() => bar.style.setProperty('width', bar.dataset.to), 400);
     }, 2500);
+  }
+
+  /** The quick-chat list (open: show it; pick(i) says line i). */
+  chatWheel(open, pick) {
+    let el = $('.chat-wheel', this.root);
+    if (!el) {
+      el = document.createElement('div');
+      el.className = 'chat-wheel';
+      this.root.appendChild(el);
+      el.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-line]');
+        if (b) this.chatPick?.(+b.dataset.line);
+      });
+    }
+    if (pick) this.chatPick = pick;
+    el.classList.toggle('show', open);
+    const pad = usingPad();
+    const key = `${open}|${pad}`;
+    if (!open || key === this.chatKey) return;
+    this.chatKey = key;
+    const PADKEY = ['↑', '→', '↓', '←', 'LB', 'RB', 'Y', 'X'];
+    el.innerHTML = `<h4>Quick chat</h4>${CHAT_LINES.map((t, i) => `<button data-line="${i}"><kbd>${pad ? PADKEY[i] : i + 1}</kbd>${esc(t)}</button>`).join('')}`;
   }
 
   /** The prize counter menu: number keys or clicks buy. */

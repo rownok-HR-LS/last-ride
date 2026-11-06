@@ -168,10 +168,13 @@ export class Room {
     const t = Date.now();
     if (!now && t - this.lastStatus < 1000) return;
     this.lastStatus = t;
-    const waiting = [...this.conns].filter((c) => c.ready && c.pid === null).length;
+    const line = [...this.conns].filter((c) => c.ready && c.pid === null);
+    const waiting = line.length;
+    // who is in line (first few), so the stop can show names
+    const names = line.slice(0, 8).map((c) => c.name || 'Rider');
     const g = this.game;
     const msg = pack({
-      t: 'lobby', busIn: this.busIn, waiting, online: this.humans(),
+      t: 'lobby', busIn: this.busIn, waiting, names, online: this.humans(),
       ride: g ? { phase: g.phase, alive: g.living(), riders: [...g.players.values()].filter((p) => !p.bot).length } : null,
     });
     for (const c of this.conns) if (c.joined && c.pid === null) this.send(c, msg);

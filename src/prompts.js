@@ -25,7 +25,7 @@ export function usingPad() {
 const PAD = {
   interact: 'X', prizes: 'X', jump: 'A', slide: 'B', dodge: 'LB', reload: 'RB', sprint: 'L3', shoulder: 'R3', map: 'View',
   attack: 'RT', aim: 'LT', cancel: 'LT', move: 'L stick', look: 'R stick', up: 'A', down: 'B', fast: 'L3', powers: 'D-pad',
-  weapons: 'Y', items: 'D-pad', pause: 'Start', help: 'H', close: 'B',
+  weapons: 'Y', items: 'D-pad', pause: 'Start', help: 'H', close: 'B', chat: 'R3',
 };
 const MOUSE = { attack: 'Click', aim: 'Right-click', cancel: 'Right-click', look: 'Mouse', pause: 'Esc', powers: '1–6', weapons: '1–3', items: '4–0' };
 const first = (action) => keyName((binds[action] || [])[0]);

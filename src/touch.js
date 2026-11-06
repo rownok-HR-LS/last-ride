@@ -19,6 +19,7 @@ const BUTTONS = [
   ['use', 'E', 'interact', 'alive'],
   ['reload', 'R', 'reload', 'alive'],
   ['swap', '⇄', 'wheel', 'alive'],
+  ['chat', icon('chat'), 'chat', 'any'],
   ['prizes', icon('ticket'), 'prizes', 'booth'],
   ['cast', icon('spark'), 'lmb', 'ghost'],
   ['up', '⤒', 'jump', 'ghost'],
@@ -215,7 +216,7 @@ export class Touch {
     this.shown = key;
     for (const b of this.el.querySelectorAll('[data-b]')) {
       const w = b.dataset.when;
-      b.hidden = !(w === state || (w === 'booth' && state === 'alive' && me.booth >= 0) || (state === 'watch' && ['up', 'down', 'fast'].includes(b.dataset.b)));
+      b.hidden = !(w === state || (w === 'any' && (state === 'alive' || state === 'ghost')) || (w === 'booth' && state === 'alive' && me.booth >= 0) || (state === 'watch' && ['up', 'down', 'fast'].includes(b.dataset.b)));
     }
   }
 }
