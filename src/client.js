@@ -35,6 +35,7 @@ import { lookItem } from '../shared/looks.js';
 import { CHAT_LINES, NIGHTS } from '../shared/constants.js';
 import { loadProgress, award } from './progress.js';
 import { setBinds } from './prompts.js';
+import { updateLampLight } from './lamplight.js';
 
 const FEMALE = new Set(OUTFITS.filter((o) => o.voice === 'f').map((o) => o.id));
 
@@ -362,6 +363,7 @@ export class Client {
     groundRain.amount.value = 0.85;
     sceneWet.value = 0.85;
     this.lamps.update([], t, cam.position.x, cam.position.z, 1);
+    updateLampLight([], 1);
     if (this.showChar) {
       const x = 2.5;
       const z = 98.8;
@@ -1304,6 +1306,7 @@ export class Client {
     const out = Math.max(Math.abs(this.camera.position.x), Math.abs(this.camera.position.z)) - PARK_EDGE;
     this.scene.fog.density = (0.0068 + Math.min(1, Math.max(0, out / 120)) * 0.003) * (this.night?.fog ?? 1);
     this.lamps.update(snap.blackouts, this.time, this.camera.position.x, this.camera.position.z, this.intro.power(snap));
+    updateLampLight(snap.blackouts, this.intro.power(snap));
     this.bus.update(snap.bus, true, dt, { cabin: this.cine ? this.cine.cabin : 0 });
     // the tour's driver never leaves his seat
     const ds = this.bus.driverSeat(this.driverPos || (this.driverPos = new THREE.Vector3()));

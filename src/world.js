@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { softShaft, nightAir } from './shafts.js';
 import { wetten, groundAO } from './wet.js';
+import { addLampLight, loadLampLight } from './lamplight.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
 import { PROPS, LAMPS, LAMP_HEAD, PARK_EDGE, PRIZE_BOOTHS, DECOR, LANDMARKS_OUT, rotXZ } from '../shared/map.js';
@@ -693,6 +694,8 @@ function groundMaterial() {
       .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
         // the pools mirror the sky, but the town glow on the horizon is a saturated purple: keep its light, drop most of its colour
         reflectedLight.indirectSpecular = mix(reflectedLight.indirectSpecular, vec3(dot(reflectedLight.indirectSpecular, vec3(0.3, 0.5, 0.2))) * vec3(0.92, 0.96, 1.05), puddle * 0.7);`);
+    // the street lamps' light on the ground, baked in Blender with every shadow cast across it
+    addLampLight(sh, { ground: true });
   };
   return m;
 }
@@ -882,6 +885,10 @@ function buildLamps(scene) {
     pools.setMatrixAt(i, m);
   });
   pools.renderOrder = 1;
+  // the painted pools stand in until the baked lamp light (lamplight.js) is in, which has the real ones
+  loadLampLight().then(() => {
+    pools.visible = false;
+  }).catch((e) => console.warn('lamp light', e));
   // the light falling from each head, made visible by the rain and mist
   const coneH = LAMP_HEAD.y - 0.25;
   const coneMat = softShaft(new THREE.MeshBasicMaterial({
@@ -933,7 +940,8 @@ function buildLamps(scene) {
         }
         const l = LAMPS[o.i];
         pl.position.set(l.x + LAMP_HEAD.x, LAMP_HEAD.y - 0.4, l.z);
-        pl.intensity = 55 * level[o.i];
+        // the baked light (lamplight.js) already carries most of it: these add the shine and the sharp falloff
+        pl.intensity = 35 * level[o.i];
       });
     },
   };

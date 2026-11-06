@@ -5,6 +5,8 @@
 // the foot of a wall, a booth or a crate darkens where the ground beside it is shaded, fading out over the first
 // metre or two, so nothing looks pasted onto the ground. world.js hands the texture over once it has loaded.
 
+import { addLampLight } from './lamplight.js';
+
 export const sceneWet = { value: 0 };
 /** The ground's baked occlusion (texture) and whether it is in yet (0 / 1). */
 export const groundAO = { map: { value: null }, on: { value: 0 } };
@@ -16,6 +18,8 @@ export function wetten(mat) {
   const prev = mat.onBeforeCompile;
   mat.onBeforeCompile = (sh, renderer) => {
     prev?.call(mat, sh, renderer);
+    // and lit by the street lamps (baked in Blender)
+    addLampLight(sh);
     sh.uniforms.sceneWet = sceneWet;
     sh.uniforms.groundAO = groundAO.map;
     sh.uniforms.groundAOOn = groundAO.on;
@@ -50,6 +54,6 @@ export function wetten(mat) {
         #endif`);
   };
   const key = mat.customProgramCacheKey?.bind(mat);
-  mat.customProgramCacheKey = () => `${key ? key() : ''}|wet2`;
+  mat.customProgramCacheKey = () => `${key ? key() : ''}|wet3`;
   return mat;
 }

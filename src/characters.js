@@ -9,6 +9,7 @@ import { WEAPONS, FISTS } from '../shared/items.js';
 import { weaponModel, GRIP } from './weapons.js';
 import { OUTFITS, PLAYER_HEIGHT } from '../shared/constants.js';
 import { grimyStripes, glow } from './textures.js';
+import { addLampLight } from './lamplight.js';
 
 /** How far out from vertical (seen from the front) a relaxed upper arm may hang. */
 const ARM_HANG = 9 * (Math.PI / 180);
@@ -218,6 +219,8 @@ function lookShader(sh) {
       // struck: a hot flash that hugs the outline, so a hit reads at a glance
       float hitRim = pow(1.0 - abs(dot(normalize(-vViewPosition), normal)), 1.5);
       totalEmissiveRadiance += vec3(1.0, 0.42, 0.3) * lookHit * (0.18 + hitRim * 1.1);`);
+  // walking past a street lamp lights you up (the bake in Blender, read from the light grid)
+  addLampLight(sh);
 }
 
 /** Bake each vertex's bind-pose position (metres above the feet, centred) for the look masks. */
