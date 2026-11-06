@@ -109,3 +109,16 @@ export function cullInstances(camera, force = false) {
     }
   }
 }
+
+/** Put every copy of every culled batch back in its buffer (for tools that need the whole park, e.g. baking). */
+export function restoreAllInstances() {
+  for (const b of batches) {
+    const { mesh, all, colors, n } = b;
+    mesh.instanceMatrix.array.set(all.subarray(0, n * 16));
+    if (colors) mesh.instanceColor.array.set(colors.subarray(0, n * 3));
+    mesh.count = n;
+    mesh.visible = n > 0;
+    mesh.instanceMatrix.clearUpdateRanges();
+    mesh.instanceMatrix.needsUpdate = true;
+  }
+}

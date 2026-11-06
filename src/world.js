@@ -501,11 +501,32 @@ export function buildWorld(scene) {
   // ground: forest floor with broken cobbled walkways blended in by a mask
   const ground = new THREE.Mesh(scaledPlane(240, 240 / 4), groundMaterial());
   ground.rotation.x = -Math.PI / 2;
+  ground.name = 'ground';
+  // ambient occlusion baked in Blender (scripts/blender/bake-ground-ao.py): every building, tent, ride, booth, prop
+  // and tree softly darkens the ground around it. Its second UV set spans the whole ground once.
+  {
+    const pos = ground.geometry.attributes.position;
+    const uv1 = new Float32Array(pos.count * 2);
+    for (let i = 0; i < pos.count; i++) {
+      uv1[i * 2] = (pos.getX(i) + 120) / 240;
+      uv1[i * 2 + 1] = (pos.getY(i) + 120) / 240;
+    }
+    ground.geometry.setAttribute('uv1', new THREE.BufferAttribute(uv1, 2));
+    new THREE.TextureLoader().load('./tex/ground_ao.webp', (t) => {
+      t.channel = 1;
+      t.colorSpace = THREE.NoColorSpace;
+      t.anisotropy = 4;
+      ground.material.aoMap = t;
+      ground.material.aoMapIntensity = 1;
+      ground.material.needsUpdate = true;
+    });
+  }
   ground.receiveShadow = true;
   scene.add(ground);
   const wildsTex = pbr('forest_leaves_02');
   const wildsMat = new THREE.MeshStandardMaterial({ color: '#8a8070', map: wildsTex.map, normalMap: wildsTex.normalMap, roughness: 1 });
   const wilds = new THREE.Mesh(scaledPlane(1400, 1400 / 5), wildsMat);
+  wilds.name = 'wilds';
   wilds.rotation.x = -Math.PI / 2;
   wilds.position.y = -0.03;
   scene.add(wilds);
@@ -641,6 +662,13 @@ function groundMaterial() {
           mapN.xy += rn * 0.3 * puddle;
         }
         normal = normalize(tbn * mapN);`)
+      // the baked occlusion: three.js only shades ambient light with it, but at night the moon and the lamps light
+      // the ground, so it softens those too, as contact shadow round every wall, tent and booth
+      .replace('#include <aomap_fragment>', `#include <aomap_fragment>
+        #ifdef USE_AOMAP
+          reflectedLight.directDiffuse *= mix(1.0, ambientOcclusion, 0.75);
+          reflectedLight.directSpecular *= ambientOcclusion;
+        #endif`)
       .replace('#include <roughnessmap_fragment>', `// the rain falling now leaves everything with a film of water
         float roughnessFactor = mix(roughness - wetG * 0.3 - pathK * 0.2 - rainAmt * 0.18, 0.1, puddle);`)
       .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
