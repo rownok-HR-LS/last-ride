@@ -32,7 +32,7 @@ import { loadSettings } from './settings.js';
 import { Touch, isTouch } from './touch.js';
 import { Pads } from './gamepad.js';
 import { lookItem } from '../shared/looks.js';
-import { CHAT_LINES } from '../shared/constants.js';
+import { CHAT_LINES, NIGHTS } from '../shared/constants.js';
 import { loadProgress, award } from './progress.js';
 import { setBinds } from './prompts.js';
 
@@ -1096,7 +1096,7 @@ export class Client {
           this.hud.banner(e.winner === me ? 'YOU SURVIVED' : 'RIDE OVER', `${this.name(e.winner)} survived the Last Ride`, 4);
           break;
         case 'live':
-          this.hud.banner('THE DOORS ARE OPEN', 'Jump off whenever you like', 2);
+          this.hud.banner('THE DOORS ARE OPEN', `Jump off whenever you like · tonight: ${(NIGHTS[this.snap?.night] || NIGHTS.storm).name}`, 3);
           break;
         default:
       }
@@ -1287,19 +1287,22 @@ export class Client {
     this.projectiles.update(snap, dt, this.time, this.camera.position);
     this.updateWeather(dt);
     this.updateCamera(snap, dt);
-    // a steady downpour that eases and thickens over a few minutes
-    const rainAmount = 0.75 + Math.sin(this.time * 0.05) * 0.2;
+    // tonight's rain, easing and thickening over a few minutes between its low and its high
+    const night = NIGHTS[snap.night] || NIGHTS.storm;
+    this.night = night;
+    const rainAmount = night.rain[0] + (night.rain[1] - night.rain[0]) * (0.5 + Math.sin(this.time * 0.05) * 0.5);
     this.rain.update(dt, this.camera, { amount: rainAmount, flash: this.weather.flash, bus: snap.bus });
     groundRain.time.value = this.time % 1000;
     windTime.value = this.time % 1000;
     groundRain.amount.value = rainAmount;
-    sceneWet.value = rainAmount;
+    // (on a dry night the park is still wet from the rain before)
+    sceneWet.value = Math.max(rainAmount, 0.35);
     this.rainAmount = rainAmount;
     // only the plants, trees and props in view (and close by, for shadows) get drawn
     cullInstances(this.camera);
     // the night mist is thicker out in the woods than inside the lit park
     const out = Math.max(Math.abs(this.camera.position.x), Math.abs(this.camera.position.z)) - PARK_EDGE;
-    this.scene.fog.density = 0.0068 + Math.min(1, Math.max(0, out / 120)) * 0.003;
+    this.scene.fog.density = (0.0068 + Math.min(1, Math.max(0, out / 120)) * 0.003) * (this.night?.fog ?? 1);
     this.lamps.update(snap.blackouts, this.time, this.camera.position.x, this.camera.position.z, this.intro.power(snap));
     this.bus.update(snap.bus, true, dt, { cabin: this.cine ? this.cine.cabin : 0 });
     // the tour's driver never leaves his seat
@@ -1538,8 +1541,8 @@ export class Client {
     const flash = this.weather.flash * (1 - inside * 0.75);
     this.hemi.intensity = 1.15 - inside * 0.95 + flash * 1.6;
     if (this.scene.environment) this.scene.environmentIntensity = 0.65 - inside * 0.5 + flash * 0.8;
-    this.scene.backgroundIntensity = (0.6 + flash * 1.6) * SKY_SCALE;
-    this.moonLight.intensity = 2.1 - inside * 1.7 + flash * 5;
+    this.scene.backgroundIntensity = (0.6 * (this.night?.sky ?? 1) + flash * 1.6) * SKY_SCALE;
+    this.moonLight.intensity = (2.1 - inside * 1.7) * (this.night?.moon ?? 1) + flash * 5;
     setCharacterRim(1 - inside);
     if (this.cine) {
       this.camDistNow = 4;
@@ -1797,9 +1800,11 @@ export class Client {
   /** Lightning: a few flickers, then the thunder arrives later the further off the strike was (sound covers ~343 m/s). */
   updateWeather(dt) {
     const w = this.weather;
-    w.nextBolt -= dt;
-    if (w.nextBolt <= 0) {
-      w.nextBolt = 12 + Math.random() * 22;
+    // tonight's lightning (none on a foggy or clear night; the title screen keeps the storm)
+    const bolts = this.attract ? [12, 34] : this.night ? this.night.bolts : [12, 34];
+    w.nextBolt -= bolts ? dt : 0;
+    if (bolts && w.nextBolt <= 0) {
+      w.nextBolt = bolts[0] + Math.random() * (bolts[1] - bolts[0]);
       const km = 0.4 + Math.random() * 3.6;
       const k = Math.min(1, Math.max(0.25, 1.2 / km));
       w.bolt = { t: 0, k, pulses: [[0, 1, 0.07], [0.12 + Math.random() * 0.08, 0.55, 0.05], [0.3 + Math.random() * 0.15, 0.85, 0.14]] };

@@ -76,3 +76,16 @@ export const BOT_NAMES = [
 export const CHAT_LINES = ['Over here!', 'Truce?', 'Behind you!', 'Run!', 'Thanks!', 'Ghost nearby!', 'Nice one.', 'Good game.'];
 /** Seconds between two lines from one rider. */
 export const CHAT_GAP = 2.5;
+
+/**
+ * Every ride is a different night. rain: how hard it rains [low, high] (it drifts between them), fog: how thick the
+ * mist is (1 = usual), bolts: seconds between lightning strikes [min, max] (null: none), moon: moonlight (1 = usual), sky: how much of the starry sky shows,
+ * weight: how often the night comes up. The sim picks one per ride, so everyone online rides the same night.
+ */
+export const NIGHTS = {
+  storm: { name: 'Storm night', rain: [0.6, 0.95], fog: 1, bolts: [12, 34], moon: 1, sky: 1, weight: 3 },
+  drizzle: { name: 'Drizzle', rain: [0.25, 0.45], fog: 0.85, bolts: [40, 90], moon: 1.1, sky: 1, weight: 2 },
+  fog: { name: 'Thick fog', rain: [0.06, 0.18], fog: 3.2, bolts: null, moon: 0.75, sky: 0.22, weight: 2 },
+  thunder: { name: 'Thunderstorm', rain: [0.9, 1], fog: 1.05, bolts: [5, 14], moon: 0.9, sky: 0.75, weight: 2 },
+  moon: { name: 'Clear moon', rain: [0, 0], fog: 0.7, bolts: null, moon: 1.45, sky: 1.2, weight: 1 },
+};

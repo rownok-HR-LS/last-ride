@@ -4,7 +4,7 @@ import { cleanLook, botLook } from './looks.js';
 import {
   MAX_PLAYERS, PLAYER_RADIUS, EYE_HEIGHT, RUN_SPEED, AIM_SPEED, SPRINT_SPEED, COMBAT_SPEED, MAX_HP, MAX_SHIELD, MAX_REVIVES, REVIVE_HP, REVIVE_PROTECT, GHOST_RISE,
   GHOST_SPEED, GHOST_FAST, ECTO_MAX, ECTO_REGEN, ECTO_START, GHOST_FLASH, LAUNCH_SECONDS,
-  FINAL_RIDE_SECONDS, FINAL_RIDE_RESET, END_SCREEN_SECONDS, BUS_SPEED, OUTFITS, BOT_NAMES, CHAT_LINES, CHAT_GAP } from './constants.js';
+  FINAL_RIDE_SECONDS, FINAL_RIDE_RESET, END_SCREEN_SECONDS, BUS_SPEED, OUTFITS, BOT_NAMES, CHAT_LINES, CHAT_GAP, NIGHTS } from './constants.js';
 import { rng, dirFromAngles, pick, angleDiff } from './rng.js';
 import {
   WEAPONS, FISTS, RARITIES, AMMO, ITEMS, POWERS, RIDES, PRIZES, TICKETS, STAMINA, HEAVY, DODGE, SLIDE, BLOCK, PARRY, THROW, COMBO, IMPACT, ASSIST,
@@ -47,6 +47,12 @@ export class Game {
     this.time = 0;
     this.phase = 'launch';
     this.launchIn = LAUNCH_SECONDS;
+    // tonight's weather (see NIGHTS)
+    {
+      const ids = Object.keys(NIGHTS);
+      let r = this.rand() * ids.reduce((n, id) => n + NIGHTS[id].weight, 0);
+      this.night = ids.find((id) => (r -= NIGHTS[id].weight) < 0) || 'storm';
+    }
     this.players = new Map();
     this.nextId = 1;
     this.loot = new Map();
@@ -1716,7 +1722,7 @@ export class Game {
       players.push(this.playerView(p));
     }
     const snap = {
-      time: this.time, phase: this.phase, launchIn: this.launchIn, finalT: this.finalT, winner: this.winner, endT: this.endT,
+      time: this.time, phase: this.phase, night: this.night, launchIn: this.launchIn, finalT: this.finalT, winner: this.winner, endT: this.endT,
       alive, ghosts, players,
       zone: { cx: zn.cx, cz: zn.cz, r: zn.r, nx: zn.nx, nz: zn.nz, nr: zn.nr, state: zn.state, t: zn.t, idx: zn.idx, dps: this.zoneDps() },
       bus: { x: this.bus.x, z: this.bus.z, yaw: this.bus.yaw, s: this.bus.s, v: this.bus.v, open: this.phase === 'live' && this.bus.s < BUS_ROUTE.len },
