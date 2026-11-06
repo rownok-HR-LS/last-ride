@@ -2,7 +2,7 @@
 // Static geometry is merged per material to keep draw calls low.
 import * as THREE from 'three';
 import { softShaft, nightAir } from './shafts.js';
-import { wetten } from './wet.js';
+import { wetten, groundAO } from './wet.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
 import { PROPS, LAMPS, LAMP_HEAD, PARK_EDGE, PRIZE_BOOTHS, DECOR, LANDMARKS_OUT, rotXZ } from '../shared/map.js';
@@ -519,6 +519,9 @@ export function buildWorld(scene) {
       ground.material.aoMap = t;
       ground.material.aoMapIntensity = 1;
       ground.material.needsUpdate = true;
+      // and the foot of everything standing on it (wet.js)
+      groundAO.map.value = t;
+      groundAO.on.value = 1;
     });
   }
   ground.receiveShadow = true;
