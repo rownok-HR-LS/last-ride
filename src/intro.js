@@ -4,6 +4,7 @@
 // and wildlife. It runs during the sim's 'launch' phase (the bus reaches the gate as it ends) and can be skipped.
 import * as THREE from 'three';
 import { LAUNCH_SECONDS } from '../shared/constants.js';
+import { DECOR } from '../shared/map.js';
 import * as audio from './audio.js';
 
 /**
@@ -18,8 +19,35 @@ const LINES = [
   [25.5, 'Only one rider leaves on the last bus. The rest… stay.'],
 ];
 
+/** When the park's lights stutter back on: as the narrator says so. */
+const POWER_ON = 18.9;
+
 /** One-off sounds: [time, name]. */
-const CUES = [[3.2, 'owl'], [9.8, 'twig'], [15.5, 'owl'], [19.2, 'crow'], [21.2, 'power']];
+const CUES = [[3.2, 'owl'], [9.8, 'twig'], [14.6, 'owl'], [16.6, 'crow'], [POWER_ON, 'power']];
+
+/** The story props nearest the gate (shared/map.js storyProps), for the shots that cut away from the bus. */
+const GATE = [0, 112];
+function nearest(model, fallback) {
+  let best = null;
+  for (const d of DECOR) {
+    if (d.model === model && (!best || Math.hypot(d.x - GATE[0], d.z - GATE[1]) < Math.hypot(best.x - GATE[0], best.z - GATE[1]))) best = d;
+  }
+  return best || { x: fallback[0], z: fallback[1], rot: fallback[2] };
+}
+const MEMORIAL = nearest('memorial', [-7, 101.5, Math.PI / 2]);
+const BOARD = nearest('missing_board', [12, 60, -Math.PI / 2]);
+const BARRIER = nearest('barricade', [-14, 86, Math.PI / 2]);
+/** A point by a prop: f metres out from its face, r to its right, y up. */
+function propAt(d, f, r, y) {
+  const s = Math.sin(d.rot);
+  const c = Math.cos(d.rot);
+  return [d.x + s * f + c * r, y, d.z + c * f - s * r];
+}
+const span = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+/** A shot in world space looking at a prop, focused on it. */
+function onProp(pos, look) {
+  return { pos, look, focus: span(pos, look) };
+}
 
 const ease = (u) => 0.5 - 0.5 * Math.cos(Math.PI * Math.min(1, Math.max(0, u)));
 
@@ -35,24 +63,34 @@ const SHOTS = [
     cam: (u, b, A) => ({ pos: A.at(66 - u * 2, -4.6 + u * 0.4, 0.9 + u * 0.2), look: b.at(5, 0, 1.4) }),
   },
   {
-    // down by the front wheel, riding along: tyres on the broken road, the beams cutting the mist
-    at: 6.5, fov: 46, shake: 0.6, aperture: 1.0,
-    cam: (u, b) => ({ pos: b.at(1.6 + u * 0.8, 2.15, 0.55), look: b.at(14, 0.2, 0.7), focus: 3.2 }),
+    // "Twenty visitors went in": a slow push in on the memorial at the gate, their twenty photographs in candlelight
+    at: 7.4, fov: 32, shake: 0.25, aperture: 0.6,
+    cam: (u) => onProp(propAt(MEMORIAL, 4.4 - u * 1.9, 0.6 - u * 0.4, 1.3 - u * 0.15), propAt(MEMORIAL, -0.4, 0, 0.85)),
   },
   {
-    // inside, creeping up the aisle past the other riders toward the driver
-    at: 11.5, fov: 50, shake: 0.9, aperture: 0.12, cabin: 1, interior: 1,
-    cam: (u, b) => ({ pos: b.at(-2.6 + u * 1.4, 0.05, 2.85), look: b.at(16, -0.4, 2.45), focus: 5 }),
+    // "Nobody bought the land": the MISSING posters, still up after all these years
+    at: 11.6, fov: 36, shake: 0.3, aperture: 0.5,
+    cam: (u) => onProp(propAt(BOARD, 2.7 - u * 0.6, -1.1 + u * 0.8, 1.6), propAt(BOARD, -0.3, 0, 1.45)),
+  },
+  {
+    // "Nobody tore it down": low along the county's CLOSED barricade, the dark park behind
+    at: 13.9, fov: 38, shake: 0.35, aperture: 0.7,
+    cam: (u) => onProp(propAt(BARRIER, 2.3, -1.0 + u * 1.6, 0.75), propAt(BARRIER, 0, 0, 0.68)),
   },
   {
     // a drone high over the road, sinking as the treeline opens toward the park
-    at: 16.5, fov: 38, shake: 0.12, aperture: 0.25,
+    at: 16, fov: 38, shake: 0.12, aperture: 0.25,
     cam: (u, b) => ({ pos: b.at(-24 + u * 7, 3 - u * 1.5, 19 - u * 6), look: b.at(20, 0, 0) }),
   },
   {
     // inside the gates, low: the lights stutter on as the bus pulls up
-    at: 21, fov: 34, shake: 0.4, aperture: 0.5,
+    at: 18.4, fov: 34, shake: 0.4, aperture: 0.5,
     cam: (u, b) => ({ pos: [-3.5 + u * 1.2, 1.4 + u * 0.2, 74 + u * 5], look: [b.x * 0.3, 4.6 - u * 0.8, b.z], focus: 36 }),
+  },
+  {
+    // inside, creeping up the aisle past the other riders toward the driver
+    at: 20.3, fov: 50, shake: 0.9, aperture: 0.12, cabin: 1, interior: 1,
+    cam: (u, b) => ({ pos: b.at(-2.6 + u * 1.4, 0.05, 2.85), look: b.at(16, -0.4, 2.45), focus: 5 }),
   },
   {
     // behind the bus as it passes under the arch, craning up to the sign
@@ -180,8 +218,8 @@ export class Intro {
   power(snap) {
     if (snap.phase !== 'launch') return 1;
     const elapsed = LAUNCH_SECONDS - snap.launchIn;
-    if (elapsed < 21.2) return 0;
-    const k = Math.min(1, (elapsed - 21.2) / 2.5);
+    if (elapsed < POWER_ON) return 0;
+    const k = Math.min(1, (elapsed - POWER_ON) / 2.5);
     return k < 1 && Math.sin(elapsed * 40) > 0.2 ? 0.1 : k;
   }
 }
