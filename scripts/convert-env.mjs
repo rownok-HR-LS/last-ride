@@ -69,6 +69,11 @@ export const ENV = {
   clown_face: ['sketchfab-env/sf_d9b1f6085753403f91ff2a7bab0c0ab3.glb', 30000, 1024, false, 0.05],
   gargoyle: ['sketchfab-env/sf_73479897896947e19a0d21b61534ac4d.glb', 6000, 1024],
   roof_kit: ['sketchfab-env/sf_6dfa32e7ec614362a29fd950b87212ca.glb', 4000, 1024],
+  // story props modelled in Blender from code (scripts/blender/story-props.py, our own)
+  memorial: ['blender/memorial.glb', 6000, 1024],
+  missing_board: ['blender/missing_board.glb', 1000, 1024],
+  barricade: ['blender/barricade.glb', 600, 512],
+  plush: ['blender/plush.glb', 4500, 256, true],
 };
 
 await MeshoptEncoder.ready;

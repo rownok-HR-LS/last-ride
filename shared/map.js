@@ -665,6 +665,78 @@ for (const p of PATHS.slice(1)) {
     DECOR.push({ model, x, z, rot, w, d, h });
     LANDMARKS_OUT.push({ x, z, r: Math.hypot(w, d) / 2 + 3 });
   }
+  storyProps();
+}
+
+/**
+ * What the town left behind after the twenty went missing in 1987 (modelled in scripts/blender/story-props.py):
+ * the memorial just inside the gate, MISSING notice boards along the walkways, the county's CLOSED barricades and
+ * prize teddy bears dropped where people stood. A random stream of its own, so the rest of the park stays put.
+ */
+function storyProps() {
+  const sr = rng(1031);
+  // visual footprint (w across, d deep, as modelled), and the solid part: [local x, local z, w, d, height]
+  const SIZE = {
+    memorial: [2.52, 1.65, [0, -0.4, 1.9, 0.6, 1.4]],
+    missing_board: [2.45, 1.22, [0, -0.3, 2.15, 0.3, 2.4]],
+    barricade: [2.0, 0.63, [0, 0, 2.0, 0.4, 1.1]],
+  };
+  const place = (model, x, z, rot) => {
+    const [w, d, [lx, lz, cw, cd, h]] = SIZE[model];
+    DECOR.push({ model, x, z, rot, w, d, h });
+    const [ox, oz] = rotXZ(lx, lz, rot);
+    addBox(x + ox, z + oz, cw, cd, 0, h, rot);
+  };
+  const free = (x, z, r) => clearance(x, z, r) > 0.3 && !inKeepout(x, z) && !nearTrack(x, z, r + 1)
+    && !CHEST_SPOTS.some((c) => Math.hypot(c.x - x, c.z - z) < r + 2);
+  // the memorial, on the left as the bus comes through the gate
+  for (const [x, z] of [[-7, 101.5], [-9.5, 96], [-10, 90]]) {
+    if (free(x, z, 1.6)) {
+      place('memorial', x, z, facePath(x, z));
+      break;
+    }
+  }
+  // notice boards beside the walkways, turned to the people walking past
+  const boards = [];
+  for (let i = 0; i < 3000 && boards.length < 7; i++) {
+    const x = (sr() * 2 - 1) * (PARK_EDGE - 8);
+    const z = (sr() * 2 - 1) * (PARK_EDGE - 8);
+    const pd = pathDistance(x, z);
+    if (pd < 1.2 || pd > 3 || !free(x, z, 1.5) || boards.some((b) => Math.hypot(b[0] - x, b[1] - z) < 28)) continue;
+    boards.push([x, z]);
+    place('missing_board', x, z, facePath(x, z));
+  }
+  // CLOSED barricades: left across the side of a walkway, some knocked askew
+  const bars = [];
+  for (let i = 0; i < 3000 && bars.length < 9; i++) {
+    const x = (sr() * 2 - 1) * (PARK_EDGE - 8);
+    const z = (sr() * 2 - 1) * (PARK_EDGE - 8);
+    const pd = pathDistance(x, z);
+    if (pd < 0.3 || pd > 2.5 || !free(x, z, 1.2) || bars.some((b) => Math.hypot(b[0] - x, b[1] - z) < 18)) continue;
+    bars.push([x, z]);
+    place('barricade', x, z, facePath(x, z) + (sr() - 0.5) * 0.9);
+  }
+  // teddy bears from the prize counters, dropped on the paths and by the booths (small: no collider)
+  const kinds = ['plush#bear_brown', 'plush#bear_pink', 'plush#bear_blue'];
+  const bear = (x, z) => DECOR.push({ model: kinds[Math.floor(sr() * 3)], x, z, rot: sr() * Math.PI * 2, w: 0.35, d: 0.33, h: 0.46 });
+  for (const b of PRIZE_BOOTHS) {
+    for (let k = 0; k < 12; k++) {
+      const a = sr() * Math.PI * 2;
+      const x = b.x + Math.cos(a) * (3.2 + sr() * 1.5);
+      const z = b.z + Math.sin(a) * (3.2 + sr() * 1.5);
+      if (clearance(x, z, 0.3) > 0.1) {
+        bear(x, z);
+        break;
+      }
+    }
+  }
+  for (let i = 0, n = 0; i < 3000 && n < 14; i++) {
+    const x = (sr() * 2 - 1) * (PARK_EDGE - 6);
+    const z = (sr() * 2 - 1) * (PARK_EDGE - 6);
+    if (pathDistance(x, z) > 1.5 || clearance(x, z, 0.3) < 0.1 || nearTrack(x, z, 1)) continue;
+    bear(x, z);
+    n++;
+  }
 }
 
 // floor loot: on and beside walkways, inside buildings, near landmarks

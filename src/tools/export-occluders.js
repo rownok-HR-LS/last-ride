@@ -3,6 +3,8 @@
 // Positions only, one grey material; instanced batches stay instanced (EXT_mesh_gpu_instancing).
 // In the dev console, with the scratchpad receiver running:
 //   await (await import('/src/tools/export-occluders.js')).exportOccluders(__lr, 'http://127.0.0.1:5299/?n=occluders&ext=glb')
+// Run it on a freshly started dev server: once cull.js has been hot-reloaded the game holds a different copy of it
+// than this import gets, the culled-away copies stay hidden, and the bake misses them.
 import * as THREE from 'three';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import { restoreAllInstances } from '../cull.js';

@@ -573,6 +573,22 @@ export function buildWorld(scene) {
   buildScatter(scene);
   buildMist(scene);
   for (const d of DECOR) modelSpots.push([d.model, { x: d.x, z: d.z, rot: d.rot, w: d.w, d: d.d }]);
+  // the memorial's candles throw a warm, unsteady glow on the ground round it
+  for (const d of DECOR.filter((o) => o.model === 'memorial')) {
+    const mat = new THREE.MeshBasicMaterial({
+      map: glow(), color: '#ff9a45', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.3,
+    });
+    const pool = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 4.2), mat);
+    pool.rotation.x = -Math.PI / 2;
+    const [ox, oz] = rotXZ(0, 0.25, d.rot);
+    pool.position.set(d.x + ox, 0.05, d.z + oz);
+    pool.renderOrder = 1;
+    pool.onBeforeRender = () => {
+      const t = performance.now() / 1000;
+      mat.opacity = 0.26 + 0.05 * Math.sin(t * 9.1) * Math.sin(t * 3.7 + 1.3) + 0.02 * Math.sin(t * 23.0);
+    };
+    scene.add(pool);
+  }
   // copies of the same model share instanced meshes
   const byModel = new Map();
   for (const [name, o] of modelSpots) {
