@@ -169,7 +169,7 @@ function lookShader(sh) {
       float ca = cos(a);
       return c * ca + cross(k, c) * sin(a) + k * dot(k, c) * (1.0 - ca);
     }
-    float lkMud; float lkBl; float lkSkin;
+    float lkMud; float lkBl; float lkSkin; float lkLum;
     ${sh.fragmentShader}`
     .replace('#include <map_fragment>', `#include <map_fragment>
       {
@@ -183,6 +183,7 @@ function lookShader(sh) {
         // warm tones (every skin colour, but also brown hair and leather): orange-ish hue with some colour in it
         float warm = (1.0 - smoothstep(0.75, 1.1, hue)) * (hue < 5.6 ? 1.0 : 0.0) + smoothstep(5.6, 5.9, hue);
         lkSkin = warm * smoothstep(0.1, 0.22, sat) * smoothstep(0.08, 0.16, mx);
+        lkLum = lum;
         // clothing: a modest hue turn (never far enough to go green or purple), a lighter or darker dye, and a
         // faint colour cast on greys, whites and blacks so plain shirts, suits and jeans vary too
         vec3 t = lkHue(c, lookTint.x * 0.5) * lookTint.y;
@@ -209,6 +210,8 @@ function lookShader(sh) {
         diffuseColor.rgb = c;
       }`)
     .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
+      // skin has a soft sheen; cloth is matte; dark leather, shoes and hair a little glossier
+      roughnessFactor *= mix(mix(0.9, 0.6, 1.0 - smoothstep(0.02, 0.12, lkLum)), 0.5, lkSkin);
       roughnessFactor = mix(roughnessFactor, 0.95, lkMud * (1.0 - lookWet));
       roughnessFactor = mix(roughnessFactor, 0.25, lookWet * 0.9);
       roughnessFactor = mix(roughnessFactor, 0.22, lkBl);`)
@@ -218,7 +221,17 @@ function lookShader(sh) {
       totalEmissiveRadiance += vec3(0.45, 0.55, 0.7) * rimK * 0.55;
       // struck: a hot flash that hugs the outline, so a hit reads at a glance
       float hitRim = pow(1.0 - abs(dot(normalize(-vViewPosition), normal)), 1.5);
-      totalEmissiveRadiance += vec3(1.0, 0.42, 0.3) * lookHit * (0.18 + hitRim * 1.1);`);
+      totalEmissiveRadiance += vec3(1.0, 0.42, 0.3) * lookHit * (0.18 + hitRim * 1.1);`)
+    .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
+      // skin lets light through a little: where the moonlight falls away it keeps a warm, reddish glow instead of
+      // cutting straight to shadow (a cheap stand-in for light scattering under the skin)
+      #if NUM_DIR_LIGHTS > 0
+      {
+        float nl = dot(normal, directionalLights[0].direction);
+        float wrap = max(0.0, (nl + 0.5) / 1.5) - max(0.0, nl);
+        reflectedLight.directDiffuse += lkSkin * wrap * directionalLights[0].color * BRDF_Lambert(diffuseColor.rgb) * vec3(1.0, 0.38, 0.24) * 0.9;
+      }
+      #endif`);
   // walking past a street lamp lights you up (the bake in Blender, read from the light grid)
   addLampLight(sh);
 }
@@ -582,9 +595,15 @@ export async function loadCharacters(onProgress, first = OUTFITS.map((o) => o.id
         // the park is dark and damp: nothing should look plastic
         const mats = Array.isArray(n.material) ? n.material : [n.material];
         for (const m of mats) {
-          m.roughness = Math.max(m.roughness ?? 0.8, 0.65);
+          // how rough each part is comes from the look shader (skin, cloth, leather); the scans carry none of their own
+          m.roughness = 1;
           m.metalness = Math.min(m.metalness ?? 0, 0.2);
           if (m.map) m.map.anisotropy = 4;
+          // scans without a normal map get their folds and weave from the photo itself (its light and shade, as bumps)
+          if (m.map && !m.normalMap && !m.transparent && !(m.alphaTest > 0)) {
+            m.bumpMap = m.map;
+            m.bumpScale = 0.9;
+          }
         }
       }
     });

@@ -11,7 +11,7 @@ import { rng } from '../shared/rng.js';
 import { glow, signTex, pbr, grimyStripes, pathMask } from './textures.js';
 import { plantTrees } from './trees.js';
 import { buildScatter } from './scatter.js';
-import { placeModels } from './models.js';
+import { placeModels, setWorldMaterials } from './models.js';
 import { dressBuildings } from './buildings.js';
 import { buildKit, kitDraws, boothVariant, BOOTH_GAMES } from './kit.js';
 
@@ -104,6 +104,14 @@ export function initMaterials() {
   bulb('bulbGreen', '#9aff9a', 0.9);
   // everything built from these gets wet in the rain (the glowing bulbs are left alone)
   for (const [k, e] of Object.entries(MATS)) if (!k.startsWith('bulb')) wetten(e.mat);
+  // models can ask for these by name ('tex:<key>' parts, see models.js)
+  setWorldMaterials((key) => {
+    if (!MATS[key] && key.startsWith('#')) {
+      paint(key, key);
+      wetten(MATS[key].mat);
+    }
+    return MATS[key] || null;
+  });
   return MATS;
 }
 

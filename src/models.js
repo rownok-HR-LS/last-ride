@@ -11,19 +11,61 @@ import { cullable, lodLimit } from './cull.js';
 const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 const cache = new Map();
 
+/** world.js hands over its materials: key -> { mat, world (metres per texture tile) } (see 'tex:' below). */
+let worldMaterial = () => null;
+export function setWorldMaterials(lookup) {
+  worldMaterial = lookup;
+}
+
+/** Texture coordinates projected from the model's own space, a tile every `world` metres (for 'tex:' parts). */
+function boxUV(o, world) {
+  const g = o.geometry;
+  const pos = g.attributes.position;
+  const nor = g.attributes.normal;
+  const p = new THREE.Vector3();
+  const n = new THREE.Vector3();
+  const nm = new THREE.Matrix3().getNormalMatrix(o.matrixWorld);
+  const uv = new Float32Array(pos.count * 2);
+  for (let i = 0; i < pos.count; i++) {
+    p.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld);
+    if (nor) n.fromBufferAttribute(nor, i).applyMatrix3(nm);
+    const ax = Math.abs(n.x);
+    const ay = Math.abs(n.y);
+    const az = Math.abs(n.z);
+    const [u, v] = ay >= ax && ay >= az ? [p.x, p.z] : ax >= az ? [p.z, p.y] : [p.x, p.y];
+    uv[i * 2] = u / world;
+    uv[i * 2 + 1] = v / world;
+  }
+  g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+}
+
 /** The model's scene (shared). Clone it for each placement. */
 export function loadModel(name) {
   if (!cache.has(name)) {
     cache.set(name, loader.loadAsync(`./models/env/${name}.glb`).then((g) => {
+      g.scene.updateMatrixWorld(true);
       g.scene.traverse((o) => {
         if (!o.isMesh) return;
         o.castShadow = true;
         o.receiveShadow = true;
+        // parts the Blender scripts name 'tex:<key>' take the world's own material (its photo textures, rain and
+        // lamp light), with texture coordinates projected at real scale
+        const own = !Array.isArray(o.material) && o.material.name.startsWith('tex:') && worldMaterial(o.material.name.slice(4).replace(/\.\d+$/, ''));
+        if (own) {
+          boxUV(o, own.world || 2);
+          o.material = own.mat;
+          return;
+        }
         const mats = Array.isArray(o.material) ? o.material : [o.material];
         for (const m of mats) {
           // old, damp and dirty: nothing shiny
           m.roughness = Math.max(m.roughness ?? 0.8, 0.55);
           if (m.map) m.map.anisotropy = 4;
+          // scans without a normal map take their surface detail from the photo itself, as bumps
+          if (m.map && !m.normalMap && !m.transparent && !(m.alphaTest > 0)) {
+            m.bumpMap = m.map;
+            m.bumpScale = 0.6;
+          }
           // ...until it rains on it
           if (!m.transparent && !(m.emissiveIntensity > 0.5 && m.emissiveMap)) wetten(m);
         }

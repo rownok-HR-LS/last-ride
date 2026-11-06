@@ -172,9 +172,9 @@ def plush():
 # --- MISSING notice board --------------------------------------------------------------------------------------------
 def missing_board():
     reset()
-    wood = mat('board_wood', '#4a3b2d', 0.9)
-    ply = mat('board_ply', '#6d5839', 0.95)
-    roof = mat('board_roof', '#2e2822', 0.9)
+    wood = mat('tex:woodDark', '#4a3b2d', 0.9)
+    ply = mat('tex:wood', '#6d5839', 0.95)
+    roof = mat('tex:woodDark', '#2e2822', 0.9)
     paper = mat('posters', image='posters.png', rough=0.9, cull=True)
     for sx in (-1, 1):
         box('post', (0.1, 0.1, 2.45), (1.0 * sx, 0, 1.225), wood)
@@ -196,8 +196,8 @@ def missing_board():
 # --- the county's CLOSED barricade (sawhorse) ------------------------------------------------------------------------
 def barricade():
     reset()
-    white = mat('barricade_wood', '#cfc6b2', 0.9)
-    grey = mat('barricade_legs', '#5d5348', 0.95)
+    white = mat('tex:#cfc6b2', '#cfc6b2', 0.9)
+    grey = mat('tex:woodDark', '#5d5348', 0.95)
     sign = mat('barricade_sign', image='barricade.png', rough=0.85, cull=True)
     amber = mat('barricade_lamp', '#8a5a14', 0.4)
     box('rail', (2.0, 0.06, 0.22), (0, 0, 0.98), white)
@@ -218,8 +218,8 @@ def barricade():
 # --- the memorial to the twenty, just inside the gate ----------------------------------------------------------------
 def memorial():
     reset()
-    wood = mat('mem_wood', '#4b3a2b', 0.9)
-    ply = mat('mem_board', '#5e4a33', 0.95)
+    wood = mat('tex:woodDark', '#4b3a2b', 0.9)
+    ply = mat('tex:wood', '#5e4a33', 0.95)
     pics = mat('mem_pics', image='memorial.png', rough=0.8, cull=True)
     jar_r = mat('jar_red', '#6e1712', 0.3)
     jar_w = mat('jar_white', '#cfc4ae', 0.5)
@@ -330,7 +330,7 @@ TAPE_OLD = (0, 64, 1000, 64)
 def police_tape():
     reset()
     tape = mat('tape', image='dressing.png', rough=0.45)
-    stake = mat('stake', '#7a1c16', 0.6, metal=0.3)
+    stake = mat('tex:rust', '#7a1c16', 0.6, metal=0.3)
     band = mat('stake_band', '#d8d4c8', 0.5)
     xs = (-2.3, 0.0, 2.3)
     for x in xs:
@@ -393,8 +393,8 @@ def evidence():
 
 def pram():
     reset()
-    navy = mat('pram_body', '#2b3345', 0.7)
-    chrome = mat('pram_frame', '#8c8a86', 0.35, metal=0.8)
+    navy = mat('tex:#2b3345', '#2b3345', 0.7)
+    chrome = mat('tex:metal', '#8c8a86', 0.35, metal=0.8)
     rubber = mat('pram_tyre', '#121212', 0.9)
     # the tub: an open box
     bm = bmesh.new()
@@ -436,9 +436,9 @@ def pram():
 
 def tour_board():
     reset()
-    wood = mat('tour_wood', '#3a2c20', 0.85)
+    wood = mat('tex:woodDark', '#3a2c20', 0.85)
     face = mat('tour_face', image='dressing.png', rough=0.8, cull=True)
-    chain = mat('chain', '#555555', 0.5, metal=0.7)
+    chain = mat('tex:iron', '#555555', 0.5, metal=0.7)
     for sy, lean in ((-1, D(-13)), (1, D(13))):
         b = box('panel', (0.66, 0.03, 0.96), (0, 0.11 * sy, 0.47), wood, rot=(lean, 0, 0))
         card('poster', 0.56, 0.84, (0, 0.017 * sy, 0.0), face, (0, 256, 512, 768),
