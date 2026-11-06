@@ -13,11 +13,12 @@ const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 /** Load the kit and hand each placed part to a fresh Builder; resolves to the built group. */
 export async function buildKit(Builder, hasMaterial) {
   const B = new Builder();
-  const place = (gltf, P) => {
+  const place = (gltf, P, remap = {}) => {
     gltf.scene.updateMatrixWorld(true);
     gltf.scene.traverse((o) => {
       if (!o.isMesh) return;
-      const name = o.material?.name || '';
+      const raw = o.material?.name || '';
+      const name = remap[raw] || raw;
       const key = hasMaterial(name) ? name : 'plinth';
       // compressed (quantised) attributes clamp when transformed: unpack them to plain floats first
       const g = new THREE.BufferGeometry();
@@ -43,6 +44,16 @@ export async function buildKit(Builder, hasMaterial) {
   if (trailers.length) jobs.push(load('trailer').then((g) => trailers.forEach((p) => place(g, { x: p.x, z: p.z, rot: p.rot || 0 }))));
   const gate = PROPS.find((p) => p.type === 'arch');
   if (gate) jobs.push(load('arch').then((g) => place(g, { x: gate.x, z: gate.z, rot: 0 })));
+  // carnival game booths: one of four games (or the prize counter), painted each booth's own colour
+  const booths = PROPS.filter((p) => p.type === 'booth');
+  const variants = new Map();
+  booths.forEach((p, i) => variants.set(p, boothVariant(p, i)));
+  for (const v of new Set(variants.values())) {
+    jobs.push(load(`booth_${v}`).then((g) => booths.filter((p) => variants.get(p) === v).forEach((p) => place(g, { x: p.x, z: p.z, rot: p.rot || 0 }, { booth_main: p.color }))));
+  }
+  // game tents keep their scanned canvas; this adds bunting, guy ropes and stakes round each
+  const tents = PROPS.filter((p) => p.type === 'gametent');
+  if (tents.length) jobs.push(load('tentdress').then((g) => tents.forEach((p) => place(g, { x: p.x, z: p.z, rot: (p.x + p.z) % 6.28 }))));
   await Promise.all(jobs);
   const group = new THREE.Group();
   group.name = 'kit';
@@ -50,9 +61,15 @@ export async function buildKit(Builder, hasMaterial) {
   return group;
 }
 
-/** Is this map prop one the kit draws (the walk-in buildings' walls and roofs, the trailers, the gate)? */
+/** Which game a booth plays: the prize counters hand out prizes, the rest take turns. */
+export const BOOTH_GAMES = { ringtoss: 'RING TOSS', darts: 'BALLOON DARTS', milk: 'MILK BOTTLES', gallery: 'SHOOTING GALLERY' };
+export function boothVariant(p, i) {
+  return p.prize ? 'prize' : Object.keys(BOOTH_GAMES)[i % 4];
+}
+
+/** Is this map prop one the kit draws (the walk-in buildings' walls and roofs, the booths, trailers, the gate)? */
 export function kitDraws(p) {
-  if (p.type === 'trailer' || p.type === 'arch') return true;
+  if (p.type === 'trailer' || p.type === 'arch' || p.type === 'booth') return true;
   if (p.type !== 'wall' && p.type !== 'roof') return false;
   return BUILDINGS.some((b) => b.style === p.style && Math.abs(p.x - b.cx) <= b.w / 2 + 0.5 && Math.abs(p.z - b.cz) <= b.d / 2 + 0.5);
 }

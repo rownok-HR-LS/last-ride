@@ -13,7 +13,7 @@ import { plantTrees } from './trees.js';
 import { buildScatter } from './scatter.js';
 import { placeModels } from './models.js';
 import { dressBuildings } from './buildings.js';
-import { buildKit, kitDraws } from './kit.js';
+import { buildKit, kitDraws, boothVariant, BOOTH_GAMES } from './kit.js';
 
 // ------------------------------------------------------------------ materials
 
@@ -265,9 +265,10 @@ function roofProp(B, p) {
   B.box('dark', P, 0, p.y + 0.45, 0, p.w - 0.4, 0.2, p.d - 0.4);
 }
 
-function booth(B, p) {
+function booth(B, p, spots = modelSpots) {
   // a rusted corrugated shack (Sketchfab scan) with the game counter and the creepy prizes kept in front of it
-  modelSpots.push(['shack_open', { x: p.x, z: p.z, rot: p.rot, yaw: Math.PI, w: 4.7, d: 3.1, h: 3.3, uniform: false }]);
+  // (until the Blender kit's carnival booth replaces it: src/kit.js)
+  spots.push(['shack_open', { x: p.x, z: p.z, rot: p.rot, yaw: Math.PI, w: 4.7, d: 3.1, h: 3.3, uniform: false }]);
   B.box(p.color, p, 0, 0.52, 1.1, 4.0, 1.05, 0.45);
   B.box('cream', p, 0, 1.08, 1.12, 4.1, 0.06, 0.55);
   for (let i = 0; i < 6; i++) {
@@ -499,19 +500,23 @@ export function buildWorld(scene) {
   };
   // what the Blender kit replaces is built apart, so it can be taken away when the kit is in
   const X = new Builder();
+  const outsideSpots = [];
   fronts = dressBuildings(B, scene, modelSpots, X);
   for (const p of PROPS) {
-    if (builders[p.type]) builders[p.type](kitDraws(p) ? X : B, p);
+    const kit = kitDraws(p);
+    if (builders[p.type]) builders[p.type](kit ? X : B, p, kit ? outsideSpots : modelSpots);
     else if (p.type === 'facade') facade(B, p, scene);
   }
   B.build(scene);
   const outside = new THREE.Group();
   X.build(outside);
   scene.add(outside);
+  for (const [name, list] of groupSpots(outsideSpots)) placeModels(outside, name, list).catch((e) => console.warn(name, e));
   buildKit(Builder, (key) => !!MATS[key] || key.startsWith('#')).then((kit) => {
     scene.remove(outside);
     outside.traverse((o) => o.geometry?.dispose());
     scene.add(kit);
+    dressBooths(kit);
   }).catch((e) => console.warn('building kit', e));
   plantTrees(scene, parkTrees, { shadows: true, living: 0.15 });
 
@@ -617,6 +622,42 @@ export function buildWorld(scene) {
   }
   for (const [name, list] of byModel) placeModels(scene, name, list).catch((e) => console.warn(name, e));
   return { lamps: buildLamps(scene) };
+}
+
+/** [name, placement] pairs grouped by model name. */
+function groupSpots(spots) {
+  const by = new Map();
+  for (const [name, o] of spots) {
+    if (!by.has(name)) by.set(name, []);
+    by.get(name).push(o);
+  }
+  return by;
+}
+
+/** The kit's carnival booths: each game's name in neon on its marquee, and plush prizes on the back shelves. */
+function dressBooths(parent) {
+  const bears = [];
+  const kinds = ['plush#bear_brown', 'plush#bear_pink', 'plush#bear_blue'];
+  PROPS.filter((p) => p.type === 'booth').forEach((p, i) => {
+    const v = boothVariant(p, i);
+    const rot = p.rot || 0;
+    if (BOOTH_GAMES[v]) {
+      const sign = neonSign(BOOTH_GAMES[v], '#d9b45a', 3.3);
+      const [ox, oz] = rotXZ(0, 1.31, rot);
+      sign.position.set(p.x + ox, 3.62, p.z + oz);
+      sign.rotation.y = rot;
+      parent.add(sign);
+    }
+    // the dart board and the shooting gallery take up the back wall: no prize shelves there
+    const xs = v === 'prize' ? [-1.45, -0.72, 0, 0.72, 1.45] : v === 'darts' || v === 'gallery' ? [] : [-1.35, 1.35];
+    for (const y of [1.745, 2.385]) {
+      xs.forEach((lx, k) => {
+        const [ox, oz] = rotXZ(lx, -0.98, rot);
+        bears.push([kinds[(i + k + (y > 2 ? 1 : 0)) % 3], { x: p.x + ox, z: p.z + oz, y, rot: rot + ((k * 7 + i) % 5 - 2) * 0.12, w: 0.35, d: 0.33, h: 0.46 }]);
+      });
+    }
+  });
+  for (const [name, list] of groupSpots(bears)) placeModels(parent, name, list).catch((e) => console.warn(name, e));
 }
 
 /** A plane whose UVs repeat every `tiles` units, so tiling photo textures stay sharp. */

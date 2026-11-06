@@ -39,10 +39,11 @@ class Kit:
     def __init__(self):
         self.parts = {}
 
-    def _take(self, mat, bm, M=None):
+    def _take(self, mat, bm, M=None, recalc=True):
         if M is not None:
             bm.transform(M)
-        bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+        if recalc:
+            bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
         verts, faces = self.parts.setdefault(mat, ([], []))
         base = len(verts)
         verts.extend(tuple(v.co) for v in bm.verts)
@@ -389,7 +390,158 @@ def gate():
     return K
 
 
+# ------------------------------------------------------------------ carnival game booths (4.8 x 3.2, open to +z)
+# 'booth_main' is a stand-in: the game paints it each booth's own colour. The booth's walls, counter and roof sit on
+# the map's colliders: back wall at z -1.2, sides at x +-2.1, counter at z +1.1 (1.05 high), roof at 3.0 - 3.25.
+
+CREAM = '#e9e3d2'
+GLASS = '#2c4a3a'
+BALLOONS = ['#e2384f', '#2f9be0', '#f2b632', '#8e44d6', '#2fbf87', '#f0702c']
+
+
+def booth(variant):
+    K = Kit()
+    rr = random.Random({'ringtoss': 1, 'darts': 2, 'milk': 3, 'gallery': 4, 'prize': 5}[variant])
+    main = 'booth_main'
+    # frame and walls: plank back and sides, painted below, a bare post at each corner
+    for x in (-2.15, 2.15):
+        for z in (-1.25, 1.3):
+            K.box('woodDark', (x, 1.6, z), (0.14, 3.2, 0.14), bevel=0.02)
+    K.box('woodDark', (0, 1.55, -1.2), (4.2, 3.0, 0.1), bevel=0.01)
+    K.box(main, (0, 0.6, -1.14), (4.2, 1.2, 0.03), bevel=0.005)
+    for x in (-2.1, 2.1):
+        K.box('woodDark', (x, 1.55, 0.02), (0.1, 3.0, 2.5), bevel=0.01)
+        K.box(main, (x + (0.05 if x > 0 else -0.05), 0.6, 0.02), (0.03, 1.2, 2.5), bevel=0.005)
+        K.box(CREAM, (x + (0.05 if x > 0 else -0.05), 1.24, 0.02), (0.035, 0.08, 2.5), bevel=0.005)
+    # the counter: painted front with a cream frame, a worn top, a steel kick plate
+    K.box(main, (0, 0.55, 1.28), (4.0, 1.0, 0.1), bevel=0.02)
+    for x in (-1.95, 1.95):
+        K.box(CREAM, (x, 0.55, 1.34), (0.1, 1.0, 0.04), bevel=0.01)
+    K.box(CREAM, (0, 1.0, 1.34), (4.0, 0.1, 0.04), bevel=0.01)
+    K.box('iron', (0, 0.1, 1.34), (4.0, 0.2, 0.03), bevel=0.005)
+    K.box('woodDark', (0, 1.08, 1.12), (4.25, 0.06, 0.62), bevel=0.02)
+    # roof deck and a striped awning tilting out over the counter, scalloped along its edge
+    K.box('woodDark', (0, 3.12, 0.0), (4.8, 0.12, 3.2), bevel=0.02)
+    n = 8
+    for i in range(n):
+        x = -2.4 + (i + 0.5) * 4.8 / n
+        col = main if i % 2 == 0 else CREAM
+        K.box(col, (x, 2.92, 1.95), (4.8 / n + 0.005, 0.04, 0.8), rot=(0.45, 0, 0), bevel=0.0)
+        K.prism(col, [(x - 0.3 + 0.3 - 0.3 * math.cos(a), 2.74 - 0.18 * math.sin(a)) for a in [k * math.pi / 8 for k in range(9)]], 2.33, 0.03, bevel=0.0)
+    if variant != 'prize':
+        # a marquee sign box on the roof (the game hangs the game's name on it) with a ring of bulbs
+        K.box('dark', (0, 3.62, 1.2), (3.6, 0.82, 0.2), bevel=0.03)
+        K.box('gold', (0, 3.62, 1.19), (3.75, 0.95, 0.16), bevel=0.02)
+        for k in range(12):
+            for y in (3.14, 4.1):
+                K.ball('bulb' if rr.random() < 0.5 else 'bulbPink', (-1.8 + k * 3.6 / 11, y, 1.32), 0.06)
+        for y in (3.4, 3.62, 3.84):
+            for x in (-1.92, 1.92):
+                K.ball('bulb' if rr.random() < 0.5 else 'bulbPink', (x, y, 1.32), 0.06)
+        for x in (-1.5, 1.5):
+            K.box('iron', (x, 3.3, 1.0), (0.06, 0.4, 0.06), bevel=0.0)
+    # shelves along the back for the prizes (the game sets plush bears on them); the dart board and the shooting
+    # gallery fill the back wall themselves
+    for y in ((1.72, 2.36) if variant in ('ringtoss', 'milk', 'prize') else ()):
+        K.box('woodDark', (0, y, -0.98), (3.9, 0.05, 0.36), bevel=0.01)
+        for x in (-1.6, 0, 1.6):
+            K.box('iron', (x, y - 0.1, -1.08), (0.04, 0.18, 0.16), bevel=0.0)
+    # the game itself, kept to the back so the floor stays clear
+    if variant == 'ringtoss':
+        K.box('woodDark', (0, 0.42, -0.66), (2.6, 0.84, 0.5), bevel=0.02)
+        for i in range(6):
+            for j in range(3):
+                x, z = -1.1 + i * 0.44, -0.84 + j * 0.17
+                K.cyl(GLASS, (x, 0.97, z), 0.055, 0.22, segs=8)
+                K.cyl(GLASS, (x, 1.13, z), 0.02, 0.12, segs=6, r2=0.016)
+        for k in range(4):
+            K.cyl('#e2384f' if k % 2 else '#f2b632', (-1.2 + k * 0.7, 1.12, 1.15 + (k % 2) * 0.1), 0.09, 0.02, segs=10)
+    elif variant == 'darts':
+        K.box('woodDark', (0, 1.95, -1.12), (3.7, 1.7, 0.06), bevel=0.02)
+        K.box('#8c6a4a', (0, 1.95, -1.08), (3.5, 1.5, 0.03), bevel=0.0)
+        for i in range(9):
+            for j in range(4):
+                if rr.random() < 0.3:
+                    continue  # burst long ago
+                K.ball(rr.choice(BALLOONS), (-1.55 + i * 0.39, 1.38 + j * 0.38, -0.98), 0.14, segs=10)
+        for k in range(5):
+            K.cyl('iron', (-1.3 + rr.random() * 2.6, 1.4 + rr.random() * 1.1, -0.94), 0.01, 0.16, axis='z', segs=4)
+    elif variant == 'milk':
+        for px in (-0.9, 0.9):
+            K.box('woodDark', (px, 0.5, -0.72), (0.7, 1.0, 0.42), bevel=0.02)
+            for row, count in enumerate((3, 2, 1)):
+                for c in range(count):
+                    x = px - (count - 1) * 0.11 + c * 0.22
+                    K.cyl('metal', (x, 1.14 + row * 0.3, -0.72), 0.1, 0.28, segs=10)
+                    K.cyl('metal', (x, 1.31 + row * 0.3, -0.72), 0.07, 0.06, segs=10, r2=0.055)
+    elif variant == 'gallery':
+        K.box('iron', (0, 1.5, -0.8), (3.8, 0.06, 0.06), bevel=0.0)
+        K.box('woodDark', (0, 1.2, -0.95), (3.8, 0.6, 0.06), bevel=0.01)
+        for k in range(8):
+            x = -1.6 + k * 0.46
+            if rr.random() < 0.2:
+                continue
+            duck = [(-0.14, 0), (0.12, 0), (0.16, 0.08), (0.1, 0.14), (0.12, 0.24), (0.04, 0.27), (-0.02, 0.2), (-0.12, 0.14)]
+            K.prism('#f2b632', [(x + px, 1.53 + py) for px, py in duck], -0.83, 0.03, bevel=0.0)
+        for x in (-1.2, 0, 1.2):
+            for r, col in ((0.3, '#e2384f'), (0.2, CREAM), (0.1, '#e2384f')):
+                K.cyl(col, (x, 2.55, -1.12 + (0.3 - r) * 0.1), r, 0.02, axis='z', segs=16)
+    return K
+
+
+# ------------------------------------------------------------------ a game tent's dressing (the tent is a scan, r 4)
+
+def tentdress():
+    K = Kit()
+    rr = random.Random(77)
+    eave_r, eave_y = 3.95, 2.3
+    # pennant bunting hanging in loops round the eave
+    loops = 12
+    for i in range(loops):
+        a0 = i * 2 * math.pi / loops
+        for k in range(5):
+            t = (k + 0.5) / 5
+            a = a0 + t * 2 * math.pi / loops
+            sag = math.sin(t * math.pi) * 0.35
+            x, z = math.cos(a) * (eave_r + 0.08), math.sin(a) * (eave_r + 0.08)
+            y = eave_y - sag
+            col = BALLOONS[(i * 5 + k) % len(BALLOONS)]
+            tri = [(-0.13, 0.0), (0.13, 0.0), (0.0, -0.3)]
+            # a flag facing outward: build it in its own plane, then turn it round the tent
+            bm_pts = [(x + math.sin(a) * px * -1, y + py, z + math.cos(a) * px) for px, py in tri]
+            flag(K, col, bm_pts)
+    # guy ropes from the eave out to stakes in the ground
+    for i in range(8):
+        a = (i + 0.5) * 2 * math.pi / 8
+        x0, z0 = math.cos(a) * eave_r, math.sin(a) * eave_r
+        x1, z1 = math.cos(a) * 6.3, math.sin(a) * 6.3
+        ln = math.hypot(x1 - x0, z1 - z0)
+        mid = ((x0 + x1) / 2, (eave_y + 0.05) / 2, (z0 + z1) / 2)
+        d = Vector((x1 - x0, 0.05 - eave_y, z1 - z0))
+        q = Vector((0, 1, 0)).rotation_difference(d.normalized()).to_euler('YXZ')
+        K.box('#8c7c64', mid, (0.025, d.length, 0.025), rot=(q.x, q.y, q.z), bevel=0.0)
+        K.box('woodDark', (x1, 0.18, z1), (0.08, 0.4, 0.08), rot=(0, -a, 0.35), bevel=0.01)
+    # a pair of sandbags and an old ticket podium by the door side
+    for k, (x, z) in enumerate(((4.6, 1.2), (4.8, -0.9))):
+        K.box('#6a5a44', (x, 0.15, z), (0.6, 0.3, 0.4), rot=(0, k * 0.6, 0), bevel=0.1, segs=2)
+    K.box(CREAM, (5.2, 0.55, 0.2), (0.6, 1.1, 0.5), bevel=0.03)
+    K.box('#e2384f', (5.2, 1.13, 0.2), (0.7, 0.06, 0.6), bevel=0.02)
+    return K
+
+
+def flag(K, mat, pts):
+    """A thin triangle (pennant) through three points, with a little thickness so it shows from both sides."""
+    bm = bmesh.new()
+    vs = [bm.verts.new(p) for p in pts]
+    bm.faces.new(vs)
+    bm.faces.new(list(reversed([bm.verts.new(p) for p in pts])))
+    K._take(mat, bm, recalc=False)
+
+
 for b in layout['buildings']:
     building(b).export(f"{OUT}/kit_{b['style']}.glb")
 trailer().export(f'{OUT}/kit_trailer.glb')
 gate().export(f'{OUT}/kit_arch.glb')
+for v in ('ringtoss', 'darts', 'milk', 'gallery', 'prize'):
+    booth(v).export(f'{OUT}/kit_booth_{v}.glb')
+tentdress().export(f'{OUT}/kit_tentdress.glb')
