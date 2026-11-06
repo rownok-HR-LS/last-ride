@@ -16,8 +16,6 @@ export const ATLAS = {
   shed_worn: 1024, crates_barrels: 1024, trash_bags: 1024, coaster_car: 1024, bench: 1024, boxes: 1024,
   roof_kit: 1024, shack_open: 1024, popcorn_cart: 1024, tent_small: 1024, rocket_kiddie: 1024, kiosk: 1024,
   vending_news: 1024, ice_freezer: 1024, clown_statue: 1024, victorian: 2048,
-  // built from overlapping toy-brick parts: occlusion sees the overlaps as closed and paints them black
-  dodgem: [512, 0],
 };
 
 mkdirSync('assets-src/blender/baked', { recursive: true });
@@ -31,7 +29,7 @@ for (const name of names) {
     continue;
   }
   const out = path.join('assets-src', 'blender', 'baked', name + '.glb');
-  const log = execFileSync(BLENDER, ['--background', '--factory-startup', '--python', 'scripts/blender/atlas-bake.py', '--', src, out, ...[ATLAS[name]].flat().map(String)], { encoding: 'utf8', maxBuffer: 1 << 26 });
+  const log = execFileSync(BLENDER, ['--background', '--factory-startup', '--python', 'scripts/blender/atlas-bake.py', '--', src, out, ...[ATLAS[name]].flat().map(String), ...([ATLAS[name]].flat().length < 2 ? ['0.65'] : []), String(ENV[name][1])], { encoding: 'utf8', maxBuffer: 1 << 26 });
   console.log(name.padEnd(16), log.split('\n').filter((l) => l.startsWith('ATLAS')).join(' | '));
   // and its far version: Blender's Decimate down to (a little over) the far budget
   if (FAR[name]) {

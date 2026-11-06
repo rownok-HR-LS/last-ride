@@ -79,4 +79,5 @@ export const FAR = {
   rocket_kiddie: 0.2, clown_statue: 0.2, shed_worn: 0.35, vending_news: 0.3, ice_freezer: 0.3,
   dodgem: 0.6,
 };
-for (const [n, k] of Object.entries(FAR)) ENV[`${n}_far`] = [ENV[n][0], Math.round(ENV[n][1] * k), 256, false, 0.08];
+// the bumper car is built from hundreds of separate toy-brick parts: only a rough cut gets it down
+for (const [n, k] of Object.entries(FAR)) ENV[`${n}_far`] = [ENV[n][0], Math.round(ENV[n][1] * k), 256, false, n === 'dodgem' ? 0.6 : 0.08];

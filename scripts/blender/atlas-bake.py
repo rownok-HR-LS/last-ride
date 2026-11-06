@@ -3,10 +3,11 @@
 # and three textures instead of a dozen or more: a smaller download and fewer draw calls. See-through and cut-out
 # materials (glass, leaves, hair) are kept as they are.
 #
-#   blender --background --factory-startup --python scripts/blender/atlas-bake.py -- src.glb out.glb [size] [ao]
+#   blender --background --factory-startup --python scripts/blender/atlas-bake.py -- src.glb out.glb [size] [ao] [triangles]
 #
 # size: atlas pixels (default 1024). ao: how much of the occlusion goes into the colour, 0..1 (default 0.65).
-# The output still has the source's detail; scripts/convert-env.mjs simplifies and compresses it for the game.
+# triangles: a budget; a heavier model is cut down to it in Blender and baked from its full self (below).
+# scripts/convert-env.mjs then compresses it for the game.
 import math
 import sys
 import time
@@ -18,6 +19,7 @@ args = sys.argv[sys.argv.index('--') + 1:]
 SRC, OUT = args[0], args[1]
 SIZE = int(args[2]) if len(args) > 2 else 1024
 AO = float(args[3]) if len(args) > 3 else 0.65
+TARGET = int(args[4]) if len(args) > 4 else 0
 
 t0 = time.time()
 bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -99,6 +101,31 @@ if clear_slots:
 print(f'ATLAS {len(body.data.polygons)} faces to bake, {len(keep.data.polygons) if keep else 0} see-through kept, '
       f'{len(body.material_slots)} materials')
 
+# --- a lighter mesh, baked from the full one ------------------------------------------------------------------------
+# With a triangle budget, the model is cut down here with Decimate and everything (colour, roughness, and the
+# lost detail as a normal map) is baked from the full model onto the light one. Simplifying after the bake instead
+# would tear the atlas's UV seams.
+def tri_count(o):
+    return sum(len(p.vertices) - 2 for p in o.data.polygons)
+
+
+high = None
+if TARGET and tri_count(body) > TARGET * 1.4:
+    high = body.copy()
+    high.data = body.data.copy()
+    high.name = 'high'
+    scene.collection.objects.link(high)
+    bpy.ops.object.select_all(action='DESELECT')
+    body.select_set(True)
+    bpy.context.view_layer.objects.active = body
+    before = tri_count(body)
+    cut = body.modifiers.new('cut', 'DECIMATE')
+    cut.decimate_type = 'COLLAPSE'
+    cut.ratio = TARGET / before
+    cut.use_collapse_triangulate = True
+    bpy.ops.object.modifier_apply(modifier='cut')
+    print(f'ATLAS cut {before} -> {tri_count(body)} triangles, baking from the full model')
+
 # --- a fresh UV layout for the atlas --------------------------------------------------------------------------------
 uvs = body.data.uv_layers
 if not len(uvs):
@@ -138,9 +165,20 @@ def aim(img):
         n.image = img
 
 
-def bake(kind, img, samples=1, **kw):
+def bake(kind, img, samples=1, own=False, **kw):
+    """own: bake the light mesh's own surface (occlusion), not the full model's."""
     aim(img)
     scene.cycles.samples = samples
+    bpy.ops.object.select_all(action='DESELECT')
+    body.select_set(True)
+    bpy.context.view_layer.objects.active = body
+    if high and not own:
+        high.hide_render = False
+        high.select_set(True)
+        diag = body.dimensions.length
+        kw.update(use_selected_to_active=True, cage_extrusion=diag * 0.01, max_ray_distance=diag * 0.04)
+    elif high:
+        high.hide_render = True
     bpy.ops.object.bake(type=kind, margin=6, use_clear=True, **kw)
 
 
@@ -194,7 +232,7 @@ scene.world = world
 world.light_settings.distance = max(0.15, min(2.5, max(dims) * 0.1))
 ao = image('atlas_ao', False)
 if AO > 0:
-    bake('AO', ao, samples=96)
+    bake('AO', ao, samples=96, own=True)
 print(f'ATLAS baked {SIZE}px in {time.time() - t1:.1f}s (ao reach {world.light_settings.distance:.2f} m)')
 
 # colour x occlusion; roughness and metalness packed the glTF way (G and B)
@@ -240,6 +278,8 @@ uvs['atlas'].name = 'UVMap'
 for img in (col, orm, nrm):
     img.pack()
 
+if high:
+    bpy.data.objects.remove(high)
 bpy.ops.object.select_all(action='DESELECT')
 body.select_set(True)
 if keep:
