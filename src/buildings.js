@@ -249,9 +249,11 @@ function gableShape(w, rise) {
 
 /**
  * Dress every walk-in building. B: the world Builder (merged static meshes), spots: model placements
- * ([name, footprint]) for the shared instancer. Returns where each themed front's sign should hang.
+ * ([name, footprint]) for the shared instancer, X: the Builder for the outside (pilasters, cornices, windows, doors,
+ * pipes, false fronts), which the Blender kit (src/kit.js) replaces once it loads. Returns where each themed front's
+ * sign should hang.
  */
-export function dressBuildings(B, scene, spots) {
+export function dressBuildings(B, scene, spots, X = B) {
   const grimeMat = new THREE.MeshStandardMaterial({
     color: '#1a150f', alphaMap: grimeTexture(), transparent: true, opacity: 0.7, depthWrite: false, roughness: 1,
     polygonOffset: true, polygonOffsetFactor: -2,
@@ -282,8 +284,8 @@ export function dressBuildings(B, scene, spots) {
       const put = (key, a, len, y, h, off, depth, rz = 0) => {
         const along = s.horiz ? b.cx + a : b.cz + a;
         const across = s.line + s.out * off;
-        if (s.horiz) B.box(key, P, along, y, across, len, h, depth, 0, 0, rz);
-        else B.box(key, P, across, y, along, depth, h, len, 0, rz, 0);
+        if (s.horiz) X.box(key, P, along, y, across, len, h, depth, 0, 0, rz);
+        else X.box(key, P, across, y, along, depth, h, len, 0, rz, 0);
       };
       // cornice band and parapet with a concrete coping, all the way along (over the door lintels too)
       put('plinth', 0, s.len + 0.7, b.h - 0.22, 0.44, T / 2 + 0.12, 0.26);
@@ -333,7 +335,7 @@ export function dressBuildings(B, scene, spots) {
       for (const o of gaps) {
         for (const e of [-1, 1]) put('trim', o + e * (DOOR / 2 + 0.05), 0.3, 1.65, 3.3, T / 2 + 0.06, 0.18);
         put('trim', o, DOOR + 0.7, 3.35, 0.32, T / 2 + 0.08, 0.22);
-        if (b.style === 'tunnel') for (const e of [-1, 1]) B.sphere('bulbRed', P, s.horiz ? b.cx + o + e * 1.2 : s.line + s.out * 0.4, 3.7, s.horiz ? s.line + s.out * 0.4 : b.cz + o + e * 1.2, 0.12, 8);
+        if (b.style === 'tunnel') for (const e of [-1, 1]) X.sphere('bulbRed', P, s.horiz ? b.cx + o + e * 1.2 : s.line + s.out * 0.4, 3.7, s.horiz ? s.line + s.out * 0.4 : b.cz + o + e * 1.2, 0.12, 8);
       }
     }
     // drainpipes down every corner
@@ -341,9 +343,9 @@ export function dressBuildings(B, scene, spots) {
       for (const sz of [-1, 1]) {
         const x = b.cx + sx * (b.w / 2 + 0.16);
         const z = b.cz + sz * (b.d / 2 + 0.16);
-        B.cyl('pipe', P, x, (top - 0.2) / 2, z, 0.075, 0.075, top - 0.2, 8);
-        B.cyl('pipe', P, x, top - 0.1, z, 0.16, 0.08, 0.3, 8);
-        B.cyl('pipe', P, x + sx * 0.12, 0.12, z + sz * 0.12, 0.08, 0.08, 0.4, 8, sz * 0.9, -sx * 0.9);
+        X.cyl('pipe', P, x, (top - 0.2) / 2, z, 0.075, 0.075, top - 0.2, 8);
+        X.cyl('pipe', P, x, top - 0.1, z, 0.16, 0.08, 0.3, 8);
+        X.cyl('pipe', P, x + sx * 0.12, 0.12, z + sz * 0.12, 0.08, 0.08, 0.4, 8, sz * 0.9, -sx * 0.9);
       }
     }
     // air handlers and vents on the roof
@@ -353,9 +355,9 @@ export function dressBuildings(B, scene, spots) {
     if (b.style === 'funhouse') {
       const rise = 5.2;
       const front = new THREE.ExtrudeGeometry(archShape(b.w * 0.75, 1.6, rise), { depth: 0.4, bevelEnabled: false });
-      B.add('funhouse', front, P, b.cx, b.h, fz - 0.2);
+      X.add('funhouse', front, P, b.cx, b.h, fz - 0.2);
       const rim = new THREE.ExtrudeGeometry(archShape(b.w * 0.75 + 0.5, 1.75, rise + 0.25), { depth: 0.3, bevelEnabled: false });
-      B.add('trim', rim, P, b.cx, b.h - 0.05, fz - 0.3);
+      X.add('trim', rim, P, b.cx, b.h - 0.05, fz - 0.3);
       // a giant clown face grins over the door: you walk in under its chin
       spots.push(['clown_face', { x: b.cx, z: fz + 0.35, y: 3.3, rot: 0, w: 6, d: 6, h: 5.8 }]);
       for (const a of [-0.42, -0.21, 0.21, 0.42]) uplight(b.cx + a * b.w, fz + T / 2 + 0.03, '#ffb46a');
@@ -363,9 +365,9 @@ export function dressBuildings(B, scene, spots) {
     } else if (b.style === 'tunnel') {
       const rise = 5.5;
       const front = new THREE.ExtrudeGeometry(gableShape(b.w * 0.85, rise), { depth: 0.4, bevelEnabled: false });
-      B.add('tunnel', front, P, b.cx, b.h, fz - 0.2);
+      X.add('tunnel', front, P, b.cx, b.h, fz - 0.2);
       const rim = new THREE.ExtrudeGeometry(gableShape(b.w * 0.85 + 0.5, rise + 0.3), { depth: 0.3, bevelEnabled: false });
-      B.add('plinth', rim, P, b.cx, b.h - 0.05, fz - 0.3);
+      X.add('plinth', rim, P, b.cx, b.h - 0.05, fz - 0.3);
       // stone gargoyles crouch on the corners and the gable steps
       for (const [gx, gy, gz, rot] of [
         [b.cx - b.w / 2 + 0.2, top + 0.12, fz - 0.1, -0.5], [b.cx + b.w / 2 - 0.2, top + 0.12, fz - 0.1, 0.5],

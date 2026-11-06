@@ -13,6 +13,7 @@ import { plantTrees } from './trees.js';
 import { buildScatter } from './scatter.js';
 import { placeModels } from './models.js';
 import { dressBuildings } from './buildings.js';
+import { buildKit, kitDraws } from './kit.js';
 
 // ------------------------------------------------------------------ materials
 
@@ -72,6 +73,11 @@ export function initMaterials() {
   photo('funhouse', 'damaged_plaster', { color: '#8a7a8c', world: 4 });
   photo('tunnel', 'red_brick_03', { color: '#8a7a74', world: 3 });
   photo('arcade', 'painted_metal_shutter', { color: '#a8b0b0', world: 3, metal: true });
+  // the Blender building kit (src/kit.js): painted cinder block (made in Blender too), a shade per building
+  photo('block_funhouse', 'cinder_block', { color: '#a596b4', world: 2.4 });
+  photo('block_tunnel', 'cinder_block', { color: '#7d4a46', world: 2.4 });
+  photo('block_arcade', 'cinder_block', { color: '#86aaa6', world: 2.4 });
+  photo('shutter', 'painted_metal_shutter', { color: '#8e9490', world: 1.6, metal: true });
   photo('roof', 'corrugated_iron_02', { color: '#8a8580', metal: true, world: 3 });
   // building dressing: concrete footings and copings, dark weathered timber trim, boarded-up windows, rusty pipes
   photo('plinth', 'cracked_concrete_wall', { color: '#77736c', world: 2.5 });
@@ -491,12 +497,22 @@ export function buildWorld(scene) {
     fence, wall: wallProp, roof: roofProp, booth, crate, tree, lamp: lampPost, trash, cart, bigtop, gametent,
     arch, ticket, freefall, control, arena, station, trailer, watertower, table,
   };
-  fronts = dressBuildings(B, scene, modelSpots);
+  // what the Blender kit replaces is built apart, so it can be taken away when the kit is in
+  const X = new Builder();
+  fronts = dressBuildings(B, scene, modelSpots, X);
   for (const p of PROPS) {
-    if (builders[p.type]) builders[p.type](B, p);
+    if (builders[p.type]) builders[p.type](kitDraws(p) ? X : B, p);
     else if (p.type === 'facade') facade(B, p, scene);
   }
   B.build(scene);
+  const outside = new THREE.Group();
+  X.build(outside);
+  scene.add(outside);
+  buildKit(Builder, (key) => !!MATS[key] || key.startsWith('#')).then((kit) => {
+    scene.remove(outside);
+    outside.traverse((o) => o.geometry?.dispose());
+    scene.add(kit);
+  }).catch((e) => console.warn('building kit', e));
   plantTrees(scene, parkTrees, { shadows: true, living: 0.15 });
 
   // ground: forest floor with broken cobbled walkways blended in by a mask
