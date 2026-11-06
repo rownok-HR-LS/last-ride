@@ -26,7 +26,7 @@ export function initAudio() {
   master.connect(ctx.destination);
   sfx = ctx.createGain();
   sfx.connect(master);
-  // the night around you (rain, wind, wildlife, thunder) has its own level
+  // the night around you (rain, wildlife, thunder) has its own level
   amb = ctx.createGain();
   amb.connect(master);
   musicBus = ctx.createGain();
@@ -818,9 +818,9 @@ export function play(name, pos = null, opt = {}) {
 
 const loops = {};
 /** Loops that belong to the night rather than the action (they follow the ambience volume). */
-const AMBIENT_LOOPS = new Set(['wind', 'rain', 'rainIn', 'introPad', 'stormDrone']);
+const AMBIENT_LOOPS = new Set(['rain', 'rainIn', 'introPad', 'stormDrone']);
 const RECORDED_LOOP = {
-  wind: 'wind_loop', bus: 'bus_loop', rain: 'rain_loop', rainIn: 'rain_in',
+  bus: 'bus_loop', rain: 'rain_loop', rainIn: 'rain_in',
   breath: 'breath_loop', heart: 'heart_loop', carHum: 'crackle_loop', scoreDrone: 'score_drone', scoreDread: 'score_dread',
 };
 /** Loops with no synthesised stand-in (silent until their recording loads). */
@@ -879,10 +879,6 @@ export function loop(name, vol, pos = null) {
     if (name === 'coaster' || name === 'bus') {
       f.type = 'lowpass';
       f.frequency.value = 260;
-    } else if (name === 'wind') {
-      f.type = 'bandpass';
-      f.frequency.value = 650;
-      f.Q.value = 0.6;
     } else {
       f.type = 'lowpass';
       f.frequency.value = 500;
@@ -933,16 +929,6 @@ export function loop(name, vol, pos = null) {
         wob.start();
       }
       lp.connect(g);
-    }
-    if (name === 'wind') {
-      // gusts: the band sweeps and the level swells
-      const gust = ctx.createOscillator();
-      gust.frequency.value = 0.11;
-      const gd = ctx.createGain();
-      gd.gain.value = 380;
-      gust.connect(gd);
-      gd.connect(f.frequency);
-      gust.start();
     }
     src.start();
     l = loops[name] = { g, synth: !!rec };

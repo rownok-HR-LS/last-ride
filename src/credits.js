@@ -51,7 +51,6 @@ export const CREDITS = [
   { what: 'Rain and thunder', by: 'Caesar', url: 'https://commons.wikimedia.org/wiki/File:Rain_and_thunder.ogg', license: 'Public domain' },
   { what: 'Rain and thunder (1)', by: 'ezwa', url: 'https://commons.wikimedia.org/wiki/File:Rain_and_thunder_(1).ogg', license: 'Public domain' },
   { what: 'Rain against the window', by: 'cori', url: 'https://commons.wikimedia.org/wiki/File:Rain_against_the_window.ogg', license: 'Public domain' },
-  { what: 'Howling wind', by: 'Tvabutzku1234', url: 'https://commons.wikimedia.org/wiki/File:Howling_wind.ogg', license: 'CC0' },
   { what: 'City bus MAN SG 220: engine and door', by: 'Work With Sounds / Technical Museum of Slovenia', url: 'https://commons.wikimedia.org/wiki/File:WWS_CityBusMANSG220engine.ogg', license: 'CC BY 4.0' },
   { what: 'Chainsaw 3, Fireworks in distance 1', by: 'ezwa', url: 'https://commons.wikimedia.org/wiki/File:Chainsaw_3.ogg', license: 'Public domain' },
   { what: 'Male pain grunts', by: 'stilgar', url: 'https://commons.wikimedia.org/wiki/File:Male_pain_grunts.ogg', license: 'Public domain' },

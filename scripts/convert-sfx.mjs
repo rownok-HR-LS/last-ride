@@ -63,7 +63,6 @@ export const SFX = {
   thunder_near: { v: [[C + 'thunder_close.flac', 6.4, 15.0], [C + 'thunder_close.flac', 20.7, 29.5]], rate: 32000, q: 6 },
   bus_door: { v: [[C + 'bus_door.ogg', 0.1, 4.0]] },
   // loops
-  wind_loop: { v: [[C + 'wind.ogg', 30, 52]], loop: 2, rate: 32000, q: 6 },
   bus_loop: { v: [[C + 'bus_engine.ogg', 4, 15]], loop: 1, rate: 32000, q: 6 },
   rain_loop: { v: [[C + 'thunder_rain2.ogg', 20, 40]], loop: 2, rate: 32000, q: 6 },
   rain_in: { v: [[C + 'rain_window.ogg', 40, 58]], loop: 2, rate: 32000, q: 6 },

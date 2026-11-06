@@ -1,5 +1,5 @@
 // The opening cinematic: the tour bus drives through the woods to the park while captions tell the story.
-// Shot like film: long lenses, slow eased moves, a handheld drift, depth of field and a sound bed of engine, wind
+// Shot like film: long lenses, slow eased moves, a handheld drift, depth of field and a sound bed of engine
 // and wildlife. It runs during the sim's 'launch' phase (the bus reaches the gate as it ends) and can be skipped.
 import * as THREE from 'three';
 import { LAUNCH_SECONDS } from '../shared/constants.js';
@@ -97,7 +97,6 @@ export class Intro {
     this.done = true;
     this.el.classList.remove('show');
     audio.loop('introPad', 0);
-    audio.loop('wind', 0);
   }
 
   /**
@@ -129,8 +128,7 @@ export class Intro {
       }
     }
     this.title.classList.toggle('show', elapsed > 26.5);
-    // sound bed: wind in the trees and a low drone, swelling as the park wakes up
-    audio.loop('wind', 0.16);
+    // sound bed: a low drone, swelling as the park wakes up
     audio.loop('introPad', 0.1 + Math.min(1, Math.max(0, (elapsed - 18) / 8)) * 0.12);
     while (this.cued < CUES.length && elapsed >= CUES[this.cued][0]) {
       const [, name] = CUES[this.cued++];

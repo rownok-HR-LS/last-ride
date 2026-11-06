@@ -1779,9 +1779,8 @@ export class Client {
     audio.setRoom(under ? 1 : 0);
     audio.loop('rain', (this.rainAmount || 0) * (under ? 0.05 : 0.18));
     audio.loop('rainIn', (this.rainAmount || 0) * (under ? 0.22 : 0));
-    // the night around the park: wind through the rides, and now and then something out in the dark
+    // the night around the park: now and then something out in the dark
     if (snap.phase === 'live') {
-      audio.loop('wind', 0.1);
       this.nextAmbient = (this.nextAmbient ?? 4) - 1 / 60;
       if (this.nextAmbient <= 0) {
         this.nextAmbient = 5 + Math.random() * 9;
