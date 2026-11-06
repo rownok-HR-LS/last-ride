@@ -530,6 +530,12 @@ export class Client {
     // watching a ride you were not on: no powers
     if (me.spectator) return audio.play('deny');
     const P = POWERS[id];
+    const wait = Math.ceil((P.unlock || 0) - (me.ghostTime || 0));
+    if (wait > 0) {
+      audio.play('deny');
+      this.hud.toast(`${P.name} unlocks in ${wait}s`);
+      return;
+    }
     if (me.riseT > 0 || me.ecto < P.cost || (me.cds[id] || 0) > 0) {
       audio.play('deny');
       return;

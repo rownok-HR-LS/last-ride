@@ -1009,6 +1009,8 @@ export class Game {
     }
     const def = POWERS[cmd.id];
     if (!def || p.possess) return;
+    // a new ghost starts with the simple powers; the rest come with time spent haunting
+    if ((p.ghostTime || 0) < (def.unlock || 0)) return;
     if (cmd.id === 'scare') {
       const t = this.players.get(cmd.target);
       if (!t || t.state !== 'alive') return;
@@ -1128,6 +1130,8 @@ export class Game {
 
   update(dt) {
     this.time += dt;
+    // time spent as a ghost (over the whole ride): the stronger powers unlock with it (POWERS[...].unlock)
+    for (const p of this.players.values()) if (p.state === 'ghost') p.ghostTime = (p.ghostTime || 0) + dt;
     if (this.phase === 'end') {
       this.endT -= dt;
       this.updateRides(dt);
@@ -1738,7 +1742,7 @@ export class Game {
         booth: me.state === 'alive' ? this.boothNear(me) : -1, wardT: me.wardT, burnT: me.burnT,
         reloadT: me.reloadT, reloadDur: me.reloadDur,
         use: me.use ? { ...me.use } : null, ecto: me.ecto, cds: { ...me.cds }, possess: me.possess ? { ...me.possess } : null,
-        rootT: me.rootT, shakeT: me.shakeT, protT: me.protT, riseT: me.riseT, revivesLeft: MAX_REVIVES - me.revivesUsed, target: me.target,
+        rootT: me.rootT, shakeT: me.shakeT, protT: me.protT, riseT: me.riseT, revivesLeft: MAX_REVIVES - me.revivesUsed, target: me.target, ghostTime: me.ghostTime || 0,
         carT: me.possess?.kind === 'car' ? this.cars[me.possess.car].t : 0,
         interact: it ? { id: it.id, kind: it.kind, w: it.w, rarity: it.rarity, dura: it.dura, ammo: it.ammo, item: it.item, count: it.count } : null,
         ride,

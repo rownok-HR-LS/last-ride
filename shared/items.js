@@ -121,13 +121,14 @@ export function makeWeapon(w, rarity) {
 
 // ------------------------------------------------------------------ ghost powers
 
+/** unlock: seconds a rider must have spent as a ghost (this ride) before the power can be used. */
 export const POWERS = {
-  trap: { key: '1', name: 'Bear Trap', cost: 35, cd: 6, range: 16, max: 2, dmg: 15, root: 1.3, help: 'Hidden jaws: damage and root a survivor.' },
-  cursed: { key: '2', name: 'Cursed Loot', cost: 35, cd: 10, range: 16, max: 2, dmg: 35, radius: 3.6, help: 'A fake chest that explodes when opened.' },
-  steps: { key: '3', name: 'Fake Footsteps', cost: 10, cd: 8, range: 45, dur: 6, help: 'Phantom footsteps to lure survivors.' },
-  blackout: { key: '4', name: 'Blackout', cost: 40, cd: 20, range: 70, radius: 22, dur: 12, help: 'Kill the lights in an area.' },
-  scare: { key: '5', name: 'Jump Scare', cost: 30, cd: 12, range: 12, reveal: 6, shake: 2.2, help: 'Scare a survivor in your sights. Reveals them to everyone.' },
-  storm: { key: '6', name: 'Storm Pull', cost: 50, cd: 30, range: 300, shift: 14, help: 'Drag the storm toward a spot.' },
+  trap: { key: '1', name: 'Bear Trap', cost: 35, cd: 6, range: 16, max: 2, dmg: 15, root: 1.3, unlock: 0, help: 'Hidden jaws: damage and root a survivor.' },
+  cursed: { key: '2', name: 'Cursed Loot', cost: 35, cd: 10, range: 16, max: 2, dmg: 35, radius: 3.6, unlock: 30, help: 'A fake chest that explodes when opened.' },
+  steps: { key: '3', name: 'Fake Footsteps', cost: 10, cd: 8, range: 45, dur: 6, unlock: 0, help: 'Phantom footsteps to lure survivors.' },
+  blackout: { key: '4', name: 'Blackout', cost: 40, cd: 20, range: 70, radius: 22, dur: 12, unlock: 30, help: 'Kill the lights in an area.' },
+  scare: { key: '5', name: 'Jump Scare', cost: 30, cd: 12, range: 12, reveal: 6, shake: 2.2, unlock: 0, help: 'Scare a survivor in your sights. Reveals them to everyone.' },
+  storm: { key: '6', name: 'Storm Pull', cost: 50, cd: 30, range: 300, shift: 14, unlock: 60, help: 'Drag the storm toward a spot.' },
 };
 export const POWER_IDS = Object.keys(POWERS);
 

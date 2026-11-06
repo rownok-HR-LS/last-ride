@@ -994,3 +994,7 @@ body.pad .slot kbd, body.pad .item kbd:empty, body.pad .power kbd:empty { displa
   .tm-rider .t-rider-blurb { display: none; }
   .tm-daily { display: none; }
 }
+
+/* a ghost power not unlocked yet: dim, with the seconds left */
+.power.locked { opacity: 0.55; filter: grayscale(1); border-style: dashed; }
+.power .pcd.lock { font: 700 14px/1 var(--hud); letter-spacing: 0.04em; background: rgba(0,0,0,0.6); border-radius: 50%; }

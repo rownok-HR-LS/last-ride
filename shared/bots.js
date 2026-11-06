@@ -864,7 +864,8 @@ function planGhost(game, p, b, v) {
   if (dv > 30) return;
   const ahead = (k) => [v.x + v.vx * k, v.z + v.vz * k];
   const cmd = (id, x, z, extra = {}) => ({ c: 'power', id, x, y: v.y, z, ...extra });
-  const spend = (id) => p.ecto >= POWERS[id].cost && (p.cds[id] || 0) <= 0;
+  // only powers this ghost has unlocked (see POWERS[...].unlock)
+  const spend = (id) => p.ecto >= POWERS[id].cost && (p.cds[id] || 0) <= 0 && (p.ghostTime || 0) >= (POWERS[id].unlock || 0);
   if (spend('scare') && r < 0.25) {
     b.ghostPlan = { kind: 'cmd', cmd: { c: 'power', id: 'scare', target: v.id }, x: v.x, y: v.y + 3, z: v.z, reach: 8, t: 6 };
   } else if (spend('trap') && Math.hypot(v.vx, v.vz) > 2 && r < 0.6) {

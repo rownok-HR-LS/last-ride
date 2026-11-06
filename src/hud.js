@@ -453,9 +453,24 @@ export class Hud {
     $('.ecto div', this.root).style.width = `${me.ecto}%`;
     this.set('.ecto span', `Ecto ${Math.floor(me.ecto)}`);
     this.set('.g-revives', me.revivesLeft > 0 ? `· ${me.revivesLeft} revive${me.revivesLeft > 1 ? 's' : ''} left` : '· lost soul');
+    // the stronger powers unlock with time spent as a ghost: say when, and say so when they do
+    const gt = me.ghostTime || 0;
+    const fresh = [];
+    for (const id of POWER_IDS) {
+      const was = this.powerLocked?.[id];
+      const now = gt < (POWERS[id].unlock || 0);
+      if (was && !now) fresh.push(POWERS[id].name);
+      (this.powerLocked ??= {})[id] = now;
+    }
+    if (fresh.length) this.toast(`New power${fresh.length > 1 ? 's' : ''}: ${fresh.join(', ')}`);
     const html = POWER_IDS.map((id) => {
       const P = POWERS[id];
       const cd = me.cds[id] || 0;
+      const wait = Math.ceil((P.unlock || 0) - gt);
+      if (wait > 0) {
+        return `<div class="power locked" data-power="${id}" title="${esc(P.help)} Unlocks after ${P.unlock} s as a ghost.">
+          <div class="pi">${POWER_ICON[id]}</div><div class="pn">${P.name}</div><div class="pcd lock">${wait}s</div></div>`;
+      }
       const ok = me.ecto >= P.cost && cd <= 0 && me.riseT <= 0 && !me.possess;
       return `<div class="power ${ok ? '' : 'off'} ${view.power === id ? 'sel' : ''}" data-power="${id}" title="${esc(P.help)}">
         <kbd>${usingPad() ? PAD_POWER[P.key - 1] ?? '' : P.key}</kbd><div class="pi">${POWER_ICON[id]}</div><div class="pn">${P.name}</div><div class="pc">${P.cost}</div>
