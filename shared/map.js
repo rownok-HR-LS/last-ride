@@ -680,10 +680,17 @@ function storyProps() {
     memorial: [2.52, 1.65, [0, -0.4, 1.9, 0.6, 1.4]],
     missing_board: [2.45, 1.22, [0, -0.3, 2.15, 0.3, 2.4]],
     barricade: [2.0, 0.63, [0, 0, 2.0, 0.4, 1.1]],
+    // tape and evidence markers are walked through; the pram and the board are not
+    police_tape: [6.04, 0.38, null],
+    evidence: [1.7, 1.17, null],
+    pram: [1.15, 0.72, [0, 0, 1.0, 0.6, 1.0]],
+    tour_board: [0.66, 0.47, [0, 0, 0.66, 0.45, 1.0]],
   };
   const place = (model, x, z, rot) => {
-    const [w, d, [lx, lz, cw, cd, h]] = SIZE[model];
-    DECOR.push({ model, x, z, rot, w, d, h });
+    const [w, d, solid] = SIZE[model];
+    DECOR.push({ model, x, z, rot, w, d, h: solid ? solid[4] : 0.5 });
+    if (!solid) return;
+    const [lx, lz, cw, cd, h] = solid;
     const [ox, oz] = rotXZ(lx, lz, rot);
     addBox(x + ox, z + oz, cw, cd, 0, h, rot);
   };
@@ -736,6 +743,38 @@ function storyProps() {
     if (pathDistance(x, z) > 1.5 || clearance(x, z, 0.3) < 0.1 || nearTrack(x, z, 1)) continue;
     bear(x, z);
     n++;
+  }
+  // the tour's sandwich boards just inside the gate: tonight's ride, chalked up
+  let boards2 = 0;
+  for (const [x, z, rot] of [[6.8, 108.5, 0.35], [5.8, 104, 0.3], [-7.2, 93, -0.3], [7.2, 88, 0.25]]) {
+    if (boards2 < 2 && free(x, z, 0.6)) {
+      place('tour_board', x, z, rot);
+      boards2++;
+    }
+  }
+  // where the search in 1987 stopped: police tape along a walkway, evidence markers on the far side of it
+  const scenes = [];
+  for (let i = 0; i < 4000 && scenes.length < 5; i++) {
+    const x = (sr() * 2 - 1) * (PARK_EDGE - 10);
+    const z = (sr() * 2 - 1) * (PARK_EDGE - 10);
+    const pd = pathDistance(x, z);
+    if (pd < 1.5 || pd > 5 || !free(x, z, 3.3) || scenes.some((s) => Math.hypot(s[0] - x, s[1] - z) < 34)) continue;
+    const rot = facePath(x, z);
+    const [ex, ez] = rotXZ(0.4, -1.9, rot);
+    if (!free(x + ex, z + ez, 1)) continue;
+    scenes.push([x, z]);
+    place('police_tape', x, z, rot);
+    place('evidence', x + ex, z + ez, rot + (sr() - 0.5) * 0.6);
+  }
+  // prams left on the paths
+  const prams = [];
+  for (let i = 0; i < 3000 && prams.length < 5; i++) {
+    const x = (sr() * 2 - 1) * (PARK_EDGE - 8);
+    const z = (sr() * 2 - 1) * (PARK_EDGE - 8);
+    const pd = pathDistance(x, z);
+    if (pd < -2 || pd > 2.5 || !free(x, z, 0.8) || prams.some((p) => Math.hypot(p[0] - x, p[1] - z) < 22)) continue;
+    prams.push([x, z]);
+    place('pram', x, z, sr() * Math.PI * 2);
   }
 }
 

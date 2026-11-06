@@ -12,6 +12,7 @@ import os
 import random
 import sys
 
+import bmesh
 import bpy
 from mathutils import Vector
 
@@ -292,7 +293,167 @@ def memorial():
     export('memorial')
 
 
+# --- set dressing, round two ----------------------------------------------------------------------------------------
+def strip(name, pts, width, m, region, atlas=(1024, 1024)):
+    """A ribbon through pts [(point, width direction)], its texture running the whole length once."""
+    bm = bmesh.new()
+    uvl = bm.loops.layers.uv.new()
+    lens = [0.0]
+    for i in range(1, len(pts)):
+        lens.append(lens[-1] + (Vector(pts[i][0]) - Vector(pts[i - 1][0])).length)
+    x, y, rw, rh = region
+    W, H = atlas
+    u0, u1 = x / W, (x + rw) / W
+    v0, v1 = 1 - (y + rh) / H, 1 - y / H
+    rows = []
+    for (p, w), l in zip(pts, lens):
+        w = Vector(w).normalized() * width / 2
+        p = Vector(p)
+        rows.append((bm.verts.new(p - w), bm.verts.new(p + w), u0 + (u1 - u0) * l / lens[-1]))
+    for a, b in zip(rows, rows[1:]):
+        f = bm.faces.new((a[0], b[0], b[1], a[1]))
+        for loop, uv in zip(f.loops, ((a[2], v0), (b[2], v0), (b[2], v1), (a[2], v1))):
+            loop[uvl].uv = uv
+    me = bpy.data.meshes.new(name)
+    bm.to_mesh(me)
+    bm.free()
+    o = bpy.data.objects.new(name, me)
+    bpy.context.scene.collection.objects.link(o)
+    o.data.materials.append(m)
+    return o
+
+
+TAPE = (0, 0, 1000, 64)
+TAPE_OLD = (0, 64, 1000, 64)
+
+
+def police_tape():
+    reset()
+    tape = mat('tape', image='dressing.png', rough=0.45)
+    stake = mat('stake', '#7a1c16', 0.6, metal=0.3)
+    band = mat('stake_band', '#d8d4c8', 0.5)
+    xs = (-2.3, 0.0, 2.3)
+    for x in xs:
+        cyl('stake', 0.028, 1.02, (x, 0, 0.51), stake, verts=8)
+        cyl('band', 0.03, 0.08, (x, 0, 0.86), band, verts=8)
+    # sagging runs between the stakes, with a slight twist
+    for a, b in zip(xs, xs[1:]):
+        pts = []
+        for i in range(13):
+            t = i / 12
+            tw = math.sin(t * math.pi * 2) * 0.35
+            pts.append(((a + (b - a) * t, math.sin(t * math.pi) * 0.04, 0.93 - 0.13 * math.sin(t * math.pi)), (0, tw, 1)))
+        strip('tape', pts, 0.07, tape, TAPE)
+    # the far end torn loose: it trails off the last stake and lies in the mud
+    trail = [((2.3, 0, 0.93), (0, 0, 1)), ((2.42, -0.03, 0.72), (0, 0.2, 1)), ((2.5, -0.05, 0.45), (0, 0.5, 1)),
+             ((2.56, -0.07, 0.18), (0, 0.8, 0.6)), ((2.66, -0.1, 0.02), (0, 1, 0.1)), ((3.0, -0.2, 0.012), (0.2, 1, 0)),
+             ((3.4, -0.18, 0.012), (0, 1, 0)), ((3.7, -0.3, 0.012), (-0.2, 1, 0))]
+    strip('tape_torn', trail, 0.07, tape, TAPE_OLD)
+    export('police_tape')
+
+
+def sneaker(at, rot):
+    red = mat('canvas', '#9a2f2a', 0.9)
+    white = mat('rubber', '#cfc9bb', 0.8)
+    parts = [box('sole', (0.28, 0.1, 0.03), (0, 0, 0.015), white),
+             ball('upper', 0.1, (-0.03, 0, 0.06), red, (1.2, 0.48, 0.5)),
+             ball('toe', 0.06, (0.08, 0, 0.035), white, (1.0, 0.75, 0.55))]
+    for k in range(4):
+        parts.append(box('lace', (0.012, 0.07, 0.006), (0.03 - k * 0.03, 0, 0.098 - k * 0.004), white))
+    bpy.ops.object.select_all(action='DESELECT')
+    for p in parts:
+        p.select_set(True)
+    bpy.context.view_layer.objects.active = parts[0]
+    bpy.ops.object.join()
+    o = bpy.context.active_object
+    o.location = at
+    o.rotation_euler = rot
+    return o
+
+
+def evidence():
+    reset()
+    marks = mat('markers', image='dressing.png', rough=0.6, cull=True)
+    for i, (x, y, a) in enumerate([(-0.6, -0.2, 20), (-0.1, 0.35, -35), (0.45, -0.1, 10), (0.95, 0.4, 60), (0.25, -0.65, -15)]):
+        region = (i * 128 + 4, 132, 120, 120)
+        for side in (-1, 1):
+            # a folded card tent: two faces leaning on each other
+            card('marker', 0.1, 0.1, (x + math.sin(D(a)) * 0.022 * side, y - math.cos(D(a)) * 0.022 * side, 0.048), marks,
+                 region, rot=(D(90 - 22), 0, D(a) + (0 if side > 0 else math.pi)))
+    sneaker((0.5, 0.12, 0.04), (D(75), 0, D(130)))
+    # a flashlight dropped in the search, long dead
+    body = mat('torch', '#1d1d1f', 0.5, metal=0.6)
+    lens = mat('torch_lens', '#9aa3a8', 0.2)
+    c, s = math.cos(D(25)), math.sin(D(25))
+    cyl('torch', 0.02, 0.18, (0.9, -0.05, 0.022), body, rot=(0, D(90), D(25)), verts=10)
+    cyl('torch_head', 0.032, 0.05, (0.9 + c * 0.11, -0.05 + s * 0.11, 0.032), body, rot=(0, D(90), D(25)), verts=10, r2=0.022)
+    cyl('torch_lens', 0.03, 0.004, (0.9 + c * 0.137, -0.05 + s * 0.137, 0.032), lens, rot=(0, D(90), D(25)), verts=10)
+    export('evidence')
+
+
+def pram():
+    reset()
+    navy = mat('pram_body', '#2b3345', 0.7)
+    chrome = mat('pram_frame', '#8c8a86', 0.35, metal=0.8)
+    rubber = mat('pram_tyre', '#121212', 0.9)
+    # the tub: an open box
+    bm = bmesh.new()
+    bmesh.ops.create_cube(bm, size=1.0)
+    bmesh.ops.delete(bm, geom=[f for f in bm.faces if f.normal.z > 0.9], context='FACES')
+    me = bpy.data.meshes.new('tub')
+    bm.to_mesh(me)
+    bm.free()
+    tub = bpy.data.objects.new('tub', me)
+    bpy.context.scene.collection.objects.link(tub)
+    apply_scale(tub, (0.8, 0.42, 0.3))
+    tub.location = (0, 0, 0.47)
+    done(tub, navy, 'tub')
+    # the folding hood over the back third
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=16, ring_count=10, radius=0.26, location=(-0.26, 0, 0.62))
+    hood = bpy.context.active_object
+    bm = bmesh.new()
+    bm.from_mesh(hood.data)
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if v.co.z < -0.01 or v.co.x > 0.02], context='VERTS')
+    bm.to_mesh(hood.data)
+    bm.free()
+    apply_scale(hood, (1.0, 0.82, 1.0))
+    done(hood, navy, 'hood', smooth=True)
+    for sy in (-1, 1):
+        cyl('rail', 0.014, 0.92, (0, 0.17 * sy, 0.3), chrome, rot=(0, D(90), 0), verts=8)
+        # the handle rising behind
+        cyl('handle', 0.014, 0.5, (-0.5, 0.17 * sy, 0.78), chrome, rot=(0, D(-38), 0), verts=8)
+        for sx in (-1, 1):
+            cyl('tyre', 0.16, 0.035, (0.31 * sx, 0.26 * sy, 0.16), rubber, rot=(D(90), 0, 0), verts=20)
+            cyl('hub', 0.05, 0.045, (0.31 * sx, 0.26 * sy, 0.16), chrome, rot=(D(90), 0, 0), verts=10)
+            cyl('strut', 0.012, 0.3, (0.24 * sx, 0.21 * sy, 0.24), chrome, rot=(D(90 + 10 * sy), D(-30 * sx), 0), verts=6)
+    cyl('axle', 0.012, 0.56, (0.31, 0, 0.16), chrome, rot=(D(90), 0, 0), verts=6)
+    cyl('axle', 0.012, 0.56, (-0.31, 0, 0.16), chrome, rot=(D(90), 0, 0), verts=6)
+    cyl('bar', 0.02, 0.4, (-0.66, 0, 0.98), rubber, rot=(D(90), 0, 0), verts=8)
+    # a bear still sits in it
+    bear('blue', at=(0.12, 0, 0.36), turn=D(-90), s=0.55)
+    export('pram')
+
+
+def tour_board():
+    reset()
+    wood = mat('tour_wood', '#3a2c20', 0.85)
+    face = mat('tour_face', image='dressing.png', rough=0.8, cull=True)
+    chain = mat('chain', '#555555', 0.5, metal=0.7)
+    for sy, lean in ((-1, D(-13)), (1, D(13))):
+        b = box('panel', (0.66, 0.03, 0.96), (0, 0.11 * sy, 0.47), wood, rot=(lean, 0, 0))
+        card('poster', 0.56, 0.84, (0, 0.017 * sy, 0.0), face, (0, 256, 512, 768),
+             rot=(D(90), 0, 0 if sy < 0 else math.pi), parent=b)
+    box('hinge', (0.6, 0.06, 0.04), (0, 0, 0.94), wood)
+    for sx in (-0.3, 0.3):
+        box('chain', (0.012, 0.22, 0.012), (sx, 0, 0.3), chain)
+    export('tour_board')
+
+
 plush()
 missing_board()
 barricade()
 memorial()
+police_tape()
+evidence()
+pram()
+tour_board()

@@ -64,6 +64,10 @@ export const ENV = {
   missing_board: ['blender/missing_board.glb', 1000, 1024],
   barricade: ['blender/barricade.glb', 600, 512],
   plush: ['blender/plush.glb', 4500, 256, true],
+  police_tape: ['blender/police_tape.glb', 400, 512],
+  evidence: ['blender/evidence.glb', 1200, 512],
+  pram: ['blender/pram.glb', 2500, 256],
+  tour_board: ['blender/tour_board.glb', 200, 1024],
 };
 
 /**

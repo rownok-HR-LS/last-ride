@@ -154,4 +154,40 @@ function polaroid(px, py, [name], i) {
   </svg>`;
   await sharp(Buffer.from(svg)).png().toFile(`${OUT}/barricade.png`);
 }
+// --- set dressing: police tape (two strips), evidence marker numbers, the tour's sandwich-board poster ------------
+{
+  let tape = '';
+  for (const [y, fade] of [[0, 1], [64, 0.7]]) {
+    tape += `<rect y="${y}" width="1024" height="64" fill="#e3bd17" opacity="${fade}"/><rect y="${y}" width="1024" height="64" fill="#6b5a2a" opacity="${1 - fade}"/>`;
+    for (let x = 14; x < 1024; x += 500) {
+      tape += `<text x="${x}" y="${y + 44}" font-family="Arial Black, Arial" font-weight="bold" font-size="30" fill="#111" letter-spacing="1">POLICE LINE</text>
+        <text x="${x + 262}" y="${y + 43}" font-family="Arial Black, Arial" font-weight="bold" font-size="22" fill="#111">DO NOT CROSS</text>`;
+    }
+    tape += `<rect y="${y}" width="1024" height="64" filter="url(#paper)"/>${stains(0, y, 1024, 64, 6)}`;
+  }
+  let marks = '';
+  for (let i = 0; i < 5; i++) {
+    const x = i * 128;
+    marks += `<rect x="${x + 4}" y="132" width="120" height="120" rx="6" fill="#f0c419"/>
+      <text x="${x + 64}" y="226" text-anchor="middle" font-family="Arial Black, Arial" font-weight="bold" font-size="92" fill="#111">${i + 1}</text>
+      <text x="${x + 64}" y="150" text-anchor="middle" font-family="Arial" font-weight="bold" font-size="13" fill="#111">EVIDENCE</text>
+      ${stains(x + 4, 132, 120, 120, 2)}`;
+  }
+  // the tour's chalkboard-style sandwich board: 512 x 768
+  const board = `<rect x="0" y="256" width="512" height="768" fill="#1d2420"/>
+    <rect x="0" y="256" width="512" height="768" filter="url(#grain)" opacity="0.6"/>
+    <rect x="18" y="274" width="476" height="732" fill="none" stroke="#c9b27a" stroke-width="6"/>
+    <text x="256" y="350" text-anchor="middle" font-family="Segoe Print, Segoe Script, cursive" font-size="40" fill="#efe6cf">Midnight</text>
+    <text x="256" y="405" text-anchor="middle" font-family="Segoe Print, Segoe Script, cursive" font-size="40" fill="#efe6cf">Wonderland Tours</text>
+    <line x1="80" y1="430" x2="432" y2="430" stroke="#c9b27a" stroke-width="3"/>
+    <text x="256" y="520" text-anchor="middle" font-family="Impact, Arial Black, sans-serif" font-size="74" fill="#d8452f" letter-spacing="3">THE LAST</text>
+    <text x="256" y="600" text-anchor="middle" font-family="Impact, Arial Black, sans-serif" font-size="74" fill="#d8452f" letter-spacing="3">RIDE</text>
+    <text x="256" y="680" text-anchor="middle" font-family="Segoe Print, Segoe Script, cursive" font-size="34" fill="#efe6cf">tonight only</text>
+    <text x="256" y="760" text-anchor="middle" font-family="Segoe Print, Segoe Script, cursive" font-size="30" fill="#efe6cf">20 seats · no refunds</text>
+    <text x="256" y="830" text-anchor="middle" font-family="Segoe Print, Segoe Script, cursive" font-size="28" fill="#efe6cf">bus leaves at midnight</text>
+    <text x="256" y="930" text-anchor="middle" font-family="Segoe Print, Segoe Script, cursive" font-size="26" fill="#9fb59a">one rider comes home</text>
+    ${stains(0, 256, 512, 768, 6)}`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024">${DEFS}<rect width="1024" height="1024" fill="#444"/>${tape}${marks}${board}</svg>`;
+  await sharp(Buffer.from(svg)).png().toFile(`${OUT}/dressing.png`);
+}
 console.log('story textures ->', OUT);
