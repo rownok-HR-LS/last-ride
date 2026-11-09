@@ -2,6 +2,7 @@
 // and a fan of buttons for the right thumb. Buttons press the same keys the keyboard does, so everything else
 // (bindings, the HUD, online play) works unchanged. Weapon slots, items and ghost powers in the HUD can be tapped.
 import { icon } from './icons.js';
+import { setTouch } from './prompts.js';
 
 /** Does this device have a touch screen as its main pointer? */
 export const isTouch = () => matchMedia('(pointer: coarse)').matches || (navigator.maxTouchPoints > 0 && !matchMedia('(pointer: fine)').matches);
@@ -34,6 +35,7 @@ export class Touch {
     this.client = client;
     this.input = client.input;
     this.input.touch = true;
+    setTouch(true);
     document.body.classList.add('touch');
     this.el = document.createElement('div');
     this.el.className = 'touch-ui hidden';

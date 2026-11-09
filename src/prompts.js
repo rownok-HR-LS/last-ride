@@ -22,6 +22,19 @@ export function usingPad() {
   return pad;
 }
 
+let touch = false;
+/** A touch screen with the on-screen controls (touch.js): prompts name those buttons instead of keys. */
+export function setTouch(on) {
+  touch = on;
+}
+export function usingTouch() {
+  return touch && !pad;
+}
+const TOUCH = {
+  interact: 'E', prizes: 'E', reload: 'R', jump: '⤒', slide: '⤓', up: '⤒', down: '⤓', attack: 'the attack button', aim: 'the aim button',
+  cancel: 'the aim button', map: 'Map', weapons: '⇄', powers: '↯', pause: '☰', move: 'the left stick', look: 'drag to look', close: '✕',
+};
+
 const PAD = {
   interact: 'X', prizes: 'X', jump: 'A', slide: 'B', dodge: 'LB', reload: 'RB', sprint: 'L3', shoulder: 'R3', map: 'View',
   attack: 'RT', aim: 'LT', cancel: 'LT', move: 'L stick', look: 'R stick', up: 'A', down: 'B', fast: 'L3', powers: 'D-pad',
@@ -33,6 +46,7 @@ const first = (action) => keyName((binds[action] || [])[0]);
 /** The name of what triggers an action, e.g. 'E' or 'X', 'Click' or 'RT', 'WASD' or 'L stick'. */
 export function keyOf(action) {
   if (pad) return PAD[action] ?? '?';
+  if (touch && TOUCH[action]) return TOUCH[action];
   if (action === 'move') {
     const k = ['forward', 'left', 'back', 'right'].map(first);
     return k.every((x) => x.length === 1) ? k.join('') : 'move keys';

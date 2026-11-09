@@ -20,7 +20,8 @@ import { createPost, SSR } from './post.js';
 import { ringTex } from './textures.js';
 import { Guide } from './guide.js';
 import { Intro } from './intro.js';
-import { cullInstances } from './cull.js';
+import { cullInstances, setCullScale } from './cull.js';
+import { freed } from './ktx.js';
 import { Bus } from './bus.js';
 import { Projectiles } from './projectiles.js';
 import { weaponModel, projectileModel, itemModel } from './weapons.js';
@@ -225,6 +226,12 @@ export class Client {
       note.classList.remove('show');
       note.querySelector('button').hidden = true;
       note.querySelector('span').textContent = 'Your graphics card reset. Getting the park back…';
+      // the textures' data was let go once on the graphics card (ktx.js): they can't be sent again, so start over
+      // (an online ride carries on after a reload)
+      if (freed.any) {
+        location.reload();
+        return;
+      }
       this.warmUp();
     });
   }
@@ -289,6 +296,12 @@ export class Client {
       this.lastDrop = null;
       if (!helped) {
         this.noDropUntil = this.time + 45;
+        // the processor is the limit: draw less often and less far instead (once)
+        if (!this.cpuSave) {
+          this.cpuSave = true;
+          this.shadowEvery = 4;
+          setCullScale(0.7);
+        }
         k = was.k;
         this.quality = k;
         this.renderer.setPixelRatio(base * k);
@@ -419,16 +432,20 @@ export class Client {
     setBinds(s.keys);
     audio.setVolumes(s.volume);
     // [sharpness, rain, shadow map, effects (ambient shading, wet reflections, lamp glow), edge smoothing, sharpest
-    // pixel density]. Ultra renders at the screen's full density; the others stop at 1.5 (a sharp laptop screen
+    // pixel density, shadows redrawn every Nth frame, how far small props are drawn]. The last two spare the
+    // processor, which is what holds a laptop or a phone back (drawing calls, not pixels). Ultra renders at the screen's full density; the others stop at 1.5 (a sharp laptop screen
     // would otherwise cost twice the pixels for little to see).
     const Q = {
-      ultra: [1, 1, 4096, true, true, 2],
-      high: [1, 1, 2048, true, true, 1.5],
-      medium: [0.8, 0.7, 1536, true, true, 1.5],
-      low: [0.62, 0.4, 1024, false, false, 1.5],
+      ultra: [1, 1, 4096, true, true, 2, 2, 1.15],
+      high: [1, 1, 2048, true, true, 1.5, 2, 1],
+      medium: [0.8, 0.7, 1536, true, true, 1.5, 3, 0.85],
+      low: [0.62, 0.4, 1024, false, false, 1.5, 4, 0.65],
     }[s.quality];
     // auto starts sharp with everything on, then adapts (see adaptQuality)
-    const [res, rain, shadow, fx, smaa, dpr] = Q || [1, 1, 2048, true, true, 1.5];
+    const [res, rain, shadow, fx, smaa, dpr, shadowEvery, reach] = Q || [1, 1, 2048, true, true, 1.5, 2, 1];
+    this.shadowEvery = shadowEvery;
+    setCullScale(reach);
+    this.cpuSave = false;
     const base = Math.min(window.devicePixelRatio, dpr);
     this.quality = res;
     this.renderer.setPixelRatio(base * res);
@@ -1313,7 +1330,7 @@ export class Client {
     this.corpses = this.corpses.filter((c) => c.update(dt));
     this.rides.update(snap, dt, this.time);
     this.fx.update(dt, this.time, snap.zone);
-    this.lootView.update(this.time, this.camera.position, this.intro.active);
+    this.lootView.update(this.time, this.camera.position, this.intro.active, this.camera.getWorldDirection(this.lootDir ??= new THREE.Vector3()));
     this.projectiles.update(snap, dt, this.time, this.camera.position);
     this.updateWeather(dt);
     this.updateCamera(snap, dt);
@@ -1406,7 +1423,7 @@ export class Client {
 
     // the moon never moves: re-render its shadow map every other frame (moving people lag by one frame at most)
     this.renderer.shadowMap.autoUpdate = false;
-    this.shadowTick = ((this.shadowTick || 0) + 1) % 2;
+    this.shadowTick = ((this.shadowTick || 0) + 1) % (this.shadowEvery || 2);
     if (this.shadowTick === 0 || this.cine) this.renderer.shadowMap.needsUpdate = true;
     gu.cine.value = this.cine ? 1 : 0;
     if (this.cine) gu.hurt.value = gu.storm.value = 0;

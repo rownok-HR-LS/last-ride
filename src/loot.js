@@ -178,15 +178,24 @@ export class LootView {
   }
 
   /** hidden: show nothing (the opening cinematic keeps the park dark and untouched). */
-  update(time, cam, hidden = false) {
+  /**
+   * dir: the camera's facing (optional). Every kind, rarity and material of loot in use is a draw call of its own,
+   * so the models themselves are only drawn close by and in view; further off it's the glow on the ground and the
+   * beam that you spot loot by (those are a handful of draw calls, however many there are).
+   */
+  update(time, cam, hidden = false, dir = null) {
     for (const p of this.pools.values()) p.n = 0;
     for (const [id, e] of hidden ? [] : this.items) {
       const l = e.data;
+      const dx = cam ? l.x - cam.x : 0;
+      const dz = cam ? l.z - cam.z : 0;
+      const d = Math.hypot(dx, dz);
       // past the fog nothing is readable anyway
-      if (cam && Math.hypot(l.x - cam.x, l.z - cam.z) > 85) continue;
+      if (d > 85) continue;
+      const near = (reach) => d < reach && (!dir || d < 8 || dx * dir.x + dz * dir.z > -0.25 * d);
       if (l.kind === 'chest') {
         q.setFromAxisAngle(UP, l.rot || 0);
-        for (const [g, m] of flatten(`chest:${l.cursed}`, () => chestModel(l.cursed))) this.add(g, m, v.set(l.x, l.y, l.z), q, sc.set(1, 1, 1));
+        if (near(55)) for (const [g, m] of flatten(`chest:${l.cursed}`, () => chestModel(l.cursed))) this.add(g, m, v.set(l.x, l.y, l.z), q, sc.set(1, 1, 1));
         const k = 1.5 + Math.sin(time * 3 + id) * 0.15;
         this.add(discGeo, discMat(l.cursed ? '#b45cff' : '#ffd27a'), v.set(l.x, l.y + 0.03, l.z), FLAT, sc.set(k, k, 1));
         continue;
@@ -197,14 +206,14 @@ export class LootView {
         const col = RARITIES[l.rarity].color;
         const upright = GRIP[l.w] === 'hand' && l.w !== 'darts' && l.w !== 'chainsaw';
         const rot = upright ? q.multiply(TILT) : q;
-        for (const [g, m] of flatten(`weapon:${l.w}:${l.rarity}`, () => weaponModel(l.w, l.rarity))) this.add(g, m, v.set(l.x, l.y + bob + (upright ? 0.1 : 0), l.z), rot, sc.set(1.3, 1.3, 1.3));
+        if (near(40)) for (const [g, m] of flatten(`weapon:${l.w}:${l.rarity}`, () => weaponModel(l.w, l.rarity))) this.add(g, m, v.set(l.x, l.y + bob + (upright ? 0.1 : 0), l.z), rot, sc.set(1.3, 1.3, 1.3));
         this.add(discGeo, discMat(col), v.set(l.x, l.y + 0.04, l.z), FLAT, sc.set(1, 1, 1));
         // every weapon gets a light beam so loot is easy to spot in the dark; rarer ones are taller
         const h = 1.4 + l.rarity * 1.4;
         this.add(beamGeo, beamMat(col), v.set(l.x, l.y + h / 2, l.z), q.identity(), sc.set(1, h, 1));
         continue;
       }
-      for (const [g, m] of flatten(`item:${l.kind}:${l.ammo}:${l.item}`, () => itemModel(l))) this.add(g, m, v.set(l.x, l.y + bob, l.z), q, sc.set(1, 1, 1));
+      if (near(45)) for (const [g, m] of flatten(`item:${l.kind}:${l.ammo}:${l.item}`, () => itemModel(l))) this.add(g, m, v.set(l.x, l.y + bob, l.z), q, sc.set(1, 1, 1));
     }
     for (const p of this.pools.values()) {
       p.mesh.count = p.n;

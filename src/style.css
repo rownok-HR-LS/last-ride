@@ -1113,3 +1113,17 @@ body.pad .slot kbd, body.pad .item kbd:empty, body.pad .power kbd:empty { displa
 @media (max-width: 760px) { .end-sign .end-pol { width: 64px; top: 10px; right: 10px; } }
 /* phones and short screens keep the arrows only: no room for the strip between the logo and the panel */
 @media (max-width: 760px), (max-height: 520px) { .tm-pols { display: none; } }
+/* a phone held sideways: the narrow-screen rules above stack the panel under the logo, which leaves no room on a
+   360-pixel-high screen. Dock the panel to the right instead (scrolling if it must), the rider bottom left. */
+@media (max-height: 520px) and (orientation: landscape) and (max-width: 760px) {
+  .tm-panel { top: 8px; bottom: 8px; left: auto; right: 8px; width: min(310px, 46vw); max-height: none; overflow-y: auto; padding: 12px; gap: 7px; }
+  .tm-rider { bottom: 10px; max-width: calc(100vw - min(310px, 46vw) - 36px); }
+  .tm-rider-pick b { font-size: 28px; }
+  .tm-play { padding: 9px 12px; font-size: 18px; }
+  .title2.modern .t-logo { top: 10px; max-width: calc(100vw - min(310px, 46vw) - 36px); }
+  .title2.modern .t-name { font-size: 34px; }
+  .title2.modern .t-sub { font-size: 10px; letter-spacing: 0.2em; }
+  .title2.modern .t-load { display: none; }
+}
+/* touch: the kill feed keeps clear of the chat button at the top of the right-hand controls */
+body.touch .feed { margin-right: 60px; }

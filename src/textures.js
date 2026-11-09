@@ -1,6 +1,6 @@
 // Procedural canvas textures for the stylised park.
 import * as THREE from 'three';
-import { ktx2 } from './ktx.js';
+import { ktx2, freeAfterUpload } from './ktx.js';
 import { rng } from '../shared/rng.js';
 import { PATHS, RING, PARK_EDGE } from '../shared/map.js';
 import { MAP_HALF } from '../shared/constants.js';
@@ -406,6 +406,7 @@ export function pbr(name) {
       ktx2().load(`./tex/${name}/${file}.ktx2`, (k) => {
         Object.assign(t, { image: k.image, mipmaps: k.mipmaps, format: k.format, type: k.type, colorSpace: k.colorSpace, minFilter: k.minFilter, magFilter: k.magFilter });
         t.generateMipmaps = false;
+        freeAfterUpload(t);
         t.needsUpdate = true;
         done();
       }, undefined, (e) => {

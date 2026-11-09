@@ -1,7 +1,7 @@
 // Tells the player what to do next: an objective line, on-screen markers, a ghost tutorial and a controls card.
 import * as THREE from 'three';
 import { icon as svgIcon } from './icons.js';
-import { keyOf, usingPad } from './prompts.js';
+import { keyOf, usingPad, usingTouch } from './prompts.js';
 import { FERRIS, STATION, PRIZE_BOOTHS } from '../shared/map.js';
 
 const TUT_KEY = 'last-ride-ghost-tutorial';
@@ -134,7 +134,9 @@ export class Guide {
 
     if (snap.phase === 'end') this.setObjective('Ride over', 'Check the results');
     else if (me.state === 'bus') {
-      if (snap.bus.open) this.setObjective('Jump off the bus', 'Press Space where you want to start. The bus stops at Free Fall. Open the map (M) to see the route.');
+      if (snap.bus.open) this.setObjective('Jump off the bus', usingTouch()
+        ? 'Tap Jump off where you want to start. The bus stops at Free Fall. Tap Map to see the route.'
+        : `Press ${keyOf('jump')} where you want to start. The bus stops at Free Fall. Open the map (${keyOf('map')}) to see the route.`);
       else this.setObjective('Midnight Wonderland Tours', 'The doors open once you are through the gates');
     }
     else if (!ghost) {
@@ -167,9 +169,9 @@ export class Guide {
         this.setObjective(`Spend your tickets · ${svgIcon('ticket')} ${me.tickets}`, `A Prize Counter sells chainsaws, crossbows and blessed relics. Walk up and press ${keyOf('prizes')}.`);
         this.place(n++, cam, booth.x, 4.5, booth.z, 'ticket', `Prize Counter · ${dist(booth.x, booth.z)} m`, 'chest');
       } else if (p.hp < 60 && (me.items.bandage || me.items.medkit)) {
-        this.setObjective('Heal up', `Press ${me.items.medkit ? '5 for a medkit' : '4 for a bandage'} somewhere safe`);
+        this.setObjective('Heal up', usingTouch() ? `Use your ${me.items.medkit ? 'medkit' : 'bandage'} (tap it in your items) somewhere safe` : `Press ${me.items.medkit ? '5 for a medkit' : '4 for a bandage'} somewhere safe`);
       } else if (p.shield < 50 && me.items.soda) {
-        this.setObjective('Drink a shield soda', 'Press 6');
+        this.setObjective('Drink a shield soda', usingTouch() ? 'Tap the soda in your items' : 'Press 6');
       } else {
         this.setObjective(`Survive · ${snap.alive} riders left`, 'Take out other riders. Watch for red warning circles, traps and possessed rides.');
       }
@@ -246,7 +248,7 @@ export class Guide {
     // keys and buttons named for whatever the player is holding (see prompts.js)
     const gh = svgIcon('ghost');
     const trap = usingPad() ? '↑' : '1';
-    const use = usingPad() ? `press ${keyOf('attack')} on` : 'click';
+    const use = usingPad() ? `press ${keyOf('attack')} on` : usingTouch() ? 'tap attack on' : 'click';
     const lets = `${keyOf('interact')} lets go.`;
     const step = {
       0: [`${gh} Fly as a ghost`, `Fly with ${keyOf('move')}. ${keyOf('up')} goes up, ${keyOf('down')} goes down, ${keyOf('fast')} flies fast. Walls can't stop you.`],

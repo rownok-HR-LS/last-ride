@@ -12,6 +12,13 @@ const lastDir = new THREE.Vector3();
 const dir = new THREE.Vector3();
 let frame = 0;
 let lastFov = 0;
+/** How far batches are drawn, as a share of each one's own reach (the graphics settings turn it down). */
+let reach = 1;
+export function setCullScale(s) {
+  if (s === reach) return;
+  reach = s;
+  lastPos.set(1e9, 0, 0);
+}
 
 /**
  * Hand an instanced mesh over to the culler once its matrices (and colours) are final.
@@ -78,7 +85,7 @@ export function cullInstances(camera, force = false) {
       const dy = cy[i] - py;
       const dz = cz[i] - pz;
       const d2 = dx * dx + dy * dy + dz * dz;
-      const lim = maxDist + r[i];
+      const lim = maxDist * reach + r[i];
       if (d2 > lim * lim) continue;
       // switch over by the trunk's distance, not the crown's, so near and far versions hand over cleanly
       if (minDist || b.lodMax) {
