@@ -5,10 +5,11 @@ import * as THREE from 'three';
 import { wetten } from './wet.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
+import { ktx2 } from './ktx.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { cullable, lodLimit } from './cull.js';
 
-const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).setKTX2Loader(ktx2());
 const cache = new Map();
 
 /** world.js hands over its materials: key -> { mat, world (metres per texture tile) } (see 'tex:' below). */

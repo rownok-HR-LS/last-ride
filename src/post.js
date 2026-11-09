@@ -272,6 +272,9 @@ export function createPost(renderer, scene, camera) {
   return {
     composer,
     ao,
+    // the lamps' glow in the fog reads depth from the AO pass: switch them together
+    glow,
+    smaa,
     grade: grade.uniforms,
     setPixelRatio(r) {
       composer.setPixelRatio(r);

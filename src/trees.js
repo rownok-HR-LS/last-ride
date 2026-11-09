@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { sway } from './wind.js';
 import { cullable, lodLimit } from './cull.js';
+import { ktx2 } from './ktx.js';
 
 /** [preset, seed, tweak]. Every variant is normalised to 1 m tall and scaled per instance. */
 export const DEAD = [
@@ -36,7 +37,7 @@ export async function preloadTrees() {
     import('three/examples/jsm/loaders/GLTFLoader.js'),
     import('three/examples/jsm/libs/meshopt_decoder.module.js'),
   ]);
-  const gltf = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync('./models/trees.glb');
+  const gltf = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).setKTX2Loader(ktx2()).loadAsync('./models/trees.glb');
   const swayed = new Map();
   const out = { full: { dead: [], living: [] }, lite: { dead: [], living: [] } };
   gltf.scene.traverse((m) => {

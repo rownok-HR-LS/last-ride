@@ -234,6 +234,7 @@ async function title() {
   // the signs paint over the rust photo, so make sure the textures are in first
   const textures = import('./textures.js').then((tex) => {
     ['rusty_metal_02', 'damaged_plaster', 'forrest_ground_01', 'cobblestone_floor_08'].forEach((n) => tex.pbr(n));
+    tex.photoTex('rusty_metal_02');
     return tex.texturesReady();
   });
   // the trees come baked (growing them here took seconds), and the park is planted from them

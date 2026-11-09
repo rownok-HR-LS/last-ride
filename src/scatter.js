@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { sway } from './wind.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
+import { ktx2 } from './ktx.js';
 import { PARK_EDGE, pathDistance, clearance, LANDMARKS_OUT } from '../shared/map.js';
 import { rng } from '../shared/rng.js';
 import { cullable } from './cull.js';
@@ -185,7 +186,7 @@ function plantGrass(scene, rr) {
 export async function buildScatter(scene) {
   const rr = rng(2718);
   plantGrass(scene, rr);
-  const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+  const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).setKTX2Loader(ktx2());
   await Promise.all(Object.entries(KINDS).map(async ([name, [inPark, inWoods, [s0, s1], shadows]]) => {
     const g = await loader.loadAsync(`./models/env/${name}.glb`);
     const pieces = parts(g.scene);

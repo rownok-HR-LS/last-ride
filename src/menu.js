@@ -1,7 +1,7 @@
 // Menus in the park's own signage: the settings board (graphics, sound, mouse, keys) and the pause sign.
 import { ACTIONS, DEFAULTS, keyName, saveSettings } from './settings.js';
 
-const QUALITY = [['auto', 'Auto'], ['high', 'High'], ['medium', 'Medium'], ['low', 'Low']];
+const QUALITY = [['auto', 'Auto'], ['ultra', 'Ultra'], ['high', 'High'], ['medium', 'Medium'], ['low', 'Low']];
 const VOLUMES = [['master', 'Master'], ['music', 'Music box'], ['effects', 'Fighting & effects'], ['ambience', 'Rain & the night']];
 
 function el(html) {
@@ -47,10 +47,11 @@ export function settingsBoard(settings, { onChange, onBack }) {
     <div class="board-buttons"><button class="ticket cream reset">Reset</button><button class="ticket back">Back</button></div>
   </div>`);
   const notes = {
-    auto: 'Sharpness adapts to keep the game smooth.',
-    high: 'Full sharpness, every effect. Needs a strong graphics card.',
+    auto: 'Sharpness adapts to keep the game smooth; effects drop out if it still struggles.',
+    ultra: 'Full screen sharpness and the finest shadows. For strong graphics cards.',
+    high: 'Full sharpness and every effect.',
     medium: 'A little softer, lighter rain, simpler shadows.',
-    low: 'For older computers: softer picture, light rain, no ambient shadowing.',
+    low: 'For older computers and laptops: softer picture, light rain, no ambient shading, reflections or lamp glow.',
   };
   const changed = () => {
     saveSettings(s);

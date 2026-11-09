@@ -16,6 +16,7 @@ import { placeModels, setWorldMaterials } from './models.js';
 import { dressBuildings } from './buildings.js';
 import { buildKit, kitDraws, boothVariant, BOOTH_GAMES } from './kit.js';
 import { buildDecals } from './decals.js';
+import { compressed } from './ktx.js';
 
 // ------------------------------------------------------------------ materials
 
@@ -958,8 +959,7 @@ function buildTreeline(scene) {
  */
 const HORIZON = { r: 900, latMin: -3, latMax: 18, mast: { dx: -0.9397, dz: 0.342, el: 8.738 } };
 function buildHorizon(scene) {
-  const tex = new THREE.TextureLoader().load('./tex/horizon.webp');
-  tex.colorSpace = THREE.SRGBColorSpace;
+  const tex = compressed('./tex/horizon.ktx2');
   tex.anisotropy = 4;
   const d2r = Math.PI / 180;
   const geo = new THREE.SphereGeometry(HORIZON.r, 160, 12, 0, Math.PI * 2, (90 - HORIZON.latMax) * d2r, (HORIZON.latMax - HORIZON.latMin) * d2r);

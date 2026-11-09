@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { PATHS, BUILDINGS, PROPS, BUS_ROUTE, clearance } from '../shared/map.js';
 import { rng } from '../shared/rng.js';
 import { addLampLight } from './lamplight.js';
+import { compressed } from './ktx.js';
 
 // tiles in the sheet (row by row)
 const OIL = [0, 1];
@@ -72,8 +73,7 @@ const UP = new THREE.Vector3(0, 1, 0);
 
 /** Build the decals (two meshes in a group). */
 export function buildDecals() {
-  const tex = new THREE.TextureLoader().load('./tex/decals.webp');
-  tex.colorSpace = THREE.SRGBColorSpace;
+  const tex = compressed('./tex/decals.ktx2');
   tex.anisotropy = 8;
   const r = rng(4242);
   const pick = (a) => (Array.isArray(a) ? a[Math.floor(r() * a.length)] : a);

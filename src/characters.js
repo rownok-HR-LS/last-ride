@@ -3,6 +3,7 @@ import { TRAILS, lookItem } from '../shared/looks.js';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
+import { ktx2 } from './ktx.js';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { WEAPONS, FISTS } from '../shared/items.js';
@@ -559,6 +560,7 @@ export async function loadCharacters(onProgress, first = OUTFITS.map((o) => o.id
   if (animSrc) return;
   const loader = new GLTFLoader();
   loader.setMeshoptDecoder(MeshoptDecoder);
+  loader.setKTX2Loader(ktx2());
   let done = 0;
   const total = new Set(first).size + 1;
   const load = async (url, counts) => {

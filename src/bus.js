@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
+import { ktx2 } from './ktx.js';
 import { glow } from './textures.js';
 
 const LENGTH = 10.8; // metres
@@ -63,7 +64,7 @@ function beamMesh(x) {
 let busModel = null;
 /** Load the bus model once. The loading screen waits on this, so the intro never shows riders without their bus. */
 export function preloadBus() {
-  return (busModel ||= new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync('./models/bus.glb').then((g) => {
+  return (busModel ||= new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).setKTX2Loader(ktx2()).loadAsync('./models/bus.glb').then((g) => {
     // The model's windows are refracting glass (transmission). Any transmissive material in view makes three.js
     // draw every solid thing in the scene a second time, every frame, to see through it: the bus is nearly always
     // on screen, so that doubled the park's draw calls. Plain see-through glass looks the same at night.

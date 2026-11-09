@@ -297,6 +297,12 @@ export class Client {
         return;
       }
     }
+    // already as soft as it goes and still slow: drop the costly effects too (once)
+    if (this.frameAvg > 1 / 45 && k <= 0.55 && !this.autoFxOff && this.time > (this.noDropUntil ?? 0)) {
+      this.autoFxOff = true;
+      this.setEffects(false);
+      return;
+    }
     if (this.frameAvg > 1 / 50 && k > 0.55 && this.time > (this.noDropUntil ?? 0)) {
       this.lastDrop = { k, before: this.frameAvg, at: this.time };
       k -= 0.1;
@@ -402,7 +408,8 @@ export class Client {
 
   /**
    * Apply the player's settings (from the settings menu): mouse, keys, volumes and graphics.
-   * Fixed quality levels: high is full sharpness with every effect; medium and low render smaller, thin the rain
+   * Fixed quality levels: ultra adds full screen density and finer shadows; high is full sharpness with every effect;
+   * medium and low render smaller, thin the rain
    * and lower the shadow detail, and low also drops the ambient occlusion and the wet ground's reflections.
    */
   applySettings(s) {
@@ -411,29 +418,48 @@ export class Client {
     this.input.binds = s.keys;
     setBinds(s.keys);
     audio.setVolumes(s.volume);
-    const base = Math.min(window.devicePixelRatio, 1.5);
-    const Q = { high: [1, 1, 2048, true], medium: [0.8, 0.7, 1536, true], low: [0.62, 0.4, 1024, false] }[s.quality];
-    if (Q) {
-      const [res, rain, shadow, ao] = Q;
-      this.quality = res;
-      this.renderer.setPixelRatio(base * res);
-      this.post.setPixelRatio(base * res);
-      this.rain.setDensity(rain);
-      this.post.ao.enabled = ao;
-      SSR.on = ao;
-      const sh = this.moonLight.shadow;
-      if (sh.mapSize.x !== shadow) {
-        sh.mapSize.set(shadow, shadow);
-        sh.map?.dispose();
-        sh.map = null;
-      }
-    } else {
-      // auto: everything on, and the resolution adapts to keep frames smooth
-      this.rain.setDensity(1);
-      this.post.ao.enabled = true;
-      SSR.on = true;
+    // [sharpness, rain, shadow map, effects (ambient shading, wet reflections, lamp glow), edge smoothing, sharpest
+    // pixel density]. Ultra renders at the screen's full density; the others stop at 1.5 (a sharp laptop screen
+    // would otherwise cost twice the pixels for little to see).
+    const Q = {
+      ultra: [1, 1, 4096, true, true, 2],
+      high: [1, 1, 2048, true, true, 1.5],
+      medium: [0.8, 0.7, 1536, true, true, 1.5],
+      low: [0.62, 0.4, 1024, false, false, 1.5],
+    }[s.quality];
+    // auto starts sharp with everything on, then adapts (see adaptQuality)
+    const [res, rain, shadow, fx, smaa, dpr] = Q || [1, 1, 2048, true, true, 1.5];
+    const base = Math.min(window.devicePixelRatio, dpr);
+    this.quality = res;
+    this.renderer.setPixelRatio(base * res);
+    this.post.setPixelRatio(base * res);
+    this.rain.setDensity(rain);
+    this.setEffects(fx);
+    this.post.smaa.enabled = smaa;
+    this.autoFxOff = false;
+    const sh = this.moonLight.shadow;
+    if (sh.mapSize.x !== shadow) {
+      sh.mapSize.set(shadow, shadow);
+      // resize the shadow map in place: throwing it away left frames sampling a missing shadow texture, every lit
+      // draw failed and the screen went black after switching to Low, Medium or Ultra
+      sh.map?.setSize(shadow, shadow);
+      this.renderer.shadowMap.needsUpdate = true;
     }
     this.resize();
+  }
+
+  /**
+   * The costly screen effects together: ambient shading, wet-ground reflections, the lamps' glow in the fog. The
+   * shading pass also draws the scene itself, so it is never switched off: with the effects off it only stops
+   * shading (no strength, fewest samples). Switching it off used to leave the Low setting with a black screen.
+   */
+  setEffects(on) {
+    const ao = this.post.ao;
+    ao.enabled = true;
+    ao.configuration.intensity = on ? 2.6 : 0;
+    if (ao.configuration.aoSamples !== (on ? 8 : 4)) ao.configuration.aoSamples = on ? 8 : 4;
+    this.post.glow.enabled = on;
+    SSR.on = on;
   }
 
   resize() {

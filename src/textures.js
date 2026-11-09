@@ -1,5 +1,6 @@
 // Procedural canvas textures for the stylised park.
 import * as THREE from 'three';
+import { ktx2 } from './ktx.js';
 import { rng } from '../shared/rng.js';
 import { PATHS, RING, PARK_EDGE } from '../shared/map.js';
 import { MAP_HALF } from '../shared/constants.js';
@@ -228,7 +229,7 @@ export function signTex(text, { color = '#c8392b', font = 'Rye, Georgia, serif' 
     const r = rng(text.length * 97 + text.charCodeAt(0));
     const c = canvas(1024, 256);
     const ctx = c.getContext('2d');
-    const rust = pbr('rusty_metal_02').map.image;
+    const rust = photoTex('rusty_metal_02').image;
     ctx.fillStyle = '#1a1512';
     ctx.fillRect(0, 0, 1024, 256);
     if (rust && rust.complete && rust.width) {
@@ -387,19 +388,45 @@ export function texturesReady() {
   return Promise.all(pending);
 }
 
-/** Diffuse / normal / ARM (ao, roughness, metalness) set from public/tex/<name>/. */
+/**
+ * Diffuse / normal / ARM (ao, roughness, metalness) set from public/tex/<name>/, GPU-compressed (KTX2, made by
+ * scripts/ktx-compress.mjs). Each comes back at once as an empty texture that fills in when its data arrives, so
+ * materials can be built straight away.
+ */
 export function pbr(name) {
   return cached(`pbr:${name}`, () => {
     const load = (file, srgb) => {
       let done;
       pending.push(new Promise((res) => (done = res)));
-      const t = loader.load(`./tex/${name}/${file}.webp`, done, undefined, done);
+      const t = new THREE.CompressedTexture([], 0, 0);
       t.wrapS = t.wrapT = THREE.RepeatWrapping;
       t.anisotropy = 8;
+      t.flipY = false;
       if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+      ktx2().load(`./tex/${name}/${file}.ktx2`, (k) => {
+        Object.assign(t, { image: k.image, mipmaps: k.mipmaps, format: k.format, type: k.type, colorSpace: k.colorSpace, minFilter: k.minFilter, magFilter: k.magFilter });
+        t.generateMipmaps = false;
+        t.needsUpdate = true;
+        done();
+      }, undefined, (e) => {
+        console.warn(`texture ${name}/${file}`, e);
+        done();
+      });
       return t;
     };
     return { map: load('diff', true), normalMap: load('nor', false), arm: load('arm', false) };
+  });
+}
+
+/**
+ * A photo texture as a plain picture, for painting into canvases (the signs' rust): the WebP kept for it. Its image
+ * is there once texturesReady() has resolved.
+ */
+export function photoTex(name) {
+  return cached(`photo:${name}`, () => {
+    let done;
+    pending.push(new Promise((res) => (done = res)));
+    return loader.load(`./tex/${name}/diff.webp`, done, undefined, done);
   });
 }
 
