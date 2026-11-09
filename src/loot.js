@@ -2,8 +2,8 @@
 import * as THREE from 'three';
 import { softShaft } from './shafts.js';
 import { RARITIES, AMMO, ITEMS } from '../shared/items.js';
-import { weaponModel, itemModel as occultModel, GRIP } from './weapons.js';
-import { glow } from './textures.js';
+import { weaponModel, itemModel as occultModel, GRIP, blenderModel } from './weapons.js';
+import { glow, pbr } from './textures.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 /**
@@ -49,7 +49,28 @@ function beamMat(color) {
   return beamMats.get(color);
 }
 
+/** One shared material per loot colour (the instanced pools are keyed by material). */
+const lootMats = new Map();
+function lootMat(key, make) {
+  if (!lootMats.has(key)) lootMats.set(key, make());
+  return lootMats.get(key);
+}
+
+/** The Blender version of a loot model (scripts/blender/build-weapons.py), or null while it isn't loaded. */
+function realItem(l) {
+  if (l.kind === 'ammo') {
+    const col = AMMO[l.ammo].color;
+    return blenderModel('l_ammo', 0, { band: lootMat(`band:${col}`, () => new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.4, roughness: 0.6 })) });
+  }
+  if (l.kind === 'tickets' || ITEMS[l.item]?.occult) return null;
+  if (l.item === 'bandage') return blenderModel('l_bandage');
+  if (l.item === 'medkit') return blenderModel('l_medkit', 0, { cross: lootMat('cross', () => new THREE.MeshStandardMaterial({ color: '#ff3a4a', emissive: '#ff3a4a', emissiveIntensity: 0.5 })) });
+  return blenderModel('l_soda', 0, { soda: lootMat('soda', () => new THREE.MeshStandardMaterial({ color: ITEMS.soda.color, emissive: ITEMS.soda.color, emissiveIntensity: 0.35, metalness: 0.4, roughness: 0.3 })) });
+}
+
 function itemModel(l) {
+  const real = realItem(l);
+  if (real) return real;
   const g = new THREE.Group();
   if (l.kind === 'ammo') {
     const col = AMMO[l.ammo].color;
@@ -79,6 +100,11 @@ function itemModel(l) {
 }
 
 function chestModel(cursed) {
+  const real = blenderModel('l_chest', 0, {
+    chestwood: lootMat(`chest:${cursed}`, () => { const t = pbr('old_planks_02'); return new THREE.MeshStandardMaterial({ map: t.map, normalMap: t.normalMap, color: cursed ? '#9a72b0' : '#d0a07a', roughness: 0.8 }); }),
+    gold: lootMat('chestgold', () => new THREE.MeshStandardMaterial({ color: '#e0b040', metalness: 0.8, roughness: 0.3, emissive: '#6a4a10', emissiveIntensity: 0.4 })),
+  });
+  if (real) return real;
   const g = new THREE.Group();
   const wood = new THREE.MeshStandardMaterial({ color: cursed ? '#4a2a5a' : '#7a4a2a', roughness: 0.8 });
   const gold = new THREE.MeshStandardMaterial({ color: '#e0b040', metalness: 0.8, roughness: 0.3, emissive: '#6a4a10', emissiveIntensity: 0.4 });

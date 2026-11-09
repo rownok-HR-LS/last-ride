@@ -238,9 +238,11 @@ async function title() {
   });
   // the trees come baked (growing them here took seconds), and the park is planted from them
   const trees = import('./trees.js').then((m) => m.preloadTrees());
+  // the weapons, loot and chests modelled in Blender
+  const weapons = import('./weapons.js').then((m) => m.preloadWeapons());
   const clientModule = import('./client.js');
   // the bus driver is one of the riders, so the park is built once they are all in
-  await Promise.all([fonts, bus, textures, riders, trees]);
+  await Promise.all([fonts, bus, textures, riders, trees, weapons]);
   const { Client } = await clientModule;
   client = new Client(app, profile, settings, { attract: true });
   window.__lr = client;

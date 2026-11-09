@@ -1,7 +1,102 @@
-// 3D models for the melee and ranged weapons, projectiles and occult tools (built from simple shapes and photo textures).
+// 3D models for the melee and ranged weapons, projectiles, occult tools and loot. The real ones are modelled in
+// Blender (scripts/blender/build-weapons.py -> public/models/weapons.glb, loaded before the first match by
+// preloadWeapons); the simple shapes below stand in if that file never arrives.
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { RARITIES } from '../shared/items.js';
 import { pbr } from './textures.js';
+
+/** name ('w_axe', 'p_bow', 'i_relic', 'l_chest', ...) -> [[material name, geometry], ...] */
+const BLENDER = new Map();
+
+/** Load the Blender models (once); never rejects, the stand-ins cover a failure. */
+let loading = null;
+export function preloadWeapons() {
+  loading ??= new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync('./models/weapons.glb').then((gltf) => {
+    gltf.scene.updateMatrixWorld(true);
+    for (const root of gltf.scene.children) {
+      const inv = root.matrixWorld.clone().invert();
+      const parts = [];
+      root.traverse((o) => {
+        if (!o.isMesh) return;
+        // compressed (quantised) attributes clamp when transformed: unpack them to plain floats first
+        const g = new THREE.BufferGeometry();
+        for (const n of ['position', 'normal']) {
+          const a = o.geometry.attributes[n];
+          if (!a) continue;
+          const arr = new Float32Array(a.count * 3);
+          for (let i = 0; i < a.count; i++) {
+            arr[i * 3] = a.getX(i);
+            arr[i * 3 + 1] = a.getY(i);
+            arr[i * 3 + 2] = a.getZ(i);
+          }
+          g.setAttribute(n, new THREE.BufferAttribute(arr, 3));
+        }
+        if (o.geometry.index) g.setIndex(new THREE.BufferAttribute(Uint32Array.from(o.geometry.index.array), 1));
+        g.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld));
+        boxUV(g, 0.3);
+        g.userData.keep = true;
+        parts.push([o.material.name, g]);
+      });
+      BLENDER.set(root.name, parts);
+    }
+  }).catch((e) => console.warn('weapon models', e));
+  return loading;
+}
+
+/** Texture coordinates projected from the model's own space, a tile every `world` metres. */
+function boxUV(g, world) {
+  const pos = g.attributes.position;
+  const nor = g.attributes.normal;
+  const uv = new Float32Array(pos.count * 2);
+  for (let i = 0; i < pos.count; i++) {
+    const ax = Math.abs(nor.getX(i));
+    const ay = Math.abs(nor.getY(i));
+    const az = Math.abs(nor.getZ(i));
+    const [u, v] = ay >= ax && ay >= az ? [pos.getX(i), pos.getZ(i)] : ax >= az ? [pos.getZ(i), pos.getY(i)] : [pos.getX(i), pos.getY(i)];
+    uv[i * 2] = u / world;
+    uv[i * 2 + 1] = v / world;
+  }
+  g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+}
+
+/** Painted steel (the axe head, the crowbar, the chainsaw's housing): the colour over a rusty, chipped texture. */
+const PAINTED_METAL = new Set(['#a3221d', '#c22a22', '#d4651c', '#2d4a3a', '#3d4a3a']);
+
+/** The game's material for one of the Blender model's named parts (extra: per-use overrides, e.g. loot colours). */
+function blenderMat(key, rarity, extra) {
+  if (extra?.[key]) return extra[key];
+  switch (key) {
+    case 'wood': return WOOD();
+    case 'wooddark': return photo('old_planks_02', '#8a7462', 0.8, 0);
+    case 'steel': return STEEL();
+    case 'chrome': return plain('#c8ccd0', 0.22, 1);
+    case 'rust': return RUST();
+    case 'black': return BLACK();
+    case 'rubber': return plain('#161515', 0.95, 0);
+    case 'tape': return plain('#7c7d7a', 0.55, 0.1);
+    case 'cardboard': return plain('#a07a50', 1, 0);
+    case 'gold': return plain('#c9a14a', 0.35, 0.9, '#3a2a08');
+    case 'string': return plain('#d8d0c0', 0.8, 0);
+    case 'rarity': {
+      const c = RARITIES[rarity ?? 0].color;
+      return plain(c, 0.4, 0.3, c);
+    }
+    default:
+      if (PAINTED_METAL.has(key)) return photo('rusty_metal_02', key, 0.55, 0.35);
+      return plain(key.startsWith('#') ? key : '#808080', 0.6, 0.05);
+  }
+}
+
+/** A Blender model as a new group (shared geometry), or null while it isn't loaded. */
+export function blenderModel(name, rarity = 0, extra = null) {
+  const parts = BLENDER.get(name);
+  if (!parts) return null;
+  const g = new THREE.Group();
+  for (const [key, geo] of parts) g.add(new THREE.Mesh(geo, blenderMat(key, rarity, extra)));
+  return g;
+}
 
 const cache = new Map();
 function mat(key, make) {
@@ -48,6 +143,8 @@ export const GRIP = {
 };
 
 export function weaponModel(w, rarity = 0) {
+  const real = blenderModel(`w_${w}`, rarity);
+  if (real) return real;
   const g = new THREE.Group();
   const add = (...o) => g.add(...o);
   switch (w) {
@@ -184,6 +281,8 @@ export function weaponModel(w, rarity = 0) {
 
 /** Projectiles in flight and stuck in things, pointing along -z. */
 export function projectileModel(kind) {
+  const real = blenderModel(`p_${kind}`);
+  if (real) return real;
   const g = new THREE.Group();
   switch (kind) {
     case 'bow':
@@ -233,6 +332,8 @@ export function projectileModel(kind) {
 
 /** Small models for occult loot and tickets lying on the floor. */
 export function itemModel(kind) {
+  const real = blenderModel(`i_${kind}`);
+  if (real) return real;
   const g = new THREE.Group();
   if (kind === 'tickets') {
     // a fan of orange carnival tickets

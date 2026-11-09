@@ -15,6 +15,7 @@ import { buildScatter } from './scatter.js';
 import { placeModels, setWorldMaterials } from './models.js';
 import { dressBuildings } from './buildings.js';
 import { buildKit, kitDraws, boothVariant, BOOTH_GAMES } from './kit.js';
+import { buildDecals } from './decals.js';
 
 // ------------------------------------------------------------------ materials
 
@@ -243,7 +244,10 @@ function roadEdgeTex() {
 export function neonSign(text, color, w) {
   const { texture, glow: lit } = signTex(text, { color });
   const m = new THREE.MeshStandardMaterial({ map: texture, emissiveMap: lit, emissive: '#ffffff', emissiveIntensity: 1.4, roughness: 0.8, side: THREE.DoubleSide });
-  return new THREE.Mesh(new THREE.PlaneGeometry(w, w / 4), m);
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(w, w / 4), m);
+  // the light bake (src/tools/export-glows.js) finds the signs by this
+  sign.userData.neon = color;
+  return sign;
 }
 
 // ------------------------------------------------------------------ props
@@ -563,6 +567,8 @@ export function buildWorld(scene) {
   }
   ground.receiveShadow = true;
   scene.add(ground);
+  // oil, cracks, mud, tracks, litter on the ground; graffiti and torn posters on the walls (Blender, decals.js)
+  scene.add(buildDecals());
   const wildsTex = pbr('forest_leaves_02');
   const wildsMat = new THREE.MeshStandardMaterial({ color: '#8a8070', map: wildsTex.map, normalMap: wildsTex.normalMap, roughness: 1 });
   const wilds = new THREE.Mesh(scaledPlane(1400, 1400 / 5), wildsMat);
@@ -942,6 +948,54 @@ function buildTreeline(scene) {
     ring.renderOrder = -1;
     scene.add(ring);
   }
+  buildHorizon(scene);
+}
+
+/**
+ * The far country beyond the woods, rendered in Blender (scripts/blender/render-horizon.py): ranges of hills going
+ * blue in the haze, a hillside town with its lights still on, a radio mast whose red light blinks. An equirectangular
+ * strip (latitude -3 to 18 degrees, seen from the middle of the park) on a band of a sphere behind the tree rings.
+ */
+const HORIZON = { r: 900, latMin: -3, latMax: 18, mast: { dx: -0.9397, dz: 0.342, el: 8.738 } };
+function buildHorizon(scene) {
+  const tex = new THREE.TextureLoader().load('./tex/horizon.webp');
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  const d2r = Math.PI / 180;
+  const geo = new THREE.SphereGeometry(HORIZON.r, 160, 12, 0, Math.PI * 2, (90 - HORIZON.latMax) * d2r, (HORIZON.latMax - HORIZON.latMin) * d2r);
+  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: true });
+  // only part of the night's mist between us and the hills: count at most 140 m of it, so the hills fade with the
+  // weather but stay a silhouette on a clear night
+  mat.onBeforeCompile = (sh) => {
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <fog_fragment>', `#ifdef USE_FOG
+        float hzDepth = min(vFogDepth, 140.0);
+        #ifdef FOG_EXP2
+          float hzFog = 1.0 - exp(-fogDensity * fogDensity * hzDepth * hzDepth);
+        #else
+          float hzFog = smoothstep(fogNear, fogFar, hzDepth);
+        #endif
+        gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor, hzFog);
+      #endif`);
+  };
+  const band = new THREE.Mesh(geo, mat);
+  // the render's columns run the other way round from the sphere's
+  band.scale.x = -1;
+  band.position.y = 2;
+  band.renderOrder = -2;
+  band.name = 'horizon';
+  scene.add(band);
+  // the mast's warning light, blinking once every second and a half
+  const { dx, dz, el } = HORIZON.mast;
+  const light = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow(), color: '#ff2a1a', transparent: true, depthWrite: false, fog: false, blending: THREE.AdditiveBlending }));
+  const ce = Math.cos(el * d2r);
+  light.position.set(dx * ce * (HORIZON.r - 5), 2 + Math.sin(el * d2r) * (HORIZON.r - 5), dz * ce * (HORIZON.r - 5));
+  light.scale.setScalar(9);
+  light.renderOrder = -1;
+  light.onBeforeRender = () => {
+    light.material.opacity = performance.now() % 1500 < 450 ? 1 : 0.05;
+  };
+  scene.add(light);
 }
 
 /**

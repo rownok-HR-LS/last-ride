@@ -1,7 +1,10 @@
 # Bake the park's lamp light in Blender (Cycles): every working street lamp and the fire in the big top, with the
 # light they bounce off walls and ground, and the shadows of everything standing in the way.
 #
-#   blender --background --factory-startup --python scripts/blender/bake-lamplight.py -- occluders.glb lamps.json outdir [samples] [ground px]
+#   blender --background --factory-startup --python scripts/blender/bake-lamplight.py -- occluders.glb lamps.json outdir [samples] [ground px] [all|ground] [glows.json]
+#
+# glows.json (src/tools/export-glows.js) adds the neon signs, each as a coloured panel of light facing out of its sign,
+# and every marquee bulb that still works.
 #
 # Writes two images and a scale (outdir/lamplight.json), which scripts/pack-lamplight.mjs turns into game textures:
 #   ground_light.png  2048 x 2048 top-down: the light on the ground (u = (x + 120) / 240, v = (120 - z) / 240)
@@ -29,6 +32,9 @@ FIRE_POWER = 3500.0
 SAMPLES = int(args[3]) if len(args) > 3 else 48
 GROUND_PX = int(args[4]) if len(args) > 4 else 1536
 ONLY = args[5] if len(args) > 5 else 'all'  # 'ground' to time the ground alone
+GLOWS = args[6] if len(args) > 6 else None
+NEON_PER_M = 90.0   # watts per metre of sign
+BULB_POWER = 14.0
 
 
 def b(v):
@@ -113,6 +119,40 @@ for l in lamps:
     n += 1
 point(b((0, 13, 0)), FIRE_POWER, (1.0, 0.3, 0.08), 1.5)
 print(f'LIGHT {n} lamps and the fire, {SAMPLES} samples', flush=True)
+
+
+def linear(hexcol):
+    return tuple((int(hexcol[i:i + 2], 16) / 255) ** 2.2 for i in (1, 3, 5))
+
+
+if GLOWS:
+    from mathutils import Matrix, Vector
+    signs = bulbs = 0
+    for g in json.load(open(GLOWS)):
+        col = linear(g['color'])
+        if g['kind'] == 'neon':
+            nrm = Vector(b((g['nx'], g['ny'], g['nz']))).normalized()
+            li = bpy.data.lights.new('neon', 'AREA')
+            li.shape = 'RECTANGLE'
+            li.size = g['w']
+            li.size_y = g['h']
+            li.energy = NEON_PER_M * g['w']
+            # a little brighter in hue than the sign's paint: neon tubes are saturated
+            li.color = tuple(min(1.0, c * 1.4) for c in col)
+            o = bpy.data.objects.new('neon', li)
+            # an area light shines down its own -Z; keep its long side level
+            zl = -nrm
+            xl = Vector((0, 0, 1)).cross(nrm)
+            xl = xl.normalized() if xl.length > 1e-3 else Vector((1, 0, 0))
+            yl = zl.cross(xl).normalized()
+            o.matrix_world = Matrix.Translation(Vector(b((g['x'], g['y'], g['z']))) + nrm * 0.12) @ Matrix((
+                (xl.x, yl.x, zl.x, 0), (xl.y, yl.y, zl.y, 0), (xl.z, yl.z, zl.z, 0), (0, 0, 0, 1)))
+            scene.collection.objects.link(o)
+            signs += 1
+        else:
+            point(b((g['x'], g['y'], g['z'])), BULB_POWER, col, 0.06)
+            bulbs += 1
+    print(f'LIGHT {signs} neon signs and {bulbs} bulbs', flush=True)
 
 
 def target(obj, img):

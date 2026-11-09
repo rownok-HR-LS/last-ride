@@ -675,7 +675,14 @@ const LOWER_BODY = /(Hips|UpLeg|Leg|Foot|Toe)/;
 
 /** Clips that play on the upper body only (an _up copy without the hips and legs is made at load). */
 const UPPER = ['m_idle', 'fight_idle', 'm_light', 'm_light2', 'm_heavy', 'm_block', 'm_block_hit', 'm_stagger', 'punch', 'punch2', 'punch_hook', 'punch_upper', 'throw', 'bow_draw',
-  'gs_idle', 'gs_combo', 'gs_down', 'gs_power', 'gs_block', 'gs_block_hit', 'gs_hit', 'react_left', 'react_right', 'react_gut', 'head_hit_big', 'mc_combo3'];
+  'gs_idle', 'gs_combo', 'gs_down', 'gs_power', 'gs_block', 'gs_block_hit', 'gs_hit', 'react_left', 'react_right', 'react_gut', 'head_hit_big', 'mc_combo3',
+  'spike_stab', 'mallet_whack', 'saw_idle', 'saw_rev'];
+/**
+ * Weapons with moves of their own (made in Blender, scripts/blender/make-anims.py): the spike stabs, the mallet
+ * comes down overhead like the whack-a-mole it was made for, the chainsaw is held in both hands and pushed in.
+ */
+const OWN_SWING = { spike: 'spike_stab', mallet: 'mallet_whack', chainsaw: 'saw_rev' };
+const OWN_GUARD = { chainsaw: 'saw_idle' };
 /** The big two-handed weapons fight with the great-sword set: both hands on the haft, the weight behind each swing. */
 const TWO_HANDED = new Set(['sledge', 'axe', 'lever']);
 /** Cuts that live inside a longer clip (the great-sword combo holds three slashes). */
@@ -699,6 +706,10 @@ export const CUTS = {
   mc_c1: [0.45, 0.93, 1.3, 0.7],
   mc_c2: [1.3, 1.73, 2.1, 1.5],
   mc_c3: [2.1, 2.63, 3.2, 2.35],
+  // the Blender-made moves
+  spike_stab: [0.0, 0.45, 0.9, 0.3],
+  mallet_whack: [0.0, 0.55, 1.0, 0.35],
+  saw_rev: [0.0, 0.4, 0.8, 0.0],
   gs_block: [0, 0.5, 0.96],
   gs_block_hit: [0, 0.3, 0.8],
   gs_hit: [0, 0.3, 0.8],
@@ -955,8 +966,9 @@ export class Character {
     if (p.atk && def.type === 'melee') {
       const fists = w === 'fists';
       // combo: forehand, backhand, then an overhead finisher
-      const name = two
-        ? p.atk.heavy ? 'gs_power' : ['gs_c1', 'gs_c2', 'gs_c3'][this.combo]
+      const own = OWN_SWING[w] && this.clips[OWN_SWING[w]] ? OWN_SWING[w] : null;
+      const name = own || two
+        ? own || (p.atk.heavy ? 'gs_power' : ['gs_c1', 'gs_c2', 'gs_c3'][this.combo])
         : p.atk.heavy ? (fists ? (this.clips.punch_upper ? 'punch_upper' : 'punch2') : 'm_heavy') : fists ? ['punch2', this.clips.punch_hook ? 'punch_hook' : 'punch', this.clips.punch_upper ? 'punch_upper' : 'punch2'][this.combo] : this.clips.mc_combo3 ? ['mc_c1', 'mc_c2', 'mc_c3'][this.combo] : ['m_light', 'm_light2', 'm_heavy'][this.combo];
       const c = CUTS[name];
       const u = Math.min(1, p.atk.u);
@@ -966,7 +978,8 @@ export class Character {
     }
     // charging a heavy swing: wind up and hold
     if (p.charge > 0 && def.type === 'melee' && !def.auto) {
-      const name = w === 'fists' ? 'punch2' : two ? 'gs_power' : 'm_heavy';
+      const own = OWN_SWING[w] && this.clips[OWN_SWING[w]] ? OWN_SWING[w] : null;
+      const name = own || (w === 'fists' ? 'punch2' : two ? 'gs_power' : 'm_heavy');
       const c = CUTS[name];
       return { name, t: c[0] + (c[3] - c[0]) * Math.min(1, p.charge / 0.3) };
     }
@@ -977,7 +990,8 @@ export class Character {
     if (this.reactClip && !p.stagger && time - (this.reactAt ?? -9) < 0.45) return at(this.reactClip, (time - this.reactAt) / 0.45);
     if (time - (this.throwAt ?? -9) < 0.5) return at('throw', (time - this.throwAt) / 0.5);
     // in a fight the legs strafe with the directional clips while the arms hold a guard
-    const guard = def.type === 'melee' && p.combat ? (w === 'fists' && this.clips.fight_idle ? 'fight_idle' : two ? 'gs_idle' : 'm_idle') : null;
+    const ownGuard = OWN_GUARD[w] && this.clips[OWN_GUARD[w]] ? OWN_GUARD[w] : null;
+    const guard = def.type === 'melee' && (p.combat || ownGuard) ? ownGuard || (w === 'fists' && this.clips.fight_idle ? 'fight_idle' : two ? 'gs_idle' : 'm_idle') : null;
     if (p.stagger) {
       if (this.staggerAt === null) this.staggerAt = time;
       return at('m_stagger', Math.min(1, (time - this.staggerAt) / 0.7));
@@ -1060,6 +1074,8 @@ export class Character {
     // full-body overrides
     let over = null;
     let overSpeed = 1;
+    // ghosts hang limp in the air, swaying
+    if (ghost && this.clips.ghost_float) over = 'ghost_float';
     if (!ghost) {
       // sitting on the tour bus (riders) or behind its wheel (the driver)
       if (opts.seat && this.clips[opts.seat]) over = opts.seat;
@@ -1075,7 +1091,10 @@ export class Character {
         const c = CUTS.slide;
         const t = this.clips.slide ? this.action('slide').time : 0;
         overSpeed = t > c[1] && t < c[2] && speed > 4.5 ? 0.45 : 1;
-      } else if (!p.onGround) over = p.vy > 1 ? 'jump_up' : 'jump_loop';
+      } else if (!p.onGround) {
+        // a long drop (off the bus, off a ride) flails; a hop just jumps
+        over = p.vy > 1 ? 'jump_up' : p.vy < -7 && this.clips.fall_flail ? 'fall_flail' : 'jump_loop';
+      }
       else if (this.landT > 0 && speed < 3.2 && this.clips.jump_down) {
         over = 'jump_down';
         overSpeed = 1.25;
@@ -1392,7 +1411,7 @@ export class Corpse {
     if (look?.wear) this.char.wear(look.wear);
     this.char.root.position.set(x, y, z);
     this.char.root.rotation.y = yaw;
-    const deaths = ['death_from_the_front', 'death_from_the_back', 'death_from_front_headshot'];
+    const deaths = ['death_from_the_front', 'death_from_the_back', 'death_from_front_headshot', 'death_kneel', 'death_twist'].filter((d) => this.char.clips[d]);
     this.char.play(deaths[Math.floor(Math.random() * deaths.length)], 0, { once: true });
     this.t = 0;
     this.scene = scene;
