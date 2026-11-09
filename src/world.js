@@ -3,7 +3,8 @@
 import * as THREE from 'three';
 import { softShaft, nightAir } from './shafts.js';
 import { wetten, groundAO } from './wet.js';
-import { addLampLight, loadLampLight } from './lamplight.js';
+import { addLampLight, loadLampLight, lampGlow } from './lamplight.js';
+import { ssr, SSR_GLSL } from './ssr.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
 import { PROPS, LAMPS, LAMP_HEAD, PARK_EDGE, PRIZE_BOOTHS, DECOR, LANDMARKS_OUT, rotXZ } from '../shared/map.js';
@@ -702,9 +703,15 @@ function groundMaterial() {
     sh.uniforms.maskMap = { value: pathMask() };
     sh.uniforms.rainT = groundRain.time;
     sh.uniforms.rainAmt = groundRain.amount;
+    // reflections in the wet ground (ssr.js)
+    sh.uniforms.ssrTex = ssr.tex;
+    sh.uniforms.ssrView = ssr.view;
+    sh.uniforms.ssrProj = ssr.proj;
+    sh.uniforms.ssrOn = ssr.on;
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
         uniform sampler2D mapMud; uniform sampler2D mapLeaves; uniform sampler2D mapStone; uniform sampler2D norStone; uniform sampler2D maskMap; uniform float rainT; uniform float rainAmt;
+        uniform sampler2D ssrTex; uniform mat4 ssrView; uniform mat4 ssrProj; uniform float ssrOn;
         float gh(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
         float gn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
           return mix(mix(gh(i), gh(i + vec2(1, 0)), f.x), mix(gh(i + vec2(0, 1)), gh(i + vec2(1, 1)), f.x), f.y); }
@@ -766,7 +773,8 @@ function groundMaterial() {
         float roughnessFactor = mix(roughness - wetG * 0.3 - pathK * 0.2 - rainAmt * 0.18, 0.1, puddle);`)
       .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
         // the pools mirror the sky, but the town glow on the horizon is a saturated purple: keep its light, drop most of its colour
-        reflectedLight.indirectSpecular = mix(reflectedLight.indirectSpecular, vec3(dot(reflectedLight.indirectSpecular, vec3(0.3, 0.5, 0.2))) * vec3(0.92, 0.96, 1.05), puddle * 0.7);`);
+        reflectedLight.indirectSpecular = mix(reflectedLight.indirectSpecular, vec3(dot(reflectedLight.indirectSpecular, vec3(0.3, 0.5, 0.2))) * vec3(0.92, 0.96, 1.05), puddle * 0.7);
+        ${SSR_GLSL}`);
     // the street lamps' light on the ground, baked in Blender with every shadow cast across it
     addLampLight(sh, { ground: true });
   };
@@ -1005,6 +1013,12 @@ function buildLamps(scene) {
       const near = LAMPS.map((l, i) => ({ i, d: Math.hypot(l.x - cx, l.z - cz) }))
         .filter((o) => level[o.i] > 0)
         .sort((a, b) => a.d - b.d);
+      // and the nearest eight glow in the fog (post.js)
+      lampGlow.lamps.forEach((v, k) => {
+        const o = near[k];
+        if (!o) v.w = 0;
+        else v.set(LAMPS[o.i].x + LAMP_HEAD.x, LAMP_HEAD.y - 0.25, LAMPS[o.i].z, level[o.i]);
+      });
       lights.forEach((pl, k) => {
         const o = near[k];
         if (!o) {

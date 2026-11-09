@@ -16,6 +16,12 @@ export const lampLight = {
   /** ghosts' blackouts: x, z, radius, strength */
   dark: { value: Array.from({ length: MAX_DARK }, () => new THREE.Vector4()) },
 };
+/**
+ * The lamps nearest the camera for the glow in the fog (post.js): head position and how lit each is (0 = off),
+ * refreshed every frame by the lamps in world.js, so flicker, blackouts and the intro's power-up all show.
+ */
+export const lampGlow = { lamps: Array.from({ length: 8 }, () => new THREE.Vector4()) };
+
 /** Overall brightness of the baked light against the scene's own lighting (tuned by eye). */
 export const LAMP_GAIN = 7;
 

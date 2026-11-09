@@ -16,7 +16,7 @@ import { FX } from './fx.js';
 import { LootView } from './loot.js';
 import { Hud } from './hud.js';
 import { Input } from './input.js';
-import { createPost } from './post.js';
+import { createPost, SSR } from './post.js';
 import { ringTex } from './textures.js';
 import { Guide } from './guide.js';
 import { Intro } from './intro.js';
@@ -403,7 +403,7 @@ export class Client {
   /**
    * Apply the player's settings (from the settings menu): mouse, keys, volumes and graphics.
    * Fixed quality levels: high is full sharpness with every effect; medium and low render smaller, thin the rain
-   * and lower the shadow detail, and low also drops the ambient occlusion.
+   * and lower the shadow detail, and low also drops the ambient occlusion and the wet ground's reflections.
    */
   applySettings(s) {
     this.settings = s;
@@ -420,6 +420,7 @@ export class Client {
       this.post.setPixelRatio(base * res);
       this.rain.setDensity(rain);
       this.post.ao.enabled = ao;
+      SSR.on = ao;
       const sh = this.moonLight.shadow;
       if (sh.mapSize.x !== shadow) {
         sh.mapSize.set(shadow, shadow);
@@ -430,6 +431,7 @@ export class Client {
       // auto: everything on, and the resolution adapts to keep frames smooth
       this.rain.setDensity(1);
       this.post.ao.enabled = true;
+      SSR.on = true;
     }
     this.resize();
   }
@@ -1675,8 +1677,19 @@ export class Client {
       cam.fov = punchFov;
       cam.updateProjectionMatrix();
     }
-    // shadows follow the camera
+    // shadows follow the camera, reaching out ahead of where you look (most of what you see is in front of you)
     const focus = p && p.state !== 'bus' ? new THREE.Vector3(p.x, 0, p.z) : new THREE.Vector3(snap.bus.x, 0, snap.bus.z);
+    focus.x -= Math.sin(this.camYaw || 0) * 16;
+    focus.z -= Math.cos(this.camYaw || 0) * 16;
+    // ...and move in whole shadow-map texels, so shadow edges hold still instead of crawling as you walk
+    const sh = this.moonLight.shadow;
+    const texel = (sh.camera.right - sh.camera.left) / sh.mapSize.x;
+    const right = (this.shRight ??= new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), this.moonDir).normalize());
+    const up = (this.shUp ??= new THREE.Vector3().crossVectors(this.moonDir, right).normalize());
+    const a = Math.round(focus.dot(right) / texel) * texel;
+    const b = Math.round(focus.dot(up) / texel) * texel;
+    const c = focus.dot(this.moonDir);
+    focus.copy(right).multiplyScalar(a).addScaledVector(up, b).addScaledVector(this.moonDir, c);
     this.moonLight.position.copy(focus).addScaledVector(this.moonDir, 120);
     this.moonLight.target.position.copy(focus);
   }

@@ -6,8 +6,17 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { N8AOPass } from 'n8ao';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
+import { Pass, FullScreenQuad } from 'three/examples/jsm/postprocessing/Pass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { SMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass.js';
+import { lampGlow } from './lamplight.js';
+import { ssr } from './ssr.js';
+
+/** Reflections in the wet ground on or off (the quality setting can turn them off). */
+export const SSR = { on: true };
+
+/** How strongly the lamps glow in the fog (scaled by tonight's fog thickness). Tuned by eye. */
+export const GLOW = { value: 0.35 };
 
 const GradeShader = {
   uniforms: {
@@ -124,6 +133,53 @@ const GradeShader = {
     }`,
 };
 
+/**
+ * Light from the street lamps scattering in the damp night air: a halo round each head and a glow that hangs in the
+ * fog between them, even against the sky. For each pixel the view ray's single scattering from the eight nearest
+ * working lamps is summed in closed form (the integral of 1/d^2 along a line is an arctangent), so no ray marching.
+ */
+const GlowShader = {
+  uniforms: {
+    tDiffuse: { value: null },
+    tDepth: { value: null },
+    invViewProj: { value: new THREE.Matrix4() },
+    camPos: { value: new THREE.Vector3() },
+    lamps: { value: lampGlow.lamps },
+    amount: { value: 0 },
+    tint: { value: new THREE.Color('#ff9a4a') },
+  },
+  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+  fragmentShader: `
+    uniform sampler2D tDiffuse; uniform sampler2D tDepth; uniform mat4 invViewProj; uniform vec3 camPos;
+    uniform vec4 lamps[8]; uniform float amount; uniform vec3 tint;
+    varying vec2 vUv;
+    void main() {
+      vec4 c = texture2D(tDiffuse, vUv);
+      if (amount > 0.0) {
+        float zd = texture2D(tDepth, vUv).x;
+        vec4 wp = invViewProj * vec4(vUv * 2.0 - 1.0, zd * 2.0 - 1.0, 1.0);
+        wp /= wp.w;
+        vec3 ray = wp.xyz - camPos;
+        float t = length(ray);
+        vec3 dir = ray / max(t, 1e-4);
+        // the sky: the air goes on a long way
+        if (zd > 0.99999) t = 220.0;
+        float s = 0.0;
+        for (int i = 0; i < 8; i++) {
+          vec4 L = lamps[i];
+          if (L.w <= 0.0) continue;
+          vec3 o = L.xyz - camPos;
+          float b = dot(o, dir);
+          float h = sqrt(max(dot(o, o) - b * b, 0.0144));
+          // light that travels far through fog is mostly lost on the way: each lamp keeps a halo, the dark between stays
+          s += L.w * (atan((t - b) / h) - atan(-b / h)) / h * exp(-0.16 * h);
+        }
+        c.rgb += tint * s * amount;
+      }
+      gl_FragColor = c;
+    }`,
+};
+
 export function createPost(renderer, scene, camera) {
   const size = renderer.getSize(new THREE.Vector2());
   const composer = new EffectComposer(renderer);
@@ -137,7 +193,63 @@ export function createPost(renderer, scene, camera) {
   ao.autoDetectTransparency = false;
   ao.configuration.transparencyAware = false;
   composer.addPass(ao);
-  const bloom = new UnrealBloomPass(new THREE.Vector2(size.x / 2, size.y / 2), 0.42, 0.5, 0.86);
+  // keep a half-size copy of this frame (light, and distance from the camera in alpha) for the ground's reflections
+  // next frame (ssr.js); it leaves the image itself alone
+  const keep = new THREE.WebGLRenderTarget(Math.max(1, size.x >> 1), Math.max(1, size.y >> 1), {
+    type: THREE.HalfFloatType, depthBuffer: false, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter,
+  });
+  const keepQuad = new FullScreenQuad(new THREE.ShaderMaterial({
+    uniforms: { tColor: { value: null }, tDepth: { value: null }, near: { value: camera.near }, far: { value: camera.far } },
+    vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+    fragmentShader: `#include <packing>
+      uniform sampler2D tColor; uniform sampler2D tDepth; uniform float near; uniform float far; varying vec2 vUv;
+      void main() {
+        float zd = texture2D(tDepth, vUv).x;
+        float z = zd > 0.99999 ? 1e5 : -perspectiveDepthToViewZ(zd, near, far);
+        gl_FragColor = vec4(texture2D(tColor, vUv).rgb, z);
+      }`,
+    depthTest: false,
+    depthWrite: false,
+  }));
+  class KeepPass extends Pass {
+    constructor() {
+      super();
+      this.needsSwap = false;
+    }
+    render(r, writeBuffer, readBuffer) {
+      const u = keepQuad.material.uniforms;
+      u.tColor.value = readBuffer.texture;
+      u.tDepth.value = ao.beautyRenderTarget.depthTexture;
+      u.near.value = camera.near;
+      u.far.value = camera.far;
+      const was = r.getRenderTarget();
+      r.setRenderTarget(keep);
+      keepQuad.render(r);
+      r.setRenderTarget(was);
+      camera.updateMatrixWorld();
+      ssr.view.value.copy(camera.matrixWorldInverse);
+      ssr.proj.value.copy(camera.projectionMatrix);
+      ssr.tex.value = keep.texture;
+      ssr.on.value = SSR.on ? 1 : 0;
+    }
+  }
+  const glow = new ShaderPass(GlowShader);
+  const glowVP = new THREE.Matrix4();
+  const baseRender = glow.render.bind(glow);
+  glow.render = (...args) => {
+    // how much the air scatters goes with how thick tonight's fog is (scene.fog is a FogExp2)
+    const fogK = scene.fog ? scene.fog.density / 0.0068 : 0;
+    glow.uniforms.amount.value = GLOW.value * fogK;
+    camera.updateMatrixWorld();
+    glow.uniforms.invViewProj.value.copy(glowVP.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)).invert();
+    glow.uniforms.camPos.value.setFromMatrixPosition(camera.matrixWorld);
+    baseRender(...args);
+  };
+  glow.uniforms.tDepth.value = ao.beautyRenderTarget.depthTexture;
+  composer.addPass(glow);
+  // (after the glow, so the halos and light cones are in the copy the puddles mirror)
+  composer.addPass(new KeepPass());
+  const bloom =new UnrealBloomPass(new THREE.Vector2(size.x / 2, size.y / 2), 0.42, 0.5, 0.86);
   composer.addPass(bloom);
   const grade = new ShaderPass(GradeShader);
   grade.uniforms.near.value = camera.near;
@@ -154,6 +266,7 @@ export function createPost(renderer, scene, camera) {
     grade.uniforms.texel.value.set(1 / t.width, 1 / t.height);
     // the AO pass swaps its targets when resized
     grade.uniforms.tDepth.value = ao.beautyRenderTarget.depthTexture;
+    glow.uniforms.tDepth.value = ao.beautyRenderTarget.depthTexture;
   };
   texel();
   return {
@@ -162,10 +275,13 @@ export function createPost(renderer, scene, camera) {
     grade: grade.uniforms,
     setPixelRatio(r) {
       composer.setPixelRatio(r);
+      const sz = renderer.getSize(new THREE.Vector2());
+      keep.setSize(Math.max(1, (sz.x * r) >> 1), Math.max(1, (sz.y * r) >> 1));
       texel();
     },
     setSize(w, h) {
       composer.setSize(w, h);
+      keep.setSize(Math.max(1, (w * renderer.getPixelRatio()) >> 1), Math.max(1, (h * renderer.getPixelRatio()) >> 1));
       bloom.resolution.set(w / 2, h / 2);
       texel();
     },
