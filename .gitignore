@@ -4,3 +4,4 @@ assets-src
 .DS_Store
 *.log
 .claude
+__pycache__/

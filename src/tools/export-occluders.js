@@ -18,7 +18,8 @@ export async function exportOccluders(client, postTo) {
   for (const c of client.chars?.values() || []) skipRoots.add(c.char.root);
   for (const p of client.lootView?.pools?.values() || []) skipRoots.add(p.mesh);
   const skipped = (o) => {
-    for (let p = o; p; p = p.parent) if (skipRoots.has(p) || p.name === 'ground' || p.name === 'wilds') return true;
+    // (the Free Fall's seat ring climbs and drops: it would leave a shadow at whatever height it was caught)
+    for (let p = o; p; p = p.parent) if (skipRoots.has(p) || ['ground', 'wilds', 'kit_freefall_seats'].includes(p.name)) return true;
     return false;
   };
   const solid = (m) => m && !m.transparent && !(m.alphaTest > 0) && m.depthWrite !== false && (m.isMeshStandardMaterial || m.isMeshPhysicalMaterial || m.isMeshLambertMaterial || m.isMeshPhongMaterial);

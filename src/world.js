@@ -524,6 +524,12 @@ export function buildWorld(scene) {
   buildKit(Builder, (key) => !!MATS[key] || key.startsWith('#')).then((kit) => {
     scene.remove(outside);
     outside.traverse((o) => o.geometry?.dispose());
+    // the coaster's plain track (rides.js) gives way to the kit's
+    const stand = scene.getObjectByName('coasterStandIn');
+    if (stand) {
+      scene.remove(stand);
+      stand.traverse((o) => o.geometry?.dispose());
+    }
     scene.add(kit);
     dressBooths(kit);
   }).catch((e) => console.warn('building kit', e));

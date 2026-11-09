@@ -6,6 +6,7 @@ import { RIDES } from '../shared/items.js';
 import { Builder, mat } from './world.js';
 import { ringTex } from './textures.js';
 import { loadModel, mergeStatic } from './models.js';
+import { kitPart } from './kit.js';
 
 /** Copy a geometry with plain float attributes (compressed int16 ones clamp when transformed). */
 function floatGeo(src) {
@@ -109,6 +110,7 @@ export class Rides {
     this.upgradeTrain().catch((e) => console.warn('coaster car model', e));
     this.upgradeCarousel().catch((e) => console.warn('carousel model', e));
     this.upgradeCars().catch((e) => console.warn('dodgem model', e));
+    this.upgradeFreefall().catch((e) => console.warn('free fall seats', e));
   }
 
   /**
@@ -382,19 +384,23 @@ export class Rides {
       left.push(new THREE.Vector3(a[0] + rx * 0.55, a[1] + 0.2, a[2] + rz * 0.55));
       right.push(new THREE.Vector3(a[0] - rx * 0.55, a[1] + 0.2, a[2] - rz * 0.55));
     }
+    // plain stand-ins for the track and supports until the Blender model (kit_coaster, via kit.js) is in
+    const stand = new THREE.Group();
+    stand.name = 'coasterStandIn';
+    if (!this.scene.getObjectByName('kit')) this.scene.add(stand);
     const railMat = m('iron');
     for (const side of [left, right]) {
       const curve = new THREE.CatmullRomCurve3(side, true);
       const rail = new THREE.Mesh(new THREE.TubeGeometry(curve, n * 2, 0.09, 6, true), railMat);
       rail.castShadow = true;
-      this.scene.add(rail);
+      stand.add(rail);
     }
     const spine = new THREE.Mesh(
       new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map((p) => new THREE.Vector3(p[0], p[1] - 0.15, p[2])), true), n * 2, 0.22, 6, true),
       m('#e2384f'),
     );
     spine.castShadow = true;
-    this.scene.add(spine);
+    stand.add(spine);
     // ties
     const ties = new THREE.InstancedMesh(new THREE.BoxGeometry(1.4, 0.1, 0.22), m('woodDark'), Math.ceil(TRACK.len));
     const o = new THREE.Object3D();
@@ -408,14 +414,14 @@ export class Rides {
     }
     ties.count = k;
     ties.castShadow = true;
-    this.scene.add(ties);
+    stand.add(ties);
     // supports
     const B = new Builder();
     for (const s of TRACK_SUPPORTS) {
       B.cyl('#3a2a4a', { x: s.x, z: s.z }, 0, s.h / 2, 0, 0.18, 0.3, s.h, 6);
       B.cyl('concrete', { x: s.x, z: s.z }, 0, 0.2, 0, 0.5, 0.6, 0.4, 8);
     }
-    B.build(this.scene);
+    B.build(stand);
     // train
     this.train = [];
     for (let i = 0; i < 4; i++) {
@@ -495,12 +501,25 @@ export class Rides {
   }
 
   buildFreefall() {
+    // the seat ring climbs and drops the tower; a plain ring stands in until the Blender seats have loaded
+    this.freefallSeat = new THREE.Group();
+    this.freefallSeat.position.set(FREEFALL.x, 40, FREEFALL.z);
     const ring = new THREE.Mesh(new THREE.TorusGeometry(2.8, 0.45, 8, 24), m('#e2384f'));
     ring.rotation.x = Math.PI / 2;
-    ring.position.set(FREEFALL.x, 40, FREEFALL.z);
     ring.castShadow = true;
-    this.scene.add(ring);
-    this.freefallSeat = ring;
+    this.freefallSeat.add(ring);
+    this.scene.add(this.freefallSeat);
+  }
+
+  /** Twelve outward-facing seats with shoulder harnesses round a red ring (scripts/blender/build-rides.py). */
+  async upgradeFreefall() {
+    const seats = await kitPart(Builder, 'freefall_seats');
+    const g = this.freefallSeat;
+    for (const ch of [...g.children]) {
+      g.remove(ch);
+      ch.geometry?.dispose();
+    }
+    g.add(seats);
   }
 
   buildHazards() {

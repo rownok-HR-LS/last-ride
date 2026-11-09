@@ -10,33 +10,36 @@ import { BUILDINGS, PROPS } from '../shared/map.js';
 
 const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 
+/** Hand every mesh of a loaded kit part to Builder B, placed at P (materials renamed by remap). */
+function placeInto(B, gltf, P, remap, hasMaterial) {
+  gltf.scene.updateMatrixWorld(true);
+  gltf.scene.traverse((o) => {
+    if (!o.isMesh) return;
+    const raw = o.material?.name || '';
+    const name = remap[raw] || raw;
+    const key = hasMaterial(name) ? name : 'plinth';
+    // compressed (quantised) attributes clamp when transformed: unpack them to plain floats first
+    const g = new THREE.BufferGeometry();
+    for (const [n, a] of Object.entries(o.geometry.attributes)) {
+      if (n !== 'position' && n !== 'normal') continue;
+      const arr = new Float32Array(a.count * 3);
+      for (let i = 0; i < a.count; i++) {
+        arr[i * 3] = a.getX(i);
+        arr[i * 3 + 1] = a.getY(i);
+        arr[i * 3 + 2] = a.getZ(i);
+      }
+      g.setAttribute(n, new THREE.BufferAttribute(arr, 3));
+    }
+    if (o.geometry.index) g.setIndex(Array.from(o.geometry.index.array));
+    g.applyMatrix4(o.matrixWorld);
+    B.add(key, g, P);
+  });
+}
+
 /** Load the kit and hand each placed part to a fresh Builder; resolves to the built group. */
 export async function buildKit(Builder, hasMaterial) {
   const B = new Builder();
-  const place = (gltf, P, remap = {}) => {
-    gltf.scene.updateMatrixWorld(true);
-    gltf.scene.traverse((o) => {
-      if (!o.isMesh) return;
-      const raw = o.material?.name || '';
-      const name = remap[raw] || raw;
-      const key = hasMaterial(name) ? name : 'plinth';
-      // compressed (quantised) attributes clamp when transformed: unpack them to plain floats first
-      const g = new THREE.BufferGeometry();
-      for (const [n, a] of Object.entries(o.geometry.attributes)) {
-        if (n !== 'position' && n !== 'normal') continue;
-        const arr = new Float32Array(a.count * 3);
-        for (let i = 0; i < a.count; i++) {
-          arr[i * 3] = a.getX(i);
-          arr[i * 3 + 1] = a.getY(i);
-          arr[i * 3 + 2] = a.getZ(i);
-        }
-        g.setAttribute(n, new THREE.BufferAttribute(arr, 3));
-      }
-      if (o.geometry.index) g.setIndex(Array.from(o.geometry.index.array));
-      g.applyMatrix4(o.matrixWorld);
-      B.add(key, g, P);
-    });
-  };
+  const place = (gltf, P, remap = {}) => placeInto(B, gltf, P, remap, hasMaterial);
   const load = (name) => loader.loadAsync(`./models/kit/kit_${name}.glb`);
   const jobs = [];
   for (const b of BUILDINGS) jobs.push(load(b.style).then((g) => place(g, { x: b.cx, z: b.cz, rot: 0 })));
@@ -68,6 +71,12 @@ export async function buildKit(Builder, hasMaterial) {
   if (kiosks.length) jobs.push(load('kiosk').then((g) => kiosks.forEach((p) => place(g, { x: p.x, z: p.z, rot: p.rot || 0 }))));
   const towers = PROPS.filter((p) => p.type === 'watertower');
   if (towers.length) jobs.push(load('watertower').then((g) => towers.forEach((p) => place(g, { x: p.x, z: p.z, rot: 0 }))));
+  // the rides' fixed parts (scripts/blender/build-rides.py): the Free Fall tower, the coaster's track and supports
+  // (already in park coordinates), its station, the Ferris wheel's control booth, the bumper-car pavilion
+  for (const type of ['freefall', 'station', 'control', 'arena']) {
+    for (const p of PROPS.filter((q) => q.type === type)) jobs.push(load(type).then((g) => place(g, { x: p.x, z: p.z, rot: p.rot || 0 })));
+  }
+  if (PROPS.some((p) => p.type === 'track')) jobs.push(load('coaster').then((g) => place(g, { x: 0, z: 0, rot: 0 })));
   await Promise.all(jobs);
   const group = new THREE.Group();
   group.name = 'kit';
@@ -81,9 +90,25 @@ export function boothVariant(p, i) {
   return p.prize ? 'prize' : Object.keys(BOOTH_GAMES)[i % 4];
 }
 
+/**
+ * One kit part as its own group, for parts that move (the Free Fall's seat ring): built like the rest, centred on
+ * the group's origin.
+ */
+export async function kitPart(Builder, name) {
+  const g = await loader.loadAsync(`./models/kit/kit_${name}.glb`);
+  const B = new Builder();
+  placeInto(B, g, { x: 0, z: 0, rot: 0 }, {}, () => true);
+  const group = new THREE.Group();
+  group.name = `kit_${name}`;
+  B.build(group);
+  return group;
+}
+
 /** Is this map prop one the kit draws (the walk-in buildings' walls and roofs, the booths, trailers, the gate)? */
 export function kitDraws(p) {
-  if (['trailer', 'arch', 'booth', 'fence', 'cart', 'ticket', 'watertower'].includes(p.type)) return true;
+  if (['trailer', 'arch', 'booth', 'fence', 'cart', 'ticket', 'watertower', 'freefall', 'station', 'control', 'arena'].includes(p.type)) {
+    return true;
+  }
   if (p.type !== 'wall' && p.type !== 'roof') return false;
   return BUILDINGS.some((b) => b.style === p.style && Math.abs(p.x - b.cx) <= b.w / 2 + 0.5 && Math.abs(p.z - b.cz) <= b.d / 2 + 0.5);
 }
