@@ -66,6 +66,7 @@ async function title() {
       <div class="t-load"><div class="t-bar"><i></i></div><span class="t-tip"></span></div>
     </div>
     <div class="tm-rider">
+      <div class="tm-pols" role="listbox" aria-label="Riders">${OUTFITS.map((o, i) => `<button class="tm-pol" role="option" data-id="${o.id}" style="--tilt:${((i * 37) % 9) - 4}deg" title="${o.name}"><img src="./riders/${o.id}.webp" alt="${o.name}" decoding="async" /></button>`).join('')}</div>
       <div class="tm-rider-pick">
         <button class="tm-arrow tm-prev" aria-label="Previous rider">‹</button>
         <div><b class="t-rider-name"></b><small class="tm-count"></small></div>
@@ -122,6 +123,7 @@ async function title() {
     riderName.textContent = o.name;
     riderBlurb.textContent = o.blurb;
     el.querySelector('.tm-count').textContent = `${i + 1} / ${OUTFITS.length}`;
+    el.querySelectorAll('.tm-pol').forEach((b) => b.classList.toggle('on', b.dataset.id === o.id));
     // a rider still loading in the background shows as soon as it is in
     if (ridersReady) {
       const id = profile.outfit;
@@ -134,6 +136,10 @@ async function title() {
     showRider();
   };
   el.querySelector('.tm-prev').addEventListener('click', () => turn(-1));
+  el.querySelectorAll('.tm-pol').forEach((b) => b.addEventListener('click', () => {
+    profile.outfit = b.dataset.id;
+    showRider();
+  }));
   el.querySelector('.tm-next').addEventListener('click', () => turn(1));
   addEventListener('keydown', (e) => {
     if (!el.isConnected || e.target === nick || layer.classList.contains('show')) return;

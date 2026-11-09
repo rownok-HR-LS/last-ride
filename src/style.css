@@ -1099,3 +1099,17 @@ body.pad .slot kbd, body.pad .item kbd:empty, body.pad .power kbd:empty { displa
 .stub-place small { font: 700 11px/1.2 var(--hud); letter-spacing: 0.2em; color: #a9a092; }
 .stub-stats { font: 400 14px var(--ui); color: #cfc7b9; }
 .stub-stats b { font: 700 20px var(--hud); color: #f1ece2; }
+
+/* the riders as missing-person polaroids (public/riders, made from the game's own renders) */
+.tm-pols { display: flex; gap: 3px; margin: 0 0 14px; padding: 10px 6px 4px; max-width: min(640px, 90vw); overflow-x: auto; scrollbar-width: none; }
+.tm-pols::-webkit-scrollbar { display: none; }
+.tm-pol { flex: 0 0 auto; width: 29px; padding: 0; border: 0; background: none; cursor: pointer; opacity: 0.55;
+  transform: rotate(var(--tilt)); transition: transform 0.18s ease, opacity 0.18s ease, filter 0.18s ease; filter: grayscale(0.5) drop-shadow(0 2px 3px rgba(0,0,0,0.6)); }
+.tm-pol img { display: block; width: 100%; height: auto; border-radius: 1px; }
+.tm-pol:hover { opacity: 0.9; filter: grayscale(0) drop-shadow(0 3px 5px rgba(0,0,0,0.7)); }
+.tm-pol.on { opacity: 1; filter: grayscale(0) drop-shadow(0 4px 8px rgba(0,0,0,0.8)); transform: rotate(0deg) translateY(-6px) scale(1.28); z-index: 1; }
+.tm-pol:focus-visible { outline: 2px solid #f2c53a; outline-offset: 2px; }
+.end-sign .end-pol { position: absolute; top: 18px; right: 22px; width: 92px; transform: rotate(5deg); filter: drop-shadow(0 4px 8px rgba(0,0,0,0.6)); }
+@media (max-width: 760px) { .end-sign .end-pol { width: 64px; top: 10px; right: 10px; } }
+/* phones and short screens keep the arrows only: no room for the strip between the logo and the panel */
+@media (max-width: 760px), (max-height: 520px) { .tm-pols { display: none; } }

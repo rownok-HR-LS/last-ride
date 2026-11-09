@@ -648,6 +648,8 @@ export class Hud {
     const win = st[0];
     const mine = st.find((s) => s.id === snap.me?.id);
     const meWon = win && mine && win.id === mine.id;
+    const winOutfit = win && snap.players?.find((p) => p.id === win.id)?.outfit;
+    const winPol = winOutfit ? `<img class="end-pol" src="./riders/${winOutfit}.webp" alt="" />` : '';
     const clock = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
     const rows = st.slice(0, 10)
       .map((s) => `<tr class="${s.id === mine?.id ? 'me' : ''}"><td>${s.place}</td><td>${esc(s.name)}</td><td>${s.kills}</td><td>${s.ghostKills}</td><td>${s.revives}</td><td>${clock(s.alive)}</td></tr>`)
@@ -664,6 +666,7 @@ export class Hud {
     el.innerHTML = `<div class="sign end-sign">
       <div class="bulbs"></div>
       <div class="end-kicker">${meWon ? 'Midnight Wonderland Tours' : 'The last bus has left'}</div>
+      ${winPol}
       <h2>${meWon ? 'You rode the last bus out' : `${esc(win ? win.name : 'Nobody')} rode it out`}</h2>
       ${stub}
       ${earned ? xpPanel(earned) : ''}
