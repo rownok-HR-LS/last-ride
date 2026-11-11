@@ -12,6 +12,7 @@ import { buildWorld, buildSky, groundRain, SKY_SCALE } from './world.js';
 import { Rain, sheltered } from './rain.js';
 import { Rides } from './rides.js';
 import { Character, Corpse, nameTag, setCharacterRim } from './characters.js';
+import { loadRagdolls, stepRagdolls } from './ragdoll.js';
 import { FX } from './fx.js';
 import { LootView } from './loot.js';
 import { Hud } from './hud.js';
@@ -110,6 +111,48 @@ function blowWind(dt, target) {
 }
 
 export class Client {
+  /**
+   * How a dying rider falls (Corpse/ragdoll): from the pose their character is in, carrying on how they moved,
+   * thrown away from whoever killed them, hardest by a bumper car, a blast or a flung gondola.
+   */
+  deathFall(e, v) {
+    const c = this.chars.get(e.victim);
+    if (!c?.char || !c.char.root.visible) return null;
+    const killer = e.killer != null && e.killer !== e.victim ? this.game.players.get(e.killer) : null;
+    let dx = 0;
+    let dz = 0;
+    if (killer) {
+      dx = c.char.root.position.x - killer.x;
+      dz = c.char.root.position.z - killer.z;
+      const d = Math.hypot(dx, dz) || 1;
+      dx /= d;
+      dz /= d;
+    }
+    const how = String(e.how || '');
+    const type = WEAPONS[how]?.type;
+    const [h, up] = how === 'car' ? [8, 4] : how === 'coaster' ? [9, 4] : how === 'gondola' || how === 'fling' ? [5, 3]
+      : /rocket|grenade|firework|launcher|blast|bomb|mortar|cannon/i.test(how) ? [7, 5]
+        : how === 'fists' || type === 'melee' ? [3.5, 1.2] : type ? [2.2, 0.4] : [1, 0.5];
+    const vel = c.vel || [0, 0, 0];
+    return { from: c.char, push: { x: dx * h, y: up, z: dz * h }, vel: { x: vel[0], y: Math.max(vel[1], -4), z: vel[2] } };
+  }
+
+  /** The living riders and moving bumper cars near loose bodies, for shoving them about. */
+  bodyPushers(snap, dt) {
+    const riders = [];
+    for (const p of snap.players || []) if (p.state === 'alive') riders.push(p);
+    const prev = (this.carPrev ||= []);
+    const cars = (snap.cars || []).map((c, i) => {
+      const pp = prev[i];
+      const v = pp && dt > 0 ? { vx: (c.x - pp.x) / dt, vz: (c.z - pp.z) / dt } : { vx: 0, vz: 0 };
+      prev[i] = { x: c.x, z: c.z };
+      // (a car that jumped across the arena between frames isn't moving that fast)
+      if (Math.hypot(v.vx, v.vz) > 30) v.vx = v.vz = 0;
+      return { x: c.x, y: c.y, z: c.z, ...v };
+    });
+    return { riders, cars };
+  }
+
   /**
    * opts.attract: build the park and show it under the title screen (no match yet); start(profile) begins one.
    */
@@ -224,6 +267,8 @@ export class Client {
     setStage(this.renderer, this.camera, this.scene);
     this.ready = whenCompiled(this.scene).then(() => {
       this.compiled = true;
+      // the physics engine for ragdolls comes in once the menu is up (deaths fall back to animations until then)
+      setTimeout(() => loadRagdolls(), 1500);
     });
     const addNow = this.scene.add.bind(this.scene);
     // still scenery hands its moonlight shadow to one simplified stand-in (src/shadowproxy.js)
@@ -1094,7 +1139,7 @@ export class Client {
           if (v) this.fx.ecto(v.x, v.y - 1.2, v.z, 24);
           if (v && !e.steal) {
             const fx = this.bodyFx.get(v.id) || { wet: 0, blood: 0 };
-            this.corpses.push(new Corpse(v.outfit, v.x, v.y - 1.2, v.z, v.yaw, this.scene, { seed: v.id, ...fx, wear: v.look }));
+            this.corpses.push(new Corpse(v.outfit, v.x, v.y - 1.2, v.z, v.yaw, this.scene, { seed: v.id, ...fx, wear: v.look }, this.deathFall(e, v)));
             // a pool spreads out under the body
             this.fx.blood(v.x, v.y - 1.2, v.z, 1.9 + Math.random() * 0.6, 0.35);
           }
@@ -1402,7 +1447,10 @@ export class Client {
     if (!me || me.state !== 'ghost' || me.possess) this.power = null;
 
     this.updateCharacters(snap, dt);
-    this.corpses = this.corpses.filter((c) => c.update(dt));
+    // loose bodies can be shoved by riders walking into them and by bumper cars
+    const near = this.corpses.length ? this.bodyPushers(snap, dt) : null;
+    this.corpses = this.corpses.filter((c) => c.update(dt, near));
+    stepRagdolls(dt);
     this.rides.update(snap, dt, this.time);
     this.fx.update(dt, this.time, snap.zone);
     this.lootView.update(this.time, this.camera.position, this.intro.active, this.camera.getWorldDirection(this.lootDir ??= new THREE.Vector3()));
@@ -1570,6 +1618,8 @@ export class Client {
         });
       }
       ch.root.position.set(p.x, p.y, p.z);
+      // how they're moving, so a death carries it on (ragdolls)
+      if (p.state === 'alive') c.vel = [p.vx || 0, p.vy || 0, p.vz || 0];
       let ghostOpacity = 1;
       if (p.state === 'ghost') {
         // survivors only catch a faint shimmer, brighter for a moment after a ghost uses a power

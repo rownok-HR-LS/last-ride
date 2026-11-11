@@ -6,6 +6,7 @@ import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.j
 import { ktx2 } from './ktx.js';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { Ragdoll, ragdollReady } from './ragdoll.js';
 import { WEAPONS, FISTS } from '../shared/items.js';
 import { weaponModel, GRIP } from './weapons.js';
 import { OUTFITS, PLAYER_HEIGHT } from '../shared/constants.js';
@@ -1465,30 +1466,70 @@ export class Character {
   }
 }
 
-/** A body left behind where a survivor died (when nobody stole it). Plays a death animation, then sinks away. */
+/**
+ * A body left behind where a survivor died (when nobody stole it). It goes limp from the pose they died in, thrown
+ * the way the blow sent them (src/ragdoll.js), and can be kicked about; if the physics engine isn't in (or too many
+ * bodies are loose) it plays a death animation instead. Then it sinks away.
+ */
 const DEAD = { state: 'dead' };
 
 export class Corpse {
-  /** look: { seed, wet, blood, wear } of the rider who fell, so the body keeps their clothes, dye, dirt and blood. */
-  constructor(outfit, x, y, z, yaw, scene, look = null) {
+  /**
+   * look: { seed, wet, blood, wear } of the rider who fell, so the body keeps their clothes, dye, dirt and blood.
+   * fall: { from (the living Character), push, vel } to go limp from where they stood.
+   */
+  constructor(outfit, x, y, z, yaw, scene, look = null, fall = null) {
     this.char = new Character(outfit, look?.seed);
     if (look) this.char.setLook(look.wet, Math.min(1, look.blood + 0.25));
     if (look?.wear) this.char.wear(look.wear);
     this.char.root.position.set(x, y, z);
     this.char.root.rotation.y = yaw;
-    const deaths = ['death_from_the_front', 'death_from_the_back', 'death_from_front_headshot', 'death_kneel', 'death_twist'].filter((d) => this.char.clips[d]);
-    this.char.play(deaths[Math.floor(Math.random() * deaths.length)], 0, { once: true });
     this.t = 0;
     this.scene = scene;
     scene.add(this.char.root);
+    this.rag = null;
+    if (fall?.from && ragdollReady()) {
+      try {
+        // the pose they were in when it happened
+        const from = fall.from;
+        this.char.root.position.copy(from.root.position);
+        this.char.root.quaternion.copy(from.root.quaternion);
+        for (const [name, bone] of Object.entries(this.char.bones)) {
+          const src = from.bones[name];
+          if (!src) continue;
+          bone.position.copy(src.position);
+          bone.quaternion.copy(src.quaternion);
+        }
+        this.char.root.updateMatrixWorld(true);
+        this.rag = new Ragdoll(this.char, fall.push, fall.vel);
+      } catch (e) {
+        console.warn('ragdoll', e);
+        this.rag = null;
+      }
+    }
+    if (!this.rag) {
+      const deaths = ['death_from_the_front', 'death_from_the_back', 'death_from_front_headshot', 'death_kneel', 'death_twist'].filter((d) => this.char.clips[d]);
+      this.char.play(deaths[Math.floor(Math.random() * deaths.length)], 0, { once: true });
+    }
   }
 
-  update(dt) {
+  /** near: { riders, cars } that can shove a loose body about. */
+  update(dt, near = null) {
     this.t += dt;
-    this.char.mixer.update(dt);
+    if (this.rag) {
+      if (this.t < 9) {
+        if (near) this.rag.kick(near.riders, near.cars);
+      } else {
+        // it settles where it lies, then sinks like the rest
+        this.rag.dispose();
+        this.rag = null;
+        this.settled = true;
+      }
+    } else if (!this.settled) this.char.mixer.update(dt);
     this.char.face(DEAD, dt, this.t, false);
     if (this.t > 9) this.char.root.position.y -= dt * 0.3;
     if (this.t > 13) {
+      this.rag?.dispose();
       this.scene.remove(this.char.root);
       this.char.dispose();
       return false;
