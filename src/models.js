@@ -46,19 +46,24 @@ export function loadModel(name) {
   if (!cache.has(name)) {
     cache.set(name, loader.loadAsync(`./models/env/${name}.glb`).then((g) => {
       g.scene.updateMatrixWorld(true);
+      // each material by its name in the file, as finally used (broken pieces are painted with these)
+      const byName = (g.scene.userData.mats = {});
       g.scene.traverse((o) => {
         if (!o.isMesh) return;
         o.castShadow = true;
         o.receiveShadow = true;
+        const raw = Array.isArray(o.material) ? null : o.material.name;
         // parts the Blender scripts name 'tex:<key>' take the world's own material (its photo textures, rain and
         // lamp light), with texture coordinates projected at real scale
         const own = !Array.isArray(o.material) && o.material.name.startsWith('tex:') && worldMaterial(o.material.name.slice(4).replace(/\.\d+$/, ''));
         if (own) {
           boxUV(o, own.world || 2);
           o.material = own.mat;
+          byName[raw] = { mat: own.mat, uvWorld: own.world || 2 };
           return;
         }
         const mats = Array.isArray(o.material) ? o.material : [o.material];
+        for (const m of mats) byName[m.name] ??= { mat: m };
         for (const m of mats) {
           // old, damp and dirty: nothing shiny
           m.roughness = Math.max(m.roughness ?? 0.8, 0.55);
@@ -237,10 +242,15 @@ export async function placeModels(parent, name, list) {
   // the police tape's runs flutter between their stakes (src/motion.js)
   if (file === 'police_tape') await tieTape(src).catch((e) => console.warn('tape motion', e));
   const mats = list.map((o) => fitMatrix(src, o, keep));
+  // props that break: which copy is which, and where it stands (for its pieces)
+  const ids = list.some((o) => o.brk != null) ? Int32Array.from(list, (o) => o.brk ?? -1) : null;
+  if (ids) list.forEach((o, i) => o.brk != null && BREAK_PLACES.set(o.brk, { file, matrix: mats[i] }));
   const lod = !part && FAR_MODELS[file];
   const near = instance(parent, src, mats, keep);
   for (const [mesh, max] of near) {
-    cullable(mesh, max, 25);
+    // (they keep their own shadow, which goes when they break: src/shadowproxy.js leaves them out)
+    if (ids) mesh.userData.moves = true;
+    cullable(mesh, max, 25, 0, ids);
     if (lod) lodLimit(mesh, lod);
   }
   if (!lod) return;
@@ -250,5 +260,56 @@ export async function placeModels(parent, name, list) {
     for (const [mesh] of near) lodLimit(mesh, Infinity);
     return;
   }
-  for (const [mesh, max] of instance(parent, far, mats, () => true)) cullable(mesh, max, 0, lod);
+  for (const [mesh, max] of instance(parent, far, mats, () => true)) {
+    if (ids) mesh.userData.moves = true;
+    cullable(mesh, max, 0, lod, ids);
+  }
+}
+
+/** Where each breakable prop stands: id -> { file, matrix } (the placement matrix of its model). */
+export const BREAK_PLACES = new Map();
+
+const pieceCache = new Map();
+/**
+ * A prop's broken pieces (scripts/fracture-props.mjs), painted with the whole prop's own materials and the cut faces
+ * with its inside colour: [{ center (model space), parts: [{ geometry (centred on center), material }] }].
+ */
+export function brokenPieces(file, insideColor) {
+  if (!pieceCache.has(file)) {
+    pieceCache.set(file, Promise.all([loadModel(file), loader.loadAsync(`./models/env/broken/${file}.glb`)]).then(([src, g]) => {
+      const byName = src.userData.mats || {};
+      const fallback = Object.values(byName)[0]?.mat || new THREE.MeshStandardMaterial({ color: '#777' });
+      const inside = new THREE.MeshStandardMaterial({ color: insideColor || '#8a7a60', roughness: 0.92 });
+      wetten(inside);
+      g.scene.updateMatrixWorld(true);
+      const chunks = new Map();
+      g.scene.traverse((o) => {
+        if (!o.isMesh) return;
+        // the chunk is the named node (a mesh with several materials comes in as a group of meshes)
+        let node = o;
+        while (node.parent && node.parent !== g.scene && !/^chunk_/.test(node.name)) node = node.parent;
+        if (!chunks.has(node)) chunks.set(node, { center: node.getWorldPosition(new THREE.Vector3()), parts: [] });
+        // plain float positions in the model's space (packed ones clamp if transformed)
+        const geo = new THREE.BufferGeometry();
+        for (const n of ['position', 'normal', 'uv']) {
+          const a = o.geometry.attributes[n];
+          if (!a) continue;
+          const k = a.itemSize;
+          const arr = new Float32Array(a.count * k);
+          for (let i = 0; i < a.count; i++) for (let j = 0; j < k; j++) arr[i * k + j] = a.getComponent(i, j);
+          geo.setAttribute(n, new THREE.BufferAttribute(arr, k));
+        }
+        if (o.geometry.index) geo.setIndex(Array.from(o.geometry.index.array));
+        geo.applyMatrix4(o.matrixWorld);
+        const raw = o.material.name;
+        const own = raw === 'inside' ? { mat: inside } : byName[raw] || byName[raw.replace(/.d+$/, '')] || { mat: fallback };
+        if (own.uvWorld) boxUV({ geometry: geo, matrixWorld: new THREE.Matrix4() }, own.uvWorld);
+        chunks.get(node).parts.push({ geometry: geo, material: own.mat });
+      });
+      const out = [...chunks.values()];
+      for (const c of out) for (const p of c.parts) p.geometry.translate(-c.center.x, -c.center.y, -c.center.z);
+      return out;
+    }));
+  }
+  return pieceCache.get(file);
 }

@@ -14,7 +14,7 @@ for (const seed of seeds.length ? seeds : [3, 7, 11]) {
   let i = 0;
   for (; i < 60 * 60 * 15 && g.phase !== 'end'; i++) {
     g.update(dt);
-    for (const e of g.drainEvents()) if (['shove', 'carbump', 'wallhit', 'bump', 'kill', 'possess'].includes(e.e)) count[e.e] = (count[e.e] || 0) + 1;
+    for (const e of g.drainEvents()) if (['shove', 'carbump', 'wallhit', 'bump', 'kill', 'possess', 'prophit', 'propbreak'].includes(e.e)) count[e.e] = (count[e.e] || 0) + 1;
     if (i % 6) continue;
     const alive = [...g.players.values()].filter((p) => p.state === 'alive');
     for (let a = 0; a < alive.length; a++) {

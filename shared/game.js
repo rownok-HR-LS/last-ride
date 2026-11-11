@@ -12,6 +12,7 @@ import {
 } from './items.js';
 import {
   LOOT_SPOTS, CHEST_SPOTS, PRIZE_BOOTHS, FERRIS, STATION, CAR_SPAWNS, TRACK, trackAt, PARK_EDGE, BUS_ROUTE, busAt,
+  BREAKABLES, BREAKABLE_MODELS,
 } from './map.js';
 import { rayWorld, rayPlayer, groundAt, lineOfSight } from './collide.js';
 import { stepWalker, stepGhost, stepCar, wishDir, CAR_RADIUS, bodyContact, carContact, carsCollide } from './physics.js';
@@ -64,6 +65,10 @@ export class Game {
     this.projs = [];
     this.nextProj = 1;
     this.flares = [];
+    // breakable props: their health this ride, and which are broken (their colliders are switched off)
+    this.propHp = BREAKABLES.map((b) => BREAKABLE_MODELS[b.model].hp);
+    this.broken = new Set();
+    for (const b of BREAKABLES) b.col.off = false;
     this.salts = [];
     this.gondolas = [];
     this.ferris = { angle: 0, driver: null };
@@ -526,6 +531,13 @@ export class Game {
   }
 
   blast(x, y, z, radius, dmg, by, how) {
+    for (const b of BREAKABLES) {
+      if (this.broken.has(b.id)) continue;
+      const d = Math.hypot(b.x - x, b.h / 2 - y, b.z - z) - Math.min(b.w, b.d) / 2;
+      if (d > radius) continue;
+      const k = Math.max(d, 0.3);
+      this.hitProp(b.id, dmg * 1.5 * (1 - Math.max(0, d) / radius * 0.5), by, (b.x - x) / k, (b.z - z) / k, 7);
+    }
     for (const q of this.players.values()) {
       if (q.state !== 'alive') continue;
       const d = Math.hypot(q.x - x, q.y + 0.9 - y, q.z - z);
@@ -698,6 +710,22 @@ export class Game {
     hits.sort((a, b) => a.d - b.d);
     let landed = false;
     let parried = false;
+    // props in the arc take the blow too (heavier weapons and swings break them sooner)
+    {
+      const dmg = def.dmg * rar.dmg * (heavy ? def.heavy * (HEAVY.minMul + (1 - HEAVY.minMul) * power) : finisher ? COMBO.finisher : 1);
+      for (const b of BREAKABLES) {
+        if (this.broken.has(b.id)) continue;
+        const dx = b.x - p.x;
+        const dz = b.z - p.z;
+        const d = Math.hypot(dx, dz);
+        const size = Math.min(b.w, b.d) / 2;
+        if (d > def.reach + size + 0.3 || p.y > b.h + 0.5) continue;
+        const cos = d > 0.01 ? (dx * fx + dz * fz) / d : 1;
+        if (cos < Math.cos((d < size + 0.9 ? 80 : Math.max(def.arc, 70) / 2) * DEG)) continue;
+        this.hitProp(b.id, dmg, p, dx / (d || 1), dz / (d || 1), heavy ? 5 : 3);
+        landed = true;
+      }
+    }
     for (const { q, d, dx, dz } of hits.slice(0, 2)) {
       if (q.iframeT > 0) {
         this.events.push({ e: 'dodged', id: q.id, by: p.id });
@@ -860,6 +888,11 @@ export class Game {
   impact(pr, victim, head, w) {
     const owner = this.players.get(pr.owner) || null;
     const at = { x: pr.x, y: pr.y, z: pr.z };
+    // a shot into a breakable prop
+    if (!victim && w?.c?.brk != null && !pr.blast && pr.kind !== 'holy' && pr.kind !== 'flare') {
+      const v = Math.hypot(pr.vx, pr.vz) || 1;
+      this.hitProp(w.c.brk, pr.dmg || 10, owner, pr.vx / v, pr.vz / v, 2.5);
+    }
     if (pr.kind === 'holy') {
       this.splash(at, owner);
       return;
@@ -1599,6 +1632,32 @@ export class Game {
     this.events.push({ e: 'shove', id: to.id, by: by.id, x: to.x, y: to.y + 1, z: to.z });
   }
 
+  /** Damage a breakable prop; it breaks at 0. dx, dz: which way the blow went; force: how hard the pieces fly. */
+  hitProp(id, amount, by, dx, dz, force) {
+    if (this.broken.has(id) || this.phase === 'end') return;
+    this.propHp[id] -= amount;
+    if (this.propHp[id] <= 0) this.breakProp(id, dx, dz, force, by);
+    else {
+      const b = BREAKABLES[id];
+      this.events.push({ e: 'prophit', id, x: b.x, z: b.z });
+    }
+  }
+
+  /** A prop breaks: it stops blocking, the pieces fly (src/debris.js), and some leave something behind. */
+  breakProp(id, dx, dz, force, by = null) {
+    if (this.broken.has(id)) return;
+    const b = BREAKABLES[id];
+    this.broken.add(id);
+    b.col.off = true;
+    this.events.push({ e: 'propbreak', id, x: b.x, z: b.z, dx: +dx.toFixed(2), dz: +dz.toFixed(2), f: +force.toFixed(1), by: by ? by.id : null });
+    if (this.rand() < BREAKABLE_MODELS[b.model].loot) {
+      const roll = this.rand();
+      const item = pick(this.rand, ['bandage', 'bandage', 'soda', 'soda', 'flare', 'salt']);
+      const drop = roll < 0.25 ? { kind: 'tickets', count: 3 + Math.floor(this.rand() * 4) } : { kind: 'item', item, count: ITEMS[item].pickup };
+      this.scatter(b.x, 0, b.z, [drop]);
+    }
+  }
+
   updateRides(dt) {
     const f = this.ferris;
     f.angle += (f.driver ? 0.28 : 0.05) * dt;
@@ -1658,6 +1717,17 @@ export class Game {
           a.bumpAt = this.time;
           this.events.push({ e: 'carbump', x: (a.x + b.x) / 2, z: (a.z + b.z) / 2, hard: Math.min(1, hard / 14) });
         }
+      }
+    }
+    // a bumper car at speed smashes straight through props
+    for (const car of this.cars) {
+      const sp = Math.hypot(car.vx, car.vz);
+      if (sp < 4) continue;
+      for (const b of BREAKABLES) {
+        if (this.broken.has(b.id) || Math.abs(car.y - 0) > 2) continue;
+        const d = Math.hypot(b.x - car.x, b.z - car.z);
+        if (d > CAR_RADIUS + Math.min(b.w, b.d) / 2 + 0.3) continue;
+        this.breakProp(b.id, car.vx / sp, car.vz / sp, sp * 0.8, this.players.get(car.driver) || null);
       }
     }
     // bumper cars ram survivors
@@ -1804,6 +1874,7 @@ export class Game {
       ferris: { angle: this.ferris.angle, driver: this.ferris.driver },
       coaster: { s: this.coaster.s, v: this.coaster.v, running: this.coaster.running, cd: this.coaster.cd },
       cars: this.cars.map((c) => ({ x: c.x, y: c.y, z: c.z, yaw: c.yaw, driver: c.driver, t: c.t })),
+      broken: this.broken.size ? [...this.broken] : null,
       gondolas: this.gondolas.map((g) => ({ from: g.from, to: g.to, u: g.t / g.T })),
       blackouts: this.blackouts.map((b) => ({ x: b.x, z: b.z, r: b.r, t: b.t, dur: b.dur })),
       traps: this.traps

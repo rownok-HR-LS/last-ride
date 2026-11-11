@@ -624,7 +624,7 @@ export function buildWorld(scene) {
   buildBackdrop(scene);
   buildScatter(scene);
   buildMist(scene);
-  for (const d of DECOR) modelSpots.push([d.model, { x: d.x, z: d.z, rot: d.rot, w: d.w, d: d.d }]);
+  for (const d of DECOR) modelSpots.push([d.model, { x: d.x, z: d.z, rot: d.rot, w: d.w, d: d.d, brk: d.brk }]);
   // the memorial's candles throw a warm, unsteady glow on the ground round it
   for (const d of DECOR.filter((o) => o.model === 'memorial')) {
     const mat = new THREE.MeshBasicMaterial({

@@ -26,7 +26,7 @@ export function setCullScale(s) {
  * camera, so nearby things still cast shadows into view. minDist: only drawn beyond this (the far, lighter
  * version of something that has a detailed one up close).
  */
-export function cullable(mesh, maxDist, near = 25, minDist = 0) {
+export function cullable(mesh, maxDist, near = 25, minDist = 0, ids = null) {
   const n = mesh.count;
   if (!n) return;
   const all = mesh.instanceMatrix.array.slice(0, n * 16);
@@ -50,7 +50,18 @@ export function cullable(mesh, maxDist, near = 25, minDist = 0) {
   }
   // draw calls only for what is left; three keeps its whole-batch sphere for its own (coarse) test
   mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-  batches.push({ mesh, all, colors, cx, cy, cz, r, n, maxDist, near, minDist });
+  // breakable props: which prop each copy is (-1: not breakable), and whether it's broken (not drawn)
+  const hid = new Uint8Array(n);
+  batches.push({ mesh, all, colors, cx, cy, cz, r, n, maxDist, near, minDist, ids, hid });
+}
+
+/** Hide (broken) or show again every copy of breakable prop id, in whichever batch it's drawn. */
+export function setPropHidden(id, hidden) {
+  for (const b of batches) {
+    if (!b.ids) continue;
+    for (let i = 0; i < b.n; i++) if (b.ids[i] === id) b.hid[i] = hidden ? 1 : 0;
+  }
+  lastPos.set(1e9, 0, 0);
 }
 
 /** Refit every batch to the camera. Cheap enough to run every few frames; skipped while the view is still. */
@@ -84,7 +95,9 @@ export function cullInstances(camera, force = false) {
     const out = mesh.instanceMatrix.array;
     const outC = colors ? mesh.instanceColor.array : null;
     let k = 0;
+    const hid = b.hid;
     for (let i = 0; i < n; i++) {
+      if (hid && hid[i]) continue;
       const dx = cx[i] - px;
       const dy = cy[i] - py;
       const dz = cz[i] - pz;
@@ -125,7 +138,7 @@ export function cullInstances(camera, force = false) {
 export function restoreAllInstances() {
   for (const b of batches) {
     if (b.merged) {
-      for (let i = 0; i < b.n; i++) b.mesh.setVisibleAt(b.ids[i], true);
+      for (let i = 0; i < b.n; i++) b.mesh.setVisibleAt(b.batchIds[i], true);
       b.shown.fill(1);
       continue;
     }
@@ -143,14 +156,14 @@ export function restoreAllInstances() {
 
 /** One merged batch: whether each copy is drawn, by the same rules as its batch had. */
 function cullMerged(b, px, py, pz) {
-  const { mesh, ids, cx, cy, cz, r, maxD, nearD, minD, lodD, shown, n } = b;
+  const { mesh, batchIds, cx, cy, cz, r, maxD, nearD, minD, lodD, shown, n, hid } = b;
   let any = false;
   for (let i = 0; i < n; i++) {
     const dx = cx[i] - px;
     const dy = cy[i] - py;
     const dz = cz[i] - pz;
     const d2 = dx * dx + dy * dy + dz * dz;
-    let vis = true;
+    let vis = !hid[i];
     const lim = maxD[i] * reach + r[i];
     if (d2 > lim * lim) vis = false;
     else if (minD[i] || lodD[i]) {
@@ -168,7 +181,7 @@ function cullMerged(b, px, py, pz) {
     if (vis) any = true;
     if ((shown[i] === 1) !== vis) {
       shown[i] = vis ? 1 : 0;
-      mesh.setVisibleAt(ids[i], vis);
+      mesh.setVisibleAt(batchIds[i], vis);
     }
   }
   mesh.visible = any;
@@ -220,7 +233,7 @@ export async function mergeBatches(scene, build) {
     bm.sortObjects = false;
     // (the culling below already leaves out what's off screen)
     bm.perObjectFrustumCulled = false;
-    const e = { merged: true, mesh: bm, n: nInst, ids: new Int32Array(nInst), cx: new Float32Array(nInst), cy: new Float32Array(nInst), cz: new Float32Array(nInst), r: new Float32Array(nInst), maxD: new Float32Array(nInst), nearD: new Float32Array(nInst), minD: new Float32Array(nInst), lodD: new Float32Array(nInst), shown: new Uint8Array(nInst).fill(1) };
+    const e = { merged: true, mesh: bm, n: nInst, hid: new Uint8Array(nInst), ids: null, bids: new Int32Array(nInst).fill(-1), batchIds: new Int32Array(nInst), cx: new Float32Array(nInst), cy: new Float32Array(nInst), cz: new Float32Array(nInst), r: new Float32Array(nInst), maxD: new Float32Array(nInst), nearD: new Float32Array(nInst), minD: new Float32Array(nInst), lodD: new Float32Array(nInst), shown: new Uint8Array(nInst).fill(1) };
     let k = 0;
     for (const b of list) {
       const gid = bm.addGeometry(b.mesh.geometry);
@@ -228,7 +241,9 @@ export async function mergeBatches(scene, build) {
         const id = bm.addInstance(gid);
         bm.setMatrixAt(id, m.fromArray(b.all, i * 16));
         if (b.colors) bm.setColorAt(id, col.fromArray(b.colors, i * 3));
-        e.ids[k] = id;
+        e.batchIds[k] = id;
+        if (b.ids) e.bids[k] = b.ids[i];
+        e.hid[k] = b.hid[i];
         e.cx[k] = b.cx[i];
         e.cy[k] = b.cy[i];
         e.cz[k] = b.cz[i];
@@ -250,6 +265,7 @@ export async function mergeBatches(scene, build) {
       const i = batches.indexOf(b);
       if (i >= 0) batches.splice(i, 1);
     }
+    e.ids = e.bids.some((v) => v >= 0) ? e.bids : null;
     batches.push(e);
     saved += list.length - 1;
   }

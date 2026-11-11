@@ -14,6 +14,31 @@ export const LOOT_SPOTS = [];
 export const CHEST_SPOTS = [];
 /** Set dressing drawn with real models (benches, vending machines, kiddie rides, junk). Each one collides. */
 export const DECOR = [];
+/**
+ * Props that break (src/debris.js shows the pieces): hp, the chance a broken one leaves something behind, how many
+ * chunks Blender cuts it into (scripts/fracture-props.mjs) and the colour of its insides.
+ */
+export const BREAKABLE_MODELS = {
+  crates_barrels: { hp: 45, loot: 0.55, chunks: 12, inside: '#b08a5a' },
+  boxes: { hp: 30, loot: 0.5, chunks: 10, inside: '#9a7a52' },
+  trash_bags: { hp: 18, loot: 0.15, chunks: 8, inside: '#2a2a26' },
+  ice_freezer: { hp: 70, loot: 0.35, chunks: 9, inside: '#d8dcd8' },
+  vending_news: { hp: 55, loot: 0.25, chunks: 8, inside: '#5a5e62' },
+  vending_coffee: { hp: 65, loot: 0.35, chunks: 9, inside: '#4a4e52' },
+  street_fences: { hp: 50, loot: 0, chunks: 10, inside: '#8a8a86' },
+  barricade: { hp: 40, loot: 0, chunks: 7, inside: '#b89a6a' },
+  missing_board: { hp: 40, loot: 0, chunks: 8, inside: '#a88a5c' },
+  tour_board: { hp: 30, loot: 0, chunks: 6, inside: '#a88a5c' },
+};
+/** Every breakable prop: { id, model, x, z, rot, w, d, h, col } (col: its collider, switched off once broken). */
+export const BREAKABLES = [];
+function breakable(entry) {
+  if (!BREAKABLE_MODELS[entry.model]) return;
+  const col = COLLIDERS[COLLIDERS.length - 1];
+  entry.brk = BREAKABLES.length;
+  col.brk = entry.brk;
+  BREAKABLES.push({ id: entry.brk, model: entry.model, x: entry.x, z: entry.z, rot: entry.rot || 0, w: entry.w, d: entry.d, h: entry.h, col });
+}
 /** Walk-in buildings ({ cx, cz, w, d, h, style, doors }), so the client can dress their outsides. */
 export const BUILDINGS = [];
 /** Prize counters: spend tickets here (x, z = booth centre). */
@@ -175,8 +200,10 @@ const DECOR_SIZE = {
 export const LANDMARKS_OUT = [];
 function decor(model, x, z, rot) {
   const [w, d, h] = DECOR_SIZE[model];
-  DECOR.push({ model, x, z, rot, w, d, h });
+  const entry = { model, x, z, rot, w, d, h };
+  DECOR.push(entry);
   addBox(x, z, w, d, 0, h, rot);
+  breakable(entry);
 }
 
 function crate(x, z, s, h, rot = 0) {
@@ -688,11 +715,13 @@ function storyProps() {
   };
   const place = (model, x, z, rot) => {
     const [w, d, solid] = SIZE[model];
-    DECOR.push({ model, x, z, rot, w, d, h: solid ? solid[4] : 0.5 });
+    const entry = { model, x, z, rot, w, d, h: solid ? solid[4] : 0.5 };
+    DECOR.push(entry);
     if (!solid) return;
     const [lx, lz, cw, cd, h] = solid;
     const [ox, oz] = rotXZ(lx, lz, rot);
     addBox(x + ox, z + oz, cw, cd, 0, h, rot);
+    breakable(entry);
   };
   const free = (x, z, r) => clearance(x, z, r) > 0.3 && !inKeepout(x, z) && !nearTrack(x, z, r + 1)
     && !CHEST_SPOTS.some((c) => Math.hypot(c.x - x, c.z - z) < r + 2);

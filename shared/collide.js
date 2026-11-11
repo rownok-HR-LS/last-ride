@@ -29,7 +29,8 @@ export function nearby(x, z, r) {
   for (let i = cellOf(x - r); i <= cellOf(x + r); i++) {
     for (let j = cellOf(z - r); j <= cellOf(z + r); j++) {
       for (const c of grid[j * N + i]) {
-        if (c.stamp === stamp) continue;
+        // (a broken prop no longer blocks anything)
+        if (c.stamp === stamp || c.off) continue;
         c.stamp = stamp;
         scratch.push(c);
       }
@@ -217,10 +218,13 @@ export function rayWorld(ox, oy, oz, dx, dy, dz, maxT = 300) {
   for (let guard = 0; guard < N * 2 + 2; guard++) {
     if (ix < 0 || iz < 0 || ix >= N || iz >= N) break;
     for (const c of grid[iz * N + ix]) {
-      if (c.stamp === stamp) continue;
+      if (c.stamp === stamp || c.off) continue;
       c.stamp = stamp;
       const h = rayCollider(c, ox, oy, oz, dx, dy, dz, best ? best.t : maxT);
-      if (h && (!best || h.t < best.t)) best = h;
+      if (h && (!best || h.t < best.t)) {
+        best = h;
+        best.c = c;
+      }
     }
     if (best && best.t <= tCell) break;
     if (tx < tz) {

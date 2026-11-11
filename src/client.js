@@ -7,7 +7,8 @@ import { MAX_PLAYERS, OUTFITS } from '../shared/constants.js';
 import {
   WEAPONS, WEAPON_IDS, FISTS, POWERS, RIDES, HEAVY, RARITIES, PRIZES,
 } from '../shared/items.js';
-import { FERRIS, REGIONS, trackAt, pathDistance, PARK_EDGE } from '../shared/map.js';
+import { FERRIS, REGIONS, trackAt, pathDistance, PARK_EDGE, BREAKABLES } from '../shared/map.js';
+import { shatter, stepDebris, debrisCount } from './debris.js';
 import { buildWorld, buildSky, groundRain, SKY_SCALE } from './world.js';
 import { Rain, sheltered } from './rain.js';
 import { Rides } from './rides.js';
@@ -21,7 +22,7 @@ import { createPost, SSR } from './post.js';
 import { ringTex } from './textures.js';
 import { Guide } from './guide.js';
 import { Intro } from './intro.js';
-import { cullInstances, setCullScale, mergeBatches } from './cull.js';
+import { cullInstances, setCullScale, mergeBatches, setPropHidden } from './cull.js';
 import { freed } from './ktx.js';
 import { setStage, whenCompiled, needsCompile, watchAdds } from './stage.js';
 import { ShadowProxy } from './shadowproxy.js';
@@ -115,6 +116,28 @@ export class Client {
    * How a dying rider falls (Corpse/ragdoll): from the pose their character is in, carrying on how they moved,
    * thrown away from whoever killed them, hardest by a bumper car, a blast or a flung gondola.
    */
+  /** Show a prop as broken (hidden, not blocking) or whole again. */
+  syncProp(id, broken) {
+    this.brokenProps ||= new Set();
+    if (broken === this.brokenProps.has(id)) return;
+    if (broken) this.brokenProps.add(id);
+    else this.brokenProps.delete(id);
+    setPropHidden(id, broken);
+    // (online, the prediction walks through what the server says is broken)
+    BREAKABLES[id].col.off = broken;
+  }
+
+  /** Match the props to the ride's list of broken ones (a new ride starts with everything whole again). */
+  syncBroken(snap) {
+    const now = snap.broken || [];
+    const key = now.length ? now.join(',') : '';
+    if (key === this.brokenKey) return;
+    this.brokenKey = key;
+    const set = new Set(now);
+    for (const id of [...(this.brokenProps || [])]) if (!set.has(id)) this.syncProp(id, false);
+    for (const id of set) this.syncProp(id, true);
+  }
+
   deathFall(e, v) {
     const c = this.chars.get(e.victim);
     if (!c?.char || !c.char.root.visible) return null;
@@ -1252,6 +1275,25 @@ export class Client {
           audio.play('impact', [e.x, e.y, e.z]);
           if (e.id === me) this.hud.toast?.('Shoved!');
           break;
+        // breakable props (shared/game.js): a blow that doesn't break it kicks up dust; one that does, the pieces fly
+        case 'prophit': {
+          const b = BREAKABLES[e.id];
+          if (b) {
+            this.fx.dust(b.x, Math.min(1, b.h / 2), b.z);
+            audio.play('block', [b.x, 1, b.z]);
+          }
+          break;
+        }
+        case 'propbreak': {
+          const b = BREAKABLES[e.id];
+          if (!b) break;
+          this.syncProp(e.id, true);
+          shatter(this.scene, e.id, e.dx || 0, e.dz || 0, e.f || 3);
+          this.fx.dust(b.x, 0.4, b.z);
+          this.fx.dust(b.x, Math.min(1.2, b.h / 2), b.z);
+          audio.play('impact', [b.x, 1, b.z], { w: 'sledge', heavy: true });
+          break;
+        }
         case 'carbump':
           audio.play('impact', [e.x, 1, e.z]);
           if (e.hard > 0.4) audio.play('honk', [e.x, 1, e.z]);
@@ -1461,9 +1503,11 @@ export class Client {
 
     this.updateCharacters(snap, dt);
     // loose bodies can be shoved by riders walking into them and by bumper cars
-    const near = this.corpses.length ? this.bodyPushers(snap, dt) : null;
+    const near = this.corpses.length || debrisCount() ? this.bodyPushers(snap, dt) : null;
     this.corpses = this.corpses.filter((c) => c.update(dt, near));
     stepRagdolls(dt);
+    stepDebris(dt, near);
+    this.syncBroken(snap);
     this.rides.update(snap, dt, this.time);
     this.fx.update(dt, this.time, snap.zone);
     this.lootView.update(this.time, this.camera.position, this.intro.active, this.camera.getWorldDirection(this.lootDir ??= new THREE.Vector3()));

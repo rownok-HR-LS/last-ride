@@ -39,6 +39,13 @@ export function loadRagdolls() {
   return loading;
 }
 
+/** The physics world for other loose things (src/debris.js), once it's in: { R, world, addPark } or null. */
+export function physics() {
+  return world ? { R, world, addPark } : null;
+}
+/** How many other loose things are in the world (the world keeps stepping while there are any). */
+export const physicsUsers = { debris: 0 };
+
 /** Can a body go limp now? */
 export function ragdollReady() {
   return !!world && live.size < MAX;
@@ -234,7 +241,7 @@ export class Ragdoll {
 /** Step the physics world (fixed steps) and pose every loose body. */
 let acc = 0;
 export function stepRagdolls(dt) {
-  if (!world || !live.size) return;
+  if (!world || (!live.size && !physicsUsers.debris)) return;
   acc = Math.min(acc + dt, 3 / 60);
   while (acc >= 1 / 60) {
     world.step();
