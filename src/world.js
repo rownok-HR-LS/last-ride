@@ -16,6 +16,7 @@ import { placeModels, setWorldMaterials } from './models.js';
 import { dressBuildings } from './buildings.js';
 import { buildKit, kitDraws, boothVariant, BOOTH_GAMES } from './kit.js';
 import { buildDecals } from './decals.js';
+import { whenCompiled } from './stage.js';
 import { compressed } from './ktx.js';
 
 // ------------------------------------------------------------------ materials
@@ -526,7 +527,8 @@ export function buildWorld(scene) {
   X.build(outside);
   scene.add(outside);
   for (const [name, list] of groupSpots(outsideSpots)) placeModels(outside, name, list).catch((e) => console.warn(name, e));
-  buildKit(Builder, (key) => !!MATS[key] || key.startsWith('#')).then((kit) => {
+  // the kit swaps in once its shaders are ready (stage.js), so the buildings never blink out meanwhile
+  buildKit(Builder, (key) => !!MATS[key] || key.startsWith('#')).then((kit) => whenCompiled(kit).then(() => kit)).then((kit) => {
     scene.remove(outside);
     outside.traverse((o) => o.geometry?.dispose());
     // the coaster's plain track (rides.js) gives way to the kit's

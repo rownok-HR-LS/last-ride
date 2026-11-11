@@ -22,6 +22,7 @@ import { Guide } from './guide.js';
 import { Intro } from './intro.js';
 import { cullInstances, setCullScale } from './cull.js';
 import { freed } from './ktx.js';
+import { setStage, whenCompiled, needsCompile } from './stage.js';
 import { Bus } from './bus.js';
 import { Projectiles } from './projectiles.js';
 import { weaponModel, projectileModel, itemModel } from './weapons.js';
@@ -66,6 +67,38 @@ function killCause(how) {
     car: 'a bumper car', storm: 'the storm', fall: 'the fall', gondola: 'a Ferris wheel gondola', firework: 'a firework', fireworks: 'a firework',
   };
   return OTHER[how] || (WEAPONS[how] ? `a ${WEAPONS[how].name}` : how || 'something in the dark');
+}
+
+/**
+ * Where a ray first meets the tour bus's body (a box 2.8 x 3.3 x 11 m round it, turned with it), or Infinity. A ray
+ * that starts inside the box (stepping out of the door) doesn't count.
+ */
+function rayBus(bus, ox, oy, oz, dx, dy, dz, maxT) {
+  const c = Math.cos(bus.yaw || 0);
+  const s = Math.sin(bus.yaw || 0);
+  // into the bus's own frame (three.js turns local (x, z) to world by the yaw)
+  const px = ox - bus.x;
+  const pz = oz - bus.z;
+  const o = [px * c - pz * s, oy - (bus.y || 0), px * s + pz * c];
+  const d = [dx * c - dz * s, dy, dx * s + dz * c];
+  const lo = [-1.4, 0, -5.6];
+  const hi = [1.4, 3.3, 5.6];
+  if (o.every((v, i) => v > lo[i] && v < hi[i])) return Infinity;
+  let t0 = 0;
+  let t1 = maxT;
+  for (let i = 0; i < 3; i++) {
+    if (Math.abs(d[i]) < 1e-9) {
+      if (o[i] < lo[i] || o[i] > hi[i]) return Infinity;
+      continue;
+    }
+    let a = (lo[i] - o[i]) / d[i];
+    let b = (hi[i] - o[i]) / d[i];
+    if (a > b) [a, b] = [b, a];
+    t0 = Math.max(t0, a);
+    t1 = Math.min(t1, b);
+    if (t0 > t1) return Infinity;
+  }
+  return t0;
 }
 
 export class Client {
@@ -177,6 +210,34 @@ export class Client {
     this.pads = new Pads(this);
     // sound captions: important sounds near you, written on screen with where they come from
     audio.onCue((name, pos, opt) => this.caption(name, pos, opt));
+    // Compile the park's shaders in the background (stage.js) before the first frame, and anything that arrives
+    // later before it is shown: three.js would otherwise compile each on first sight and freeze the page meanwhile
+    // (seconds at a time under the title while the scenery, rides and riders stream in).
+    setStage(this.renderer, this.camera, this.scene);
+    this.ready = whenCompiled(this.scene).then(() => {
+      this.compiled = true;
+    });
+    const sceneAdd = this.scene.add.bind(this.scene);
+    const sceneRemove = this.scene.remove.bind(this.scene);
+    const waiting = new Set();
+    this.scene.add = (...objs) => {
+      for (const o of objs) {
+        if (!o?.isObject3D || !needsCompile(o)) {
+          sceneAdd(o);
+          continue;
+        }
+        waiting.add(o);
+        whenCompiled(o).then(() => {
+          if (!waiting.delete(o)) return; // taken away again before it was ready
+          sceneAdd(o);
+        });
+      }
+      return this.scene;
+    };
+    this.scene.remove = (...objs) => {
+      for (const o of objs) waiting.delete(o);
+      return sceneRemove(...objs);
+    };
     const loop = (now) => {
       if (!this.running) return;
       requestAnimationFrame(loop);
@@ -185,6 +246,8 @@ export class Client {
       this.pads.poll(dt);
       // the graphics card was reset: nothing can be drawn until the browser hands the context back
       if (this.gpuLost) return;
+      // nothing to draw until the shaders are in (the title's still picture covers it meanwhile)
+      if (!this.compiled) return;
       if (!this.paused && !document.hidden) this.adaptQuality(dt);
       if (this.attract) this.attractFrame(dt);
       else if (!this.paused) this.frame(this.slowmo > 0 && !this.online ? ((this.slowmo -= dt), dt * 0.35) : dt);
@@ -549,27 +612,10 @@ export class Client {
       ...['bow', 'crossbow', 'darts', 'harpoon', 'fireworks', 'holy', 'flare'].map((k) => projectileModel(k)),
       ...['tickets', 'holy', 'flare', 'salt', 'relic'].map((k) => itemModel(k)),
     ];
-    all.forEach((m, i) => {
-      m.position.set(this.camera.position.x + (i % 6) - 3, this.camera.position.y, this.camera.position.z + Math.floor(i / 6) - 2);
-      extras.add(m);
-    });
-    this.scene.add(extras);
-    const culled = [];
-    this.scene.traverse((o) => {
-      if (o.frustumCulled && (o.isMesh || o.isSprite || o.isPoints || o.isLine)) {
-        o.frustumCulled = false;
-        culled.push(o);
-      }
-    });
-    const r = this.renderer;
-    const rt = new THREE.WebGLRenderTarget(64, 64);
-    const prev = r.getRenderTarget();
-    r.setRenderTarget(rt);
-    r.render(this.scene, this.camera);
-    r.setRenderTarget(prev);
-    rt.dispose();
-    for (const o of culled) o.frustumCulled = true;
-    this.scene.remove(extras);
+    for (const m of all) extras.add(m);
+    // in the background (stage.js): weapons, projectiles and items nobody holds yet, and anything new in the park
+    whenCompiled(extras);
+    whenCompiled(this.scene);
   }
 
   mySnap() {
@@ -1693,8 +1739,11 @@ export class Client {
         const dz = -fz * dist + rz * side;
         const len = Math.hypot(dx, dy, dz);
         const hit = rayWorld(pivot.x, pivot.y, pivot.z, dx / len, dy / len, dz / len, len + 0.35);
+        // the tour bus too: step off beside it and the camera over your shoulder would sit inside its dark cabin
+        const busT = snap.bus ? rayBus(snap.bus, pivot.x, pivot.y, pivot.z, dx / len, dy / len, dz / len, len + 0.35) : Infinity;
+        const t = Math.min(hit ? hit.t : Infinity, busT);
         let k = 1;
-        if (hit) k = Math.max(0.12, (hit.t - 0.35) / len);
+        if (t < Infinity) k = Math.max(0.12, (t - 0.35) / len);
         // ease back out after a wall, snap in when blocked
         const ck = this.camK ?? 1;
         this.camK = ck + (k - ck) * Math.min(1, dt * (k < ck ? 30 : 5));

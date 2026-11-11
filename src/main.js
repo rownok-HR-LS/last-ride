@@ -257,10 +257,16 @@ async function title() {
   app.insertBefore(client.renderer.domElement, app.firstChild);
   ridersReady = true;
   client.showcase(profile.outfit, profile.look);
+  // the park's shaders compile in the background first (client.ready), so the page never freezes for them
+  step('Getting the park ready…', 0.97);
+  await client.ready;
   // the still of the park fades into the live one, and the loading line goes
   step('', 1);
   clearInterval(tipTimer);
-  requestAnimationFrame(() => el.classList.add('ready'));
+  // (a timer too, in case the frame callback is held back, e.g. a tab in the background)
+  const showLive = () => el.classList.add('ready');
+  requestAnimationFrame(showLive);
+  setTimeout(showLive, 250);
   play.disabled = false;
   practice.disabled = false;
   play.innerHTML = 'Ride online <small>Public ride · the bus leaves every half minute</small>';
