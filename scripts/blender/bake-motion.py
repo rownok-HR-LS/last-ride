@@ -88,7 +88,7 @@ def to_game(v):
     return (v.x, v.z, -v.y)
 
 
-def bake(name, o, tris):
+def bake(name, o, tris, uvs=None):
     rest = [to_game(v.co) for v in o.data.vertices]
     n = len(rest)
     dg = bpy.context.evaluated_depsgraph_get()
@@ -128,6 +128,8 @@ def bake(name, o, tris):
         'name': name, 'fps': FPS, 'frames': LOOP, 'range': round(rng, 5),
         'verts': [round(c, 4) for p in rest for c in p], 'tris': tris,
     }
+    if uvs:
+        info['uvs'] = [round(c, 4) for c in uvs]
     json.dump(info, open(os.path.join(OUT, name + '.json'), 'w'))
     print(f'MOTION {name}: {n} verts, {LOOP} frames, range {rng:.3f} m, settle {settle:.3f} m, flutter {flutter:.3f} m')
 
@@ -198,5 +200,6 @@ def tape():
     bake('tape', o, tris)
 
 
-pennant()
-tape()
+if __name__ == '__main__':
+    pennant()
+    tape()

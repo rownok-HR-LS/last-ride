@@ -14,6 +14,7 @@ import { Rain, sheltered } from './rain.js';
 import { Rides } from './rides.js';
 import { Character, Corpse, nameTag, setCharacterRim } from './characters.js';
 import { loadRagdolls, stepRagdolls } from './ragdoll.js';
+import { loadCloak } from './cloak.js';
 import { FX } from './fx.js';
 import { LootView } from './loot.js';
 import { Hud } from './hud.js';
@@ -292,6 +293,7 @@ export class Client {
       this.compiled = true;
       // the physics engine for ragdolls comes in once the menu is up (deaths fall back to animations until then)
       setTimeout(() => loadRagdolls(), 1500);
+      setTimeout(() => loadCloak(), 2500);
       // models that arrive later inside groups already in the park (far versions, ride parts, effects) don't pass
       // through scene.add: build their shaders in the background as soon as they're added (watchAdds), so the
       // first frame that shows them doesn't stall while the driver builds them

@@ -40,7 +40,7 @@ export function loadMotion(name) {
  * otherwise 1 + the vertex's column in the motion. toLocal turns the motion's offsets (model space) into the
  * geometry's own space (for models whose positions were packed with a scale).
  */
-export function motionMaterial(mat, m, toLocal = new THREE.Matrix3()) {
+export function motionMaterial(mat, m, toLocal = new THREE.Matrix3(), { phase = 0, ampFloor = 0 } = {}) {
   // (it moves, so it keeps casting its own shadow: src/shadowproxy.js)
   mat.userData.moves = true;
   const prev = mat.onBeforeCompile;
@@ -53,13 +53,16 @@ export function motionMaterial(mat, m, toLocal = new THREE.Matrix3()) {
       motionToLocal: { value: toLocal },
       motionTime,
       windAmp,
+      // (a piece that isn't instanced: where in the loop it starts, and the least it moves however still the night)
+      motionPhase: { value: phase },
+      motionFloor: { value: ampFloor },
     });
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', `#include <common>
         attribute float motionId;
         uniform sampler2D motionTex;
         uniform vec4 motionInfo; // columns, rows, frames, range
-        uniform float motionFps, motionTime, windAmp;
+        uniform float motionFps, motionTime, windAmp, motionPhase, motionFloor;
         uniform mat3 motionToLocal;
         vec3 motionAt(float u, float row) {
           return texture2D(motionTex, vec2(u, (row + 0.5) / motionInfo.y)).rgb * 2.0 - 1.0;
@@ -68,7 +71,7 @@ export function motionMaterial(mat, m, toLocal = new THREE.Matrix3()) {
         if (motionId > 0.5) {
           float u = (motionId - 0.5) / motionInfo.x;
           vec3 wp = position;
-          float ph = 0.0;
+          float ph = motionPhase * motionInfo.z;
           #ifdef USE_INSTANCING
             wp = (instanceMatrix * vec4(position, 1.0)).xyz;
             // each copy starts somewhere else in the loop, so neighbours don't flap in step
@@ -79,7 +82,7 @@ export function motionMaterial(mat, m, toLocal = new THREE.Matrix3()) {
           vec3 flutter = mix(motionAt(u, 1.0 + f0), motionAt(u, 1.0 + mod(f0 + 1.0, motionInfo.z)), f - f0);
           // gusts roll across the park, as in the plants' sway
           float gust = 0.6 + 0.4 * sin(motionTime * 0.35 + wp.x * 0.015 + wp.z * 0.01);
-          float k = windAmp * gust;
+          float k = max(windAmp, motionFloor) * gust;
           // the settled shape leans with the wind too: limp on a still night, blown out in a storm
           vec3 off = (motionAt(u, 0.0) * min(1.0, 0.35 + k) + flutter * k) * motionInfo.w;
           transformed += motionToLocal * off;
@@ -95,6 +98,7 @@ export function motionGeometry(m) {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(m.verts, 3));
   g.setAttribute('motionId', new THREE.Float32BufferAttribute(Array.from({ length: m.count }, (_, i) => i + 1), 1));
+  if (m.uvs) g.setAttribute('uv', new THREE.Float32BufferAttribute(m.uvs, 2));
   g.setIndex(m.tris);
   g.computeVertexNormals();
   return g;

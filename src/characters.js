@@ -7,6 +7,7 @@ import { ktx2 } from './ktx.js';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { Ragdoll, ragdollReady } from './ragdoll.js';
+import { Cloak, cloakReady } from './cloak.js';
 import { WEAPONS, FISTS } from '../shared/items.js';
 import { weaponModel, GRIP } from './weapons.js';
 import { OUTFITS, PLAYER_HEIGHT } from '../shared/constants.js';
@@ -1304,6 +1305,9 @@ export class Character {
     }
     this.headLook(p, dt, ghost || p.state !== 'alive' || !!this.over || !!opts.seat ? null : opts.lookAt);
     this.face(p, dt, time, ghost);
+    // the wraith's tattered robe (src/cloak.js), placed on the posed skeleton
+    if (ghost && !this.cloak && cloakReady()) this.cloak = new Cloak(this, OUTFIT_TINT[this.outfit]);
+    this.cloak?.update(ghost, this.ghostMat.uniforms.opacity.value, this.ghostMat.uniforms.glow.value);
     // the wraith's eyes burn when it uses a power (and always for other ghosts)
     this.eyes.visible = ghost && (opts.eyes ?? true);
     if (this.eyes.visible && this.bones.Head) {
@@ -1472,6 +1476,16 @@ export class Character {
  * bodies are loose) it plays a death animation instead. Then it sinks away.
  */
 const DEAD = { state: 'dead' };
+
+/**
+ * The main colour of each rider's clothes, which tints their ghost's robe a little (src/cloak.js). Sampled from the
+ * chest of each rider in the menu, with the menu's warm light taken out (each divided by the average of all of them).
+ */
+const OUTFIT_TINT = {
+  eric: '#302752', claudia: '#7b908c', nathan: '#6a7984', carla: '#2c2148', sophia: '#81857c', manuel: '#677677',
+  agnes: '#707269', walter: '#92765e', balthazar: '#5f444a', victor: '#57435d', dale: '#707b55', marcus: '#5f4744',
+  denise: '#4f5156', ruth: '#536165',
+};
 
 export class Corpse {
   /**
