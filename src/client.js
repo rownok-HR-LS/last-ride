@@ -1188,6 +1188,20 @@ export class Client {
         case 'bump':
           audio.play('honk', [e.x, 1, e.z]);
           break;
+        // bodies and cars meeting (shared/physics.js contacts)
+        case 'shove':
+          this.chars.get(e.id)?.char.hit();
+          audio.play('impact', [e.x, e.y, e.z]);
+          if (e.id === me) this.hud.toast?.('Shoved!');
+          break;
+        case 'carbump':
+          audio.play('impact', [e.x, 1, e.z]);
+          if (e.hard > 0.4) audio.play('honk', [e.x, 1, e.z]);
+          break;
+        case 'wallhit':
+          this.chars.get(e.id)?.char.hit();
+          audio.play('impact', [e.x, e.y, e.z]);
+          break;
         case 'zone':
           if (e.state === 'shrink') this.hud.toast('The storm is closing in!');
           break;

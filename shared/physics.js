@@ -169,6 +169,12 @@ export function stepCar(car, wx, wz, speed, dt) {
     d = Math.atan2(Math.sin(d), Math.cos(d));
     car.yaw += Math.max(-4 * dt, Math.min(4 * dt, d));
   }
+  // a knock sets it spinning, and the spin dies away
+  if (car.spin) {
+    car.yaw += car.spin * dt;
+    car.spin *= Math.exp(-2.5 * dt);
+    if (Math.abs(car.spin) < 0.01) car.spin = 0;
+  }
   const fx = -Math.sin(car.yaw);
   const fz = -Math.cos(car.yaw);
   const thrust = want > 0.1 ? speed : 0;
@@ -193,4 +199,128 @@ export function stepCar(car, wx, wz, speed, dt) {
     car.vz = mz * 0.4 - (car.vz - mz) * 0.3;
   }
   return hit;
+}
+
+// ------------------------------------------------------------------ contact between bodies
+
+/** How fast a sprinting rider must close in for a shoulder check to shove (m/s). */
+export const SHOVE_SPEED = 4.2;
+
+/**
+ * Two living riders never overlap: each gives way half the overlap (mutual) or, in your browser's prediction where
+ * the other stands still, you give way all of it. Returns the shoulder check if one ran into the other at a
+ * sprint: { by, to, nx, nz, speed } (n points from the one who ran into the other toward them).
+ */
+export function bodyContact(a, b, mutual = true) {
+  if (Math.abs(b.y - a.y) > 1.5) return null;
+  const R = PLAYER_RADIUS * 1.9;
+  let dx = b.x - a.x;
+  let dz = b.z - a.z;
+  const d2 = dx * dx + dz * dz;
+  if (d2 >= R * R) return null;
+  const d = Math.sqrt(d2);
+  if (d < 1e-4) {
+    dx = 1;
+    dz = 0;
+  } else {
+    dx /= d;
+    dz /= d;
+  }
+  const over = R - d;
+  const share = mutual ? 0.5 : 1;
+  a.x -= dx * over * share;
+  a.z -= dz * over * share;
+  pushOut(a, PLAYER_RADIUS, PLAYER_HEIGHT, a.onGround ? STEP_HEIGHT : 0.12);
+  if (mutual) {
+    b.x += dx * over * 0.5;
+    b.z += dz * over * 0.5;
+    pushOut(b, PLAYER_RADIUS, PLAYER_HEIGHT, b.onGround ? STEP_HEIGHT : 0.12);
+  }
+  // closing speed along the line between them; whoever brought it is the one who ran in
+  const va = a.vx * dx + a.vz * dz;
+  const vb = -(b.vx * dx + b.vz * dz);
+  const [by, to, sx, sz, speed] = va >= vb ? [a, b, dx, dz, va] : [b, a, -dx, -dz, vb];
+  if (!by.sprint || speed < SHOVE_SPEED) {
+    // walking into someone: lose the speed going into them, keep the rest (you slide round them)
+    if (va > 0) {
+      a.vx -= dx * va * share;
+      a.vz -= dz * va * share;
+    }
+    if (mutual && vb > 0) {
+      b.vx += dx * vb * 0.5;
+      b.vz += dz * vb * 0.5;
+    }
+    return null;
+  }
+  return { by, to, nx: sx, nz: sz, speed };
+}
+
+/**
+ * A rider against a bumper car: the car is solid and much heavier. Walking into a parked car nudges it along
+ * (mutual only); a car being driven is left to the ram (Game.updateRides).
+ */
+export function carContact(p, car, mutual = true) {
+  if (Math.abs(p.y - car.y) > 1.3) return false;
+  const R = CAR_RADIUS + PLAYER_RADIUS;
+  let dx = p.x - car.x;
+  let dz = p.z - car.z;
+  const d2 = dx * dx + dz * dz;
+  if (d2 >= R * R) return false;
+  const d = Math.sqrt(d2);
+  if (d < 1e-4) {
+    dx = 1;
+    dz = 0;
+  } else {
+    dx /= d;
+    dz /= d;
+  }
+  p.x += dx * (R - d);
+  p.z += dz * (R - d);
+  pushOut(p, PLAYER_RADIUS, PLAYER_HEIGHT, p.onGround ? STEP_HEIGHT : 0.12);
+  const into = -(p.vx * dx + p.vz * dz);
+  if (into > 0) {
+    p.vx += dx * into;
+    p.vz += dz * into;
+    if (mutual && !car.driver) {
+      car.vx -= dx * into * 0.45;
+      car.vz -= dz * into * 0.45;
+    }
+  }
+  return true;
+}
+
+/** Two bumper cars bang together: they separate, bounce apart and spin. Returns how hard they met (m/s). */
+export function carsCollide(a, b) {
+  const R = CAR_RADIUS * 2;
+  let dx = b.x - a.x;
+  let dz = b.z - a.z;
+  const d2 = dx * dx + dz * dz;
+  if (d2 >= R * R || Math.abs(a.y - b.y) > 1.2) return 0;
+  const d = Math.sqrt(d2);
+  if (d < 1e-4) {
+    dx = 1;
+    dz = 0;
+  } else {
+    dx /= d;
+    dz /= d;
+  }
+  const over = R - d;
+  a.x -= dx * over * 0.5;
+  a.z -= dz * over * 0.5;
+  b.x += dx * over * 0.5;
+  b.z += dz * over * 0.5;
+  const rel = (b.vx - a.vx) * dx + (b.vz - a.vz) * dz;
+  if (rel >= 0) return 0;
+  // a springy rubber bumper: most of the speed comes back
+  const j = (-(1 + 0.75) * rel) / 2;
+  a.vx -= j * dx;
+  a.vz -= j * dz;
+  b.vx += j * dx;
+  b.vz += j * dz;
+  // a glancing blow sets them turning
+  const tan = (b.vx - a.vx) * -dz + (b.vz - a.vz) * dx;
+  const turn = tan * 0.3 + Math.sign(tan || 1) * j * 0.12;
+  a.spin = (a.spin || 0) + turn;
+  b.spin = (b.spin || 0) - turn;
+  return -rel;
 }

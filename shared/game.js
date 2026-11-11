@@ -14,7 +14,7 @@ import {
   LOOT_SPOTS, CHEST_SPOTS, PRIZE_BOOTHS, FERRIS, STATION, CAR_SPAWNS, TRACK, trackAt, PARK_EDGE, BUS_ROUTE, busAt,
 } from './map.js';
 import { rayWorld, rayPlayer, groundAt, lineOfSight } from './collide.js';
-import { stepWalker, stepGhost, stepCar, wishDir, CAR_RADIUS } from './physics.js';
+import { stepWalker, stepGhost, stepCar, wishDir, CAR_RADIUS, bodyContact, carContact, carsCollide } from './physics.js';
 import { createBrain, updateBot } from './bots.js';
 
 const DEG = Math.PI / 180;
@@ -1174,6 +1174,7 @@ export class Game {
       if (p.queue) this.feed(p, dt, true);
       else this.stepPlayer(p, dt);
     }
+    this.collideBodies(dt);
     this.updateRides(dt);
     this.updateHazards(dt);
     if (this.zone.state === 'idle' && this.time >= this.zoneStartAt) {
@@ -1370,7 +1371,27 @@ export class Game {
     } else if (p.knockT > 0) {
       // knocked back: slide out with little control
       p.knockT -= dt;
-      stepWalker(p, 0, 0, 0, false, dt, false, 16);
+      const vx = p.vx;
+      const vz = p.vz;
+      const ex = p.x + vx * dt;
+      const ez = p.z + vz * dt;
+      stepWalker(p, 0, 0, 0, false, dt, false, p.tumbleT > 0 ? 4 : 16);
+      // a rider sent tumbling bounces off the wall they hit instead of stopping dead against it
+      const bx = p.x - ex;
+      const bz = p.z - ez;
+      const bl = Math.hypot(bx, bz);
+      if (p.tumbleT > 0 && bl > 0.02 && Math.hypot(vx, vz) > 5) {
+        const nx = bx / bl;
+        const nz = bz / bl;
+        const vn = vx * nx + vz * nz;
+        if (vn < 0) {
+          p.vx = (vx - 2 * vn * nx) * 0.5;
+          p.vz = (vz - 2 * vn * nz) * 0.5;
+          this.events.push({ e: 'wallhit', id: p.id, x: p.x, y: p.y + 1, z: p.z });
+          // (the wall's damage goes to whoever sent them flying)
+          this.damage(p, Math.min(8, -vn * 0.7), this.players.get(p.tumbleBy) || null, 'car');
+        }
+      }
     } else {
       const [wx, wz] = rooted ? [0, 0] : wishDir(i.fwd, i.side, i.yaw);
       stepWalker(p, wx, wz, speed, i.jump && !rooted && !busy, dt, false, 0, !p.combat);
@@ -1540,6 +1561,44 @@ export class Game {
     }
   }
 
+  /**
+   * Bodies are solid: living riders push each other apart and a sprint into someone is a shoulder check (they're
+   * shoved and staggered for a moment, no damage); bumper cars are solid to riders, and a parked one can be nudged.
+   */
+  collideBodies(dt) {
+    const alive = [];
+    for (const p of this.players.values()) {
+      if (p.state === 'alive') alive.push(p);
+      p.shoveCd = Math.max(0, (p.shoveCd || 0) - dt);
+      p.tumbleT = Math.max(0, (p.tumbleT || 0) - dt);
+    }
+    for (let i = 0; i < alive.length; i++) {
+      for (let j = i + 1; j < alive.length; j++) {
+        const hit = bodyContact(alive[i], alive[j], true);
+        if (hit && !hit.by.shoveCd) this.shove(hit);
+      }
+    }
+    for (const p of alive) for (const c of this.cars) if (!c.driver || Math.hypot(c.vx, c.vz) < 4) carContact(p, c, true);
+  }
+
+  /** A shoulder check: the one run into stumbles away, the one who ran in loses most of their speed. */
+  shove({ by, to, nx, nz, speed }) {
+    by.shoveCd = 0.6;
+    by.vx *= 0.45;
+    by.vz *= 0.45;
+    if (to.iframeT > 0 || to.dodgeT > 0) return;
+    const k = Math.min(9, speed * 0.9 + 2);
+    to.vx = nx * k + to.vx * 0.3;
+    to.vz = nz * k + to.vz * 0.3;
+    to.vy = Math.max(to.vy, 2.2);
+    to.onGround = false;
+    to.knockT = Math.max(to.knockT, 0.3);
+    to.staggerT = Math.max(to.staggerT, 0.4);
+    to.charge = 0;
+    to.blocking = false;
+    this.events.push({ e: 'shove', id: to.id, by: by.id, x: to.x, y: to.y + 1, z: to.z });
+  }
+
   updateRides(dt) {
     const f = this.ferris;
     f.angle += (f.driver ? 0.28 : 0.05) * dt;
@@ -1586,13 +1645,24 @@ export class Game {
       }
     }
 
+    // empty cars roll on when knocked (and slow to a stop); every car bangs off every other
+    for (const car of this.cars) {
+      if (!car.driver && (Math.hypot(car.vx, car.vz) > 0.05 || car.spin)) stepCar(car, 0, 0, 0, dt);
+    }
+    for (let i = 0; i < this.cars.length; i++) {
+      for (let j = i + 1; j < this.cars.length; j++) {
+        const a = this.cars[i];
+        const b = this.cars[j];
+        const hard = carsCollide(a, b);
+        if (hard > 2 && (a.bumpAt ?? -9) < this.time - 0.25) {
+          a.bumpAt = this.time;
+          this.events.push({ e: 'carbump', x: (a.x + b.x) / 2, z: (a.z + b.z) / 2, hard: Math.min(1, hard / 14) });
+        }
+      }
+    }
     // bumper cars ram survivors
     for (const car of this.cars) {
-      if (!car.driver) {
-        car.vx *= Math.max(0, 1 - 3 * dt);
-        car.vz *= Math.max(0, 1 - 3 * dt);
-        continue;
-      }
+      if (!car.driver) continue;
       const speed = Math.hypot(car.vx, car.vz);
       if (speed < 4) continue;
       const owner = this.players.get(car.driver);
@@ -1604,10 +1674,15 @@ export class Game {
         car.hits.set(q.id, this.time);
         const nx = (q.x - car.x) / (d || 1);
         const nz = (q.z - car.z) / (d || 1);
+        // sent tumbling: up and away, spinning, bouncing off whatever wall they meet (updateLiving)
         q.vx += nx * 11 + car.vx * 0.6;
         q.vz += nz * 11 + car.vz * 0.6;
-        q.vy = 6;
+        q.vy = 7.5;
         q.onGround = false;
+        q.knockT = Math.max(q.knockT, 0.9);
+        q.tumbleT = 1.1;
+        q.tumbleBy = car.driver;
+        q.atk = null;
         car.vx *= 0.5;
         car.vz *= 0.5;
         this.events.push({ e: 'bump', x: car.x, z: car.z });
@@ -1697,7 +1772,7 @@ export class Game {
     const g = p.state === 'alive' ? p.slots[p.cur] : null;
     return {
       id: p.id, name: p.name, outfit: p.outfit, look: p.look, bot: p.bot, state: p.state,
-      x: p.x, y: p.y, z: p.z, vx: p.vx, vy: p.vy, vz: p.vz, yaw: p.yaw, pitch: p.pitch, onGround: p.onGround,
+      x: p.x, y: p.y, z: p.z, vx: p.vx, vy: p.vy, vz: p.vz, yaw: p.yaw, pitch: p.pitch, onGround: p.onGround, tumble: (p.tumbleT || 0) > 0,
       hp: p.hp, shield: p.shield, wpn: p.state === 'alive' ? (g ? g.w : 'fists') : null, rarity: g ? g.rarity : 0,
       lastShot: p.lastShot, reloading: p.reloadT > 0, using: p.use ? p.use.item : null, aim: p.input.aim,
       slide: p.slideT > 0, sprint: p.sprint, combat: !!p.combat,

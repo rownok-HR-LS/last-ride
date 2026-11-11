@@ -5,7 +5,7 @@
 // a tenth of a second in the past, smoothly between the server's updates.
 import { Game } from '../shared/game.js';
 import { TICK, INTERP, pack, packInput } from '../shared/net.js';
-import { stepGhost, wishDir } from '../shared/physics.js';
+import { stepGhost, wishDir, bodyContact, carContact } from '../shared/physics.js';
 import { GHOST_SPEED, GHOST_FAST } from '../shared/constants.js';
 
 /** Commands that change how you move, so they are predicted as well as sent. */
@@ -312,6 +312,10 @@ export class NetGame {
     g.phase = snap.phase;
     g.zone = { ...snap.zone };
     g.salts = snap.salts.map((s) => ({ ...s }));
+    snap.cars?.forEach((c, i) => {
+      const own = g.cars[i];
+      if (own) Object.assign(own, { x: c.x, y: c.y, z: c.z, yaw: c.yaw, driver: c.driver, vx: 0, vz: 0 });
+    });
     g.players.clear();
     g.players.set(P.id, P);
     // the others stand where the server last saw them (aim assist and lunges pick from these)
@@ -341,8 +345,22 @@ export class NetGame {
     for (const c of entry.cmds) if (PREDICT_CMDS.has(c.c)) g.command(P.id, c);
     g.setInput(P.id, entry.input);
     g.time += TICK;
-    if (P.state === 'alive') g.updateLiving(P, TICK);
-    else if (P.state === 'ghost' && !P.possess) g.updateGhost(P, TICK);
+    if (P.state === 'alive') {
+      g.updateLiving(P, TICK);
+      // the others and the bumper cars are solid (they stand where the server last saw them)
+      P.shoveCd = Math.max(0, (P.shoveCd || 0) - TICK);
+      P.tumbleT = Math.max(0, (P.tumbleT || 0) - TICK);
+      for (const q of g.players.values()) {
+        if (q === P || q.state !== 'alive') continue;
+        const hit = bodyContact(P, q, false);
+        if (hit && hit.by === P && !P.shoveCd) {
+          P.shoveCd = 0.6;
+          P.vx *= 0.45;
+          P.vz *= 0.45;
+        }
+      }
+      for (const c of g.cars) if (!c.driver) carContact(P, c, false);
+    } else if (P.state === 'ghost' && !P.possess) g.updateGhost(P, TICK);
     g.projs.length = 0;
     const ev = g.drainEvents();
     if (live) for (const e of ev) if (e.id === P.id && OWN_EVENTS.has(e.e)) this.events.push(e);

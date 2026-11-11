@@ -1136,6 +1136,11 @@ export class Character {
         overSpeed = 1.4;
       }
     }
+    // rammed by a bumper car: arms and legs flailing until they land and get up
+    if (!ghost && p.tumble && this.clips.fall_flail) {
+      over = 'fall_flail';
+      overSpeed = 1.3;
+    }
     if (over !== this.over) {
       if (this.over) this.fadingOver = this.over;
       this.over = over;
