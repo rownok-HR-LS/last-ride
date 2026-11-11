@@ -17,7 +17,9 @@ import { dressBuildings } from './buildings.js';
 import { buildKit, kitDraws, boothVariant, BOOTH_GAMES } from './kit.js';
 import { buildDecals } from './decals.js';
 import { whenCompiled } from './stage.js';
-import { bunting } from './motion.js';
+import { bunting, lightStrings } from './motion.js';
+import { buildFlags, buildDoorFlaps } from './flags.js';
+import { buildSigns } from './signs.js';
 import { compressed } from './ktx.js';
 
 // ------------------------------------------------------------------ materials
@@ -355,6 +357,8 @@ function bigtop(B, p) {
   bigtopLights(B, p);
 }
 
+/** The big top's light strings' bulbs, collected while building (drawn by lightStrings). */
+const stringBulbs = [];
 /** Light strings from the big top down to the plaza. */
 function bigtopLights(B, p) {
   // light strings from the roof rim down to the plaza
@@ -367,7 +371,8 @@ function bigtopLights(B, p) {
     for (let k = 1; k < 12; k++) {
       const t = k / 12;
       const y = p.h - 0.4 + (3 - p.h) * t - Math.sin(t * Math.PI) * 1.4;
-      B.sphere(i % 2 ? 'bulb' : 'bulbPink', { x: 0, z: 0 }, x0 + (x1 - x0) * t, y, z0 + (z1 - z0) * t, 0.09, 5);
+      // (they bob on their wires in the wind: drawn apart, src/motion.js lightStrings)
+      stringBulbs.push({ key: i % 2 ? 'bulb' : 'bulbPink', x: x0 + (x1 - x0) * t, y, z: z0 + (z1 - z0) * t, t, strand: i });
     }
     B.cyl('iron', { x: x1, z: z1 }, 0, 1.6, 0, 0.06, 0.08, 3.2, 6);
   }
@@ -524,6 +529,12 @@ export function buildWorld(scene) {
     else if (p.type === 'facade') facade(B, p, scene);
   }
   B.build(scene);
+  if (stringBulbs.length) for (const m of lightStrings(stringBulbs, mat)) scene.add(m);
+  // flags streaming in the storm (src/flags.js)
+  buildFlags().then((f) => f && scene.add(f)).catch((e) => console.warn('flags', e));
+  buildDoorFlaps().then((f) => f && scene.add(f)).catch((e) => console.warn('door flaps', e));
+  // the rides' names on boards swinging from chains (src/signs.js)
+  buildSigns(Builder).then((g) => scene.add(g)).catch((e) => console.warn('signs', e));
   const outside = new THREE.Group();
   X.build(outside);
   scene.add(outside);

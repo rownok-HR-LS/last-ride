@@ -77,6 +77,11 @@ export async function buildKit(Builder, hasMaterial) {
     for (const p of PROPS.filter((q) => q.type === type)) jobs.push(load(type).then((g) => place(g, { x: p.x, z: p.z, rot: p.rot || 0 })));
   }
   if (PROPS.some((p) => p.type === 'track')) jobs.push(load('coaster').then((g) => place(g, { x: 0, z: 0, rot: 0 })));
+  // inside the walk-in buildings: mirrors, cabinets, coffins, the dark ride's track (shared/map.js inside())
+  const interiors = PROPS.filter((p) => p.type === 'interior');
+  for (const kind of new Set(interiors.map((p) => p.kind))) {
+    jobs.push(load(kind).then((g) => interiors.filter((p) => p.kind === kind).forEach((p) => place(g, { x: p.x, z: p.z, rot: p.rot || 0 }))));
+  }
   await Promise.all(jobs);
   const group = new THREE.Group();
   group.name = 'kit';

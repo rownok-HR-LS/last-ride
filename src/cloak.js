@@ -51,7 +51,7 @@ const FRAG = `
     vec3 ash = mix(vec3(0.34, 0.32, 0.30), tint, 0.3) * (0.6 + 0.5 * n) * mix(0.45, 1.0, vUv.y);
     // the red burns along the edges and fills the inside; a little always, more when it uses a power
     vec3 red = vec3(0.85, 0.09, 0.04) * (0.55 + glow);
-    vec3 col = gl_FrontFacing ? ash * 0.6 + red * (edge * 1.6 + 0.04) : red * (0.6 + 0.6 * n);
+    vec3 col = gl_FrontFacing ? ash * 0.8 + red * (edge * 2.0 + 0.05) : red * (0.6 + 0.6 * n);
     // the hem frays into the mist
     float a = (gl_FrontFacing ? 0.9 : 0.8) * opacity * smoothstep(0.02, 0.3, vUv.y + n * 0.25);
     gl_FragColor = vec4(col, a);

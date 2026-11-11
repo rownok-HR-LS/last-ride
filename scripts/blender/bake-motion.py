@@ -200,6 +200,86 @@ def tape():
     bake('tape', o, tris)
 
 
+# ------------------------------------------------------------------ a flag on a pole (0.9 x 0.56 m, the pole along its left edge)
+
+def flag():
+    reset()
+    W, H, cols, rows = 0.9, 0.56, 14, 9
+    bm = bmesh.new()
+    uvl = bm.loops.layers.uv.new()
+    grid = [[bm.verts.new((W * c / cols, 0.0, -H * r / rows)) for c in range(cols + 1)] for r in range(rows + 1)]
+    for r in range(rows):
+        for c in range(cols):
+            f = bm.faces.new((grid[r][c], grid[r][c + 1], grid[r + 1][c + 1], grid[r + 1][c]))
+            for loop, (u, v) in zip(f.loops, ((c, r), (c + 1, r), (c + 1, r + 1), (c, r + 1))):
+                loop[uvl].uv = (u / cols, 1 - v / rows)
+    me = bpy.data.meshes.new('flag')
+    bm.to_mesh(me)
+    bm.free()
+    o = bpy.data.objects.new('flag', me)
+    bpy.context.scene.collection.objects.link(o)
+    tris = []
+    for poly in me.polygons:
+        vs = list(poly.vertices)
+        tris += [vs[0], vs[1], vs[2], vs[0], vs[2], vs[3]]
+    uvs = [0.0, 0.0] * len(me.vertices)
+    for loop in me.loops:
+        u = me.uv_layers.active.data[loop.index].uv
+        uvs[loop.vertex_index * 2] = u[0]
+        uvs[loop.vertex_index * 2 + 1] = u[1]
+    cloth(o, [v.index for v in me.vertices if v.co.x < 1e-4], mass=0.05, bend=0.03)
+    # blowing out along +x, away from the pole
+    wind(strength=float(os.environ.get('FW', 140)), angle=math.radians(10), noise=1.5, turb=float(os.environ.get('FT', 500)))
+    bake('flag', o, tris, uvs)
+
+
+
+# ------------------------------------------------------------------ canvas at a tent's doorway
+
+def sheet(name, W, H, cols, rows, hem, pin_rows=1, wind_angle=90, strength=60, turb=300):
+    """A canvas sheet hanging from its top edge (x across, z down), its hem cut by hem(u) -> extra length (m)."""
+    reset()
+    bm = bmesh.new()
+    uvl = bm.loops.layers.uv.new()
+    grid = [[bm.verts.new((W * (c / cols - 0.5), 0.0, -(H + hem(c / cols)) * r / rows)) for c in range(cols + 1)] for r in range(rows + 1)]
+    for r in range(rows):
+        for c in range(cols):
+            f = bm.faces.new((grid[r][c], grid[r][c + 1], grid[r + 1][c + 1], grid[r + 1][c]))
+            for loop, (u, v) in zip(f.loops, ((c, r), (c + 1, r), (c + 1, r + 1), (c, r + 1))):
+                loop[uvl].uv = (u / cols, 1 - v / rows)
+    me = bpy.data.meshes.new(name)
+    bm.to_mesh(me)
+    bm.free()
+    o = bpy.data.objects.new(name, me)
+    bpy.context.scene.collection.objects.link(o)
+    tris = []
+    for poly in me.polygons:
+        vs = list(poly.vertices)
+        tris += [vs[0], vs[1], vs[2], vs[0], vs[2], vs[3]]
+    uvs = [0.0, 0.0] * len(me.vertices)
+    for loop in me.loops:
+        u = me.uv_layers.active.data[loop.index].uv
+        uvs[loop.vertex_index * 2] = u[0]
+        uvs[loop.vertex_index * 2 + 1] = u[1]
+    top = max(v.co.z for v in me.vertices)
+    cloth(o, [v.index for v in me.vertices if v.co.z > top - 1e-4 - (H / rows) * (pin_rows - 1)], mass=0.25, bend=0.15)
+    # the wind blows through the doorway (+y), gusting
+    wind(strength=strength, angle=math.radians(wind_angle), noise=1.5, turb=turb)
+    bake(name, o, tris, uvs)
+
+
+def valance():
+    # a scalloped strip across the top of the doorway (4 m wide, 0.55 m deep plus 0.25 m scallops)
+    sheet('valance', 4.0, 0.55, 24, 5, lambda u: 0.25 * abs(math.sin(u * math.pi * 6)), strength=90, turb=420)
+
+
+def flap():
+    # a tall canvas side flap (1.2 m wide, 4 m), tied back at the top, loose below
+    sheet('flap', 1.2, 4.0, 8, 16, lambda u: 0.15 * math.sin(u * math.pi * 3), pin_rows=2, strength=22, turb=160)
+
+
 if __name__ == '__main__':
-    pennant()
-    tape()
+    only = set(sys.argv[sys.argv.index('--') + 2:])
+    for name, fn in (('pennant', pennant), ('tape', tape), ('flag', flag), ('valance', valance), ('flap', flap)):
+        if not only or name in only:
+            fn()

@@ -161,7 +161,7 @@ def sleeve():
     reset()
     L = 0.55
     bm = tube('robe_sleeve', 9, 14, lambda t: 0.065 + 0.08 * t ** 1.4, lambda t: -L * t, jag=0.35, seed=12)
-    finish('robe_sleeve', bm, lambda c: c.z > -0.07, mass=0.06, bend=0.05, wind=30, turb=180)
+    finish('robe_sleeve', bm, lambda c: c.z > -0.07, mass=0.05, bend=0.03, wind=90, turb=520)
 
 
 skirt()

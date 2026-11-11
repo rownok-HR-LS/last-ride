@@ -609,6 +609,191 @@ def watertower():
     return K
 
 
+
+# ------------------------------------------------------------------ a ride's hanging sign (the post, and the part that swings)
+# The post stands at the origin; its arm reaches out along +x to the pivot at (1.15, 3.3, 0). The board and its chains
+# are a separate kit (signboard), built round that pivot so the game can swing it.
+
+def signpost():
+    K = Kit()
+    K.box('plinth', (0, 0.15, 0), (0.5, 0.3, 0.5), bevel=0.03)
+    K.box('woodDark', (0, 1.85, 0), (0.18, 3.4, 0.18), bevel=0.02)
+    # the arm, a brace under it, and an iron cap
+    K.box('woodDark', (0.6, 3.42, 0), (1.35, 0.14, 0.12), bevel=0.015)
+    rod(K, 'iron', (0.07, 2.85, 0), (0.85, 3.36, 0), 0.025)
+    K.box('iron', (0, 3.62, 0), (0.24, 0.06, 0.24), bevel=0.0)
+    # the hook the chains hang from
+    K.cyl('iron', (1.15, 3.33, 0), 0.03, 0.12, segs=8)
+    return K
+
+
+def signboard():
+    K = Kit()
+    # two chains of oval links from the hook (pivot at the origin) down to the board's top corners
+    for x in (-0.55, 0.55):
+        top = (0.0, -0.02, 0.0)
+        end = (x, -0.62, 0.0)
+        n = 7
+        for i in range(n):
+            t0, t1 = i / n, (i + 1) / n
+            a = tuple(top[k] + (end[k] - top[k]) * t0 for k in range(3))
+            b = tuple(top[k] + (end[k] - top[k]) * t1 for k in range(3))
+            rod(K, 'iron', a, b, 0.012, segs=4)
+            K.ball('iron', a, 0.02, segs=6)
+    # the board: weathered planks in a painted frame (the game paints the ride's name on both faces)
+    K.box('woodDark', (0, -0.95, 0), (1.5, 0.62, 0.06), bevel=0.01)
+    for y in (-0.66, -1.24):
+        K.box('#b8892e', (0, y, 0), (1.56, 0.05, 0.08), bevel=0.0)
+    for x in (-0.76, 0.76):
+        K.box('#b8892e', (x, -0.95, 0), (0.05, 0.63, 0.08), bevel=0.0)
+    return K
+
+
+# ------------------------------------------------------------------ inside the walk-in buildings
+# Each piece stands on the floor at its origin, its front toward +z. shared/map.js places them (and their colliders).
+
+def arcade_cabinet(seed=1):
+    """A dead 1980s upright: side panels, a cracked screen (some still glow faintly), a control deck, a marquee."""
+    K = Kit()
+    rr = random.Random(seed)
+    body = ['#2a2440', '#3c1f24', '#1f3036', '#40381c'][seed % 4]
+    for x in (-0.36, 0.36):
+        K.box(body, (x, 0.95, 0), (0.06, 1.9, 0.78), bevel=0.01)
+    K.box(body, (0, 0.45, -0.05), (0.66, 0.9, 0.6), bevel=0.01)
+    K.box('dark', (0, 1.55, -0.18), (0.66, 1.1, 0.42), bevel=0.0)
+    # the screen, tilted back; a few still give a cold glow
+    K.box('bulbCyan' if rr.random() < 0.35 else 'dark', (0, 1.42, 0.05), (0.5, 0.42, 0.03), rot=(-0.25, 0, 0), bevel=0.0)
+    K.box('#cfc9b8', (0, 1.0, 0.24), (0.66, 0.08, 0.34), rot=(0.35, 0, 0), bevel=0.01)
+    for x in (-0.15, 0.12, 0.2):
+        K.cyl('#d0322a', (x, 1.07, 0.27), 0.025, 0.04, segs=8)
+    K.box('#e9d9a0', (0, 1.84, 0.02), (0.66, 0.16, 0.08), bevel=0.0)
+    K.box('trim', (0, 1.93, -0.05), (0.74, 0.04, 0.8), bevel=0.0)
+    return K
+
+
+def claw_machine():
+    K = Kit()
+    K.box('#c83b4c', (0, 0.45, 0), (1.1, 0.9, 1.1), bevel=0.02)
+    for x in (-0.53, 0.53):
+        for z in (-0.53, 0.53):
+            K.box('gold', (x, 1.45, z), (0.05, 1.1, 0.05), bevel=0.0)
+    K.box('#c83b4c', (0, 2.08, 0), (1.12, 0.16, 1.12), bevel=0.02)
+    # the prizes heaped inside, and the claw hanging still
+    rr = random.Random(5)
+    for i in range(14):
+        K.ball(['#e2384f', '#2f9be0', '#f2b632', '#8e44d6', '#2fbf87'][i % 5], (rr.uniform(-0.38, 0.38), 0.98 + rr.random() * 0.12, rr.uniform(-0.38, 0.38)), 0.09, segs=6)
+    rod(K, 'iron', (0.1, 1.98, -0.1), (0.1, 1.55, -0.1), 0.012)
+    for a in range(3):
+        ang = a * 2 * math.pi / 3
+        rod(K, 'iron', (0.1, 1.55, -0.1), (0.1 + math.cos(ang) * 0.08, 1.42, -0.1 + math.sin(ang) * 0.08), 0.01)
+    K.box('#2a2a2a', (0, 0.95, 0.56), (0.5, 0.06, 0.12), bevel=0.0)
+    return K
+
+
+def change_counter():
+    K = Kit()
+    K.box('boards', (0, 0.52, 0), (2.4, 1.04, 0.62), bevel=0.02)
+    K.box('woodDark', (0, 1.07, 0.02), (2.5, 0.06, 0.7), bevel=0.01)
+    # a brass grille, a coin tray, the CHANGE sign
+    for i in range(9):
+        K.box('gold', (-0.9 + i * 0.225, 1.55, -0.2), (0.02, 0.9, 0.02), bevel=0.0)
+    K.box('gold', (0, 2.0, -0.2), (2.0, 0.04, 0.04), bevel=0.0)
+    K.box('iron', (0.5, 1.13, 0.2), (0.3, 0.05, 0.22), bevel=0.0)
+    K.box('#c8392b', (0, 2.2, -0.2), (1.1, 0.3, 0.04), bevel=0.0)
+    return K
+
+
+def mirror_warped():
+    """A funhouse mirror: a tall bulging glass in a gilded frame on feet."""
+    K = Kit()
+    K.box('gold', (0, 1.25, 0), (1.3, 2.5, 0.12), bevel=0.03)
+    # the glass, bulging out in the middle
+    K.box('metal', (0, 1.25, 0.07), (1.08, 2.25, 0.02), bevel=0.0)
+    K.ball('metal', (0, 1.25, 0.03), 0.5, segs=16)
+    K.box('woodDark', (0, 0.05, 0.1), (1.0, 0.1, 0.4), bevel=0.01)
+    return K
+
+
+def clown_cutout(seed=2):
+    """A painted plywood clown on a stand: grinning face, round red nose, peeling."""
+    K = Kit()
+    K.box('#e9e3d2', (0, 1.0, 0), (0.7, 1.4, 0.04), bevel=0.0)
+    K.ball('#e9e3d2', (0, 1.95, 0), 0.32, segs=10)
+    K.ball('#d0322a', (0, 1.93, 0.28), 0.06, segs=8)
+    K.box('#2a2440' if seed % 2 else '#2f9be0', (0, 1.0, 0.03), (0.72, 0.9, 0.02), bevel=0.0)
+    K.box('#d0322a', (0, 1.62, 0.05), (0.5, 0.08, 0.02), bevel=0.0)
+    K.box('woodDark', (0, 0.2, -0.2), (0.08, 0.4, 0.4), rot=(0.5, 0, 0), bevel=0.0)
+    K.box('woodDark', (0, 0.02, -0.12), (0.6, 0.04, 0.3), bevel=0.0)
+    return K
+
+
+def fortune_booth():
+    """A fortune teller's cabinet: a glass case, a turbaned dummy at a crystal ball, a coin slot."""
+    K = Kit()
+    K.box('#4a1f3a', (0, 0.45, 0), (1.3, 0.9, 0.9), bevel=0.02)
+    K.box('#4a1f3a', (0, 2.25, 0), (1.3, 0.3, 0.9), bevel=0.02)
+    for x in (-0.62, 0.62):
+        K.box('gold', (x, 1.35, 0.42), (0.05, 1.5, 0.05), bevel=0.0)
+        K.box('#4a1f3a', (x, 1.35, -0.2), (0.06, 1.5, 0.5), bevel=0.0)
+    K.box('dark', (0, 1.35, -0.42), (1.2, 1.5, 0.05), bevel=0.0)
+    # the dummy, its turban and the ball
+    K.box('#6a2a4a', (0, 1.25, -0.12), (0.5, 0.6, 0.3), bevel=0.04)
+    K.ball('skin', (0, 1.72, -0.12), 0.15, segs=10)
+    K.ball('#d9b45a', (0, 1.86, -0.12), 0.16, segs=10)
+    K.ball('bulbCyan', (0, 1.05, 0.15), 0.1, segs=10)
+    K.box('#e9d9a0', (0, 2.25, 0.46), (1.0, 0.18, 0.02), bevel=0.0)
+    return K
+
+
+def coffin():
+    """A coffin prop lying on the floor, its lid knocked askew."""
+    K = Kit()
+    K.box('woodDark', (0, 0.22, 0), (0.62, 0.44, 1.95), bevel=0.04, segs=2)
+    K.box('woodDark', (0, 0.2, 0.75), (0.74, 0.4, 0.3), bevel=0.04, segs=2)
+    K.box('#5a2a1a', (0.08, 0.47, 0.05), (0.66, 0.05, 1.9), rot=(0, 0.12, 0.08), bevel=0.01)
+    K.box('gold', (0.08, 0.5, 0.35), (0.06, 0.02, 0.4), rot=(0, 0.12, 0.08), bevel=0.0)
+    K.box('gold', (0.08, 0.5, 0.35), (0.25, 0.02, 0.06), rot=(0, 0.12, 0.08), bevel=0.0)
+    return K
+
+
+def ride_car():
+    """A stalled dark-ride car: a high-backed tub with a lap bar, on bogies."""
+    K = Kit()
+    K.box('#5a1a1c', (0, 0.55, 0), (1.1, 0.6, 1.6), bevel=0.06, segs=2)
+    K.box('#5a1a1c', (0, 1.05, -0.65), (1.1, 0.7, 0.25), bevel=0.06, segs=2)
+    K.box('dark', (0, 0.62, 0.05), (0.9, 0.5, 1.2), bevel=0.02)
+    rod(K, 'iron', (-0.45, 0.95, 0.25), (0.45, 0.95, 0.25), 0.025)
+    for z in (-0.55, 0.55):
+        K.box('iron', (0, 0.15, z), (0.9, 0.2, 0.3), bevel=0.01)
+    K.box('gold', (0, 0.9, 0.82), (0.5, 0.2, 0.04), bevel=0.0)
+    return K
+
+
+def rail_segment():
+    """2 m of dark-ride track on the floor: two flat rails on sleepers, a centre guide."""
+    K = Kit()
+    for x in (-0.42, 0.42):
+        K.box('rust', (x, 0.04, 0), (0.07, 0.06, 2.0), bevel=0.0)
+    K.box('iron', (0, 0.05, 0), (0.05, 0.08, 2.0), bevel=0.0)
+    for z in (-0.75, -0.25, 0.25, 0.75):
+        K.box('woodDark', (0, 0.015, z), (1.1, 0.03, 0.14), bevel=0.0)
+    return K
+
+
+def skeleton_hanging():
+    """A prop skeleton dangling from a chain, for the dark ride's scares (feet about 2.15 m up)."""
+    K = Kit()
+    rod(K, 'iron', (0, 4.2, 0), (0, 3.35, 0), 0.01)
+    K.ball('#e2dccb', (0, 3.2, 0), 0.12, segs=8)
+    K.box('#e2dccb', (0, 2.85, 0), (0.28, 0.42, 0.14), bevel=0.04)
+    for side in (-1, 1):
+        rod(K, '#e2dccb', (side * 0.15, 3.02, 0), (side * 0.22, 2.55, 0.03), 0.025)
+        rod(K, '#e2dccb', (side * 0.08, 2.6, 0), (side * 0.1, 2.15, 0.04), 0.03)
+    for i in range(4):
+        K.box('#e2dccb', (0, 2.98 - i * 0.09, 0.07), (0.26, 0.02, 0.02), bevel=0.0)
+    return K
+
+
 for b in layout['buildings']:
     if not ONLY or b['style'] in ONLY:
         building(b).export(f'{OUT}/kit_{b['style']}.glb')
@@ -632,3 +817,15 @@ if not ONLY or 'kiosk' in ONLY:
     kiosk().export(f'{OUT}/kit_kiosk.glb')
 if not ONLY or 'watertower' in ONLY:
     watertower().export(f'{OUT}/kit_watertower.glb')
+if not ONLY or 'signpost' in ONLY:
+    signpost().export(f'{OUT}/kit_signpost.glb')
+if not ONLY or 'signboard' in ONLY:
+    signboard().export(f'{OUT}/kit_signboard.glb')
+for i in range(4):
+    if not ONLY or f'cabinet_{i}' in ONLY:
+        arcade_cabinet(i).export(f'{OUT}/kit_cabinet_{i}.glb')
+for name, fn in (('claw', claw_machine), ('counter', change_counter), ('mirror', mirror_warped), ('clown', clown_cutout),
+                 ('fortune', fortune_booth), ('coffin', coffin), ('ridecar', ride_car), ('rail', rail_segment),
+                 ('skeleton', skeleton_hanging)):
+    if not ONLY or name in ONLY:
+        fn().export(f'{OUT}/kit_{name}.glb')

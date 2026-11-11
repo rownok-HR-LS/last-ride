@@ -69,6 +69,10 @@ export function stillCaster(o, movers, scene) {
 export async function exportCasters(client, postTo) {
   const { GLTFExporter } = await import('three/examples/jsm/exporters/GLTFExporter.js');
   const { restoreAllInstances } = await import('./cull.js');
+  // every still caster casting its own shadow again (wait for the stand-in first: if it loaded mid-export it would
+  // take their shadows away and they would be missing from the new one)
+  await client.shadowProxy?.ready;
+  client.shadowProxy?.set(false);
   restoreAllInstances();
   const scene = client.scene;
   scene.updateMatrixWorld(true);

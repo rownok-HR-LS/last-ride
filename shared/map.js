@@ -206,6 +206,17 @@ function decor(model, x, z, rot) {
   breakable(entry);
 }
 
+/**
+ * A set piece inside a walk-in building (the Blender kit's kit_<kind>, src/kit.js), at (lx, lz) from the building's
+ * centre. solid: [w, d, h] for a collider (cover); null for things overhead or underfoot.
+ */
+function inside(kind, b, lx, lz, rot = 0, solid = null) {
+  const x = b.cx + lx;
+  const z = b.cz + lz;
+  prop({ type: 'interior', kind, x, z, rot });
+  if (solid) addBox(x, z, solid[0], solid[1], 0, solid[2], rot);
+}
+
 function crate(x, z, s, h, rot = 0) {
   prop({ type: 'crate', x, z, s, h, rot });
   addBox(x, z, s, s, 0, h, rot);
@@ -454,6 +465,19 @@ wall(-15, -84, 8, 0.4, 7.5, 'funhouse');
 wall(-14, -77.5, 0.4, 5, 7.5, 'funhouse');
 prop({ type: 'facade', x: -20, z: -73.7, style: 'funhouse', label: 'FUNHOUSE' });
 CHEST_SPOTS.push({ x: -29, z: -86, rot: 0 }, { x: -11, z: -87, rot: 0 }, { x: -20, z: -79, rot: 0 }, { x: -29, z: -77, rot: 0 });
+// inside: warped mirrors on the back wall and the partition, clown cut-outs by the doors, a fortune teller
+{
+  const b = BUILDINGS[BUILDINGS.length - 1];
+  const MIRROR = [1.3, 0.45, 2.5];
+  inside('mirror', b, -2.2, -7.4, 0, MIRROR);
+  inside('mirror', b, 1.6, -7.4, 0, MIRROR);
+  inside('mirror', b, -5.55, 1.2, Math.PI / 2, MIRROR);
+  inside('mirror', b, -5.55, -2.4, Math.PI / 2, MIRROR);
+  inside('clown', b, 8.6, 6.6, Math.PI, [0.75, 0.5, 2.2]);
+  inside('clown', b, -2.9, 6.3, Math.PI, [0.75, 0.5, 2.2]);
+  inside('fortune', b, -10.6, 1.8, Math.PI / 2, [1.3, 0.95, 2.4]);
+  decor('boxes', b.cx + 4.6, b.cz - 5.1, 0);
+}
 
 // Tunnel of Terror (dark-ride building)
 building(40, -84, 26, 14, 8, 'tunnel', { s: [-8, 8], n: [0] });
@@ -461,12 +485,40 @@ wall(36, -84, 0.4, 8, 8, 'tunnel');
 wall(44, -84, 0.4, 8, 8, 'tunnel');
 prop({ type: 'facade', x: 40, z: -76.7, style: 'tunnel', label: 'TUNNEL OF TERROR' });
 CHEST_SPOTS.push({ x: 30, z: -88, rot: 0 }, { x: 50, z: -88, rot: 0 }, { x: 40, z: -86, rot: 0 }, { x: 40, z: -80, rot: Math.PI });
+// inside: the ride's track round the partitions, stalled cars, coffins, skeletons dangling overhead
+{
+  const b = BUILDINGS[BUILDINGS.length - 1];
+  // the track: in at the left door, round behind the partitions, out at the right (2 m pieces, underfoot)
+  for (let z = 6; z > -5; z -= 2) inside('rail', b, -8, z, 0);
+  for (let x = -7; x < 8; x += 2) inside('rail', b, x, -5.5, Math.PI / 2);
+  for (let z = -4.5; z < 7; z += 2) inside('rail', b, 8, z, 0);
+  inside('ridecar', b, -8, 0.6, 0, [1.15, 1.65, 1.45]);
+  inside('ridecar', b, 5.6, -5.5, Math.PI / 2, [1.15, 1.65, 1.45]);
+  inside('coffin', b, -11.6, 2.4, 0, [0.75, 2.0, 0.55]);
+  inside('coffin', b, 11.3, 1.2, 0, [0.75, 2.0, 0.55]);
+  inside('coffin', b, 2.6, 5.4, Math.PI / 2, [0.75, 2.0, 0.55]);
+  for (const [x, z] of [[-8, 3.4], [8, -1.2], [0.5, -5.6], [-11, -5.4], [11, 4.4]]) inside('skeleton', b, x, z, (x + z) % 6.28);
+}
 
 // Arcade hall
 building(-80, 84, 20, 14, 6.5, 'arcade', { s: [-4], e: [2], n: [5] });
 for (let i = 0; i < 4; i++) crate(-87 + i * 4.6, 80, 1.1, 2.2);
 prop({ type: 'facade', x: -80, z: 91.2, style: 'arcade', label: 'ARCADE' });
 CHEST_SPOTS.push({ x: -86, z: 87, rot: Math.PI }, { x: -74, z: 87, rot: Math.PI }, { x: -78, z: 79, rot: 0 });
+// inside: dead cabinets along the west wall and in back-to-back islands (cover), a claw machine, the change counter
+{
+  const b = BUILDINGS[BUILDINGS.length - 1];
+  const CAB = [0.8, 0.82, 1.95];
+  let k = 0;
+  for (const z of [-5.6, -4.75, -3.9, -0.4, 0.45, 1.3]) inside(`cabinet_${k++ % 4}`, b, -9.3, z, Math.PI / 2, CAB);
+  for (const x of [-4.2, -3.38, -2.56, 1.0, 1.82, 2.64]) {
+    inside(`cabinet_${k++ % 4}`, b, x, 0.25, 0, CAB);
+    inside(`cabinet_${k++ % 4}`, b, x, -0.6, Math.PI, CAB);
+  }
+  inside('claw', b, 8.1, -5.3, 0, [1.15, 1.15, 2.2]);
+  inside('counter', b, 6.5, 5.7, Math.PI, [2.5, 0.75, 1.1]);
+  decor('trash_bags', b.cx - 8.4, b.cz + 5.6, 0.7);
+}
 
 // Free Fall drop tower
 prop({ type: 'freefall', ...FREEFALL });

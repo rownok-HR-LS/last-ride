@@ -266,6 +266,16 @@ export async function placeModels(parent, name, list) {
   }
 }
 
+/**
+ * Where a model is put for placement o (as placeModels does), and its own height range in model space:
+ * { matrix, ymin, ymax, src }.
+ */
+export async function placementOf(file, o) {
+  const src = await loadMerged(file);
+  const box = new THREE.Box3().setFromObject(src);
+  return { matrix: fitMatrix(src, o, () => true), ymin: box.min.y, ymax: box.max.y, src };
+}
+
 /** Where each breakable prop stands: id -> { file, matrix } (the placement matrix of its model). */
 export const BREAK_PLACES = new Map();
 

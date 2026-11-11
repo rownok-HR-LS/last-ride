@@ -6,6 +6,7 @@
 // The night sets windAmp (0 still .. 1 a storm, a little over in a thunderstorm), which also speeds the playback and
 // sways the plants harder (src/wind.js); the Ferris wheel's gondolas rock with it (src/rides.js).
 import * as THREE from 'three';
+import { windTime as windTimeRef } from './wind.js';
 
 /** Seconds of playback: the client advances it faster in a stronger wind. */
 export const motionTime = { value: 0 };
@@ -179,4 +180,44 @@ export async function bunting(tents) {
   mesh.receiveShadow = true;
   mesh.userData.moves = true;
   return mesh;
+}
+
+/**
+ * Strings of bulbs hung between poles, bobbing on their wires: each bulb swings with the wind, most in the middle
+ * of its span (t: 0..1 along the string), each strand in its own rhythm. bulbs: [{ key, x, y, z, t, strand }];
+ * material(key) gives the world's bulb materials.
+ */
+export function lightStrings(bulbs, material) {
+  const out = [];
+  for (const key of new Set(bulbs.map((b) => b.key))) {
+    const list = bulbs.filter((b) => b.key === key);
+    const mat = material(key).clone();
+    mat.onBeforeCompile = (sh) => {
+      sh.uniforms.windTime = windTimeRef;
+      sh.uniforms.windAmp = windAmp;
+      sh.vertexShader = sh.vertexShader
+        .replace('#include <common>', '#include <common>\nattribute vec2 aSway;\nuniform float windTime;\nuniform float windAmp;')
+        .replace('#include <begin_vertex>', `#include <begin_vertex>
+          {
+            float s = sin(3.14159 * aSway.x);
+            float ph = aSway.y * 1.7;
+            float k = s * (0.35 + 0.85 * windAmp);
+            transformed += vec3(sin(windTime * 1.6 + ph) * 0.16, (sin(windTime * 2.1 + ph * 1.3) - 1.0) * 0.06, cos(windTime * 1.3 + ph) * 0.16) * k;
+          }`);
+    };
+    mat.customProgramCacheKey = () => 'lightStrings';
+    const mesh = new THREE.InstancedMesh(new THREE.SphereGeometry(0.09, 7, 5), mat, list.length);
+    const sway = new Float32Array(list.length * 2);
+    const m = new THREE.Matrix4();
+    list.forEach((b, i) => {
+      mesh.setMatrixAt(i, m.makeTranslation(b.x, b.y, b.z));
+      sway[i * 2] = b.t;
+      sway[i * 2 + 1] = b.strand;
+    });
+    mesh.geometry.setAttribute('aSway', new THREE.InstancedBufferAttribute(sway, 2));
+    mesh.computeBoundingSphere();
+    mesh.name = 'lightStrings';
+    out.push(mesh);
+  }
+  return out;
 }
