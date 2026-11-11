@@ -21,7 +21,7 @@ import { createPost, SSR } from './post.js';
 import { ringTex } from './textures.js';
 import { Guide } from './guide.js';
 import { Intro } from './intro.js';
-import { cullInstances, setCullScale } from './cull.js';
+import { cullInstances, setCullScale, mergeBatches } from './cull.js';
 import { freed } from './ktx.js';
 import { setStage, whenCompiled, needsCompile, watchAdds } from './stage.js';
 import { ShadowProxy } from './shadowproxy.js';
@@ -273,6 +273,15 @@ export class Client {
       // through scene.add: build their shaders in the background as soon as they're added (watchAdds), so the
       // first frame that shows them doesn't stall while the driver builds them
       watchAdds(this.scene);
+      // scenery that shares a material is drawn together (cull.js mergeBatches): once the park has loaded, and again
+      // for whatever arrived later. ?nomerge leaves it all separate (the baking tools want the plain batches).
+      if (!/[?&]nomerge/.test(location.search)) {
+        const merge = () => mergeBatches(this.scene, (bm) => whenCompiled(bm)).then((n) => {
+          this.mergedDraws = (this.mergedDraws || 0) + n;
+        }).catch((e) => console.warn('merge', e));
+        setTimeout(merge, 8000);
+        setTimeout(merge, 40000);
+      }
     });
     const addNow = this.scene.add.bind(this.scene);
     // still scenery hands its moonlight shadow to one simplified stand-in (src/shadowproxy.js)

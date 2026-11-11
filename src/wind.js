@@ -23,6 +23,9 @@ export function sway(mat, amp) {
           #ifdef USE_INSTANCING
             wp = (instanceMatrix * vec4(position, 1.0)).xyz;
           #endif
+          #ifdef USE_BATCHING
+            wp = (batchingMatrix * vec4(position, 1.0)).xyz;
+          #endif
           // neighbours move together, gusts roll across the park
           float ph = wp.x * 0.35 + wp.z * 0.27;
           float gust = 0.55 + 0.45 * sin(windTime * 0.33 + wp.x * 0.015 + wp.z * 0.01);

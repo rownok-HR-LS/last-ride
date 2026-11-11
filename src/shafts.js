@@ -17,6 +17,9 @@ export function softShaft(mat, { bright = 'bottom', power = 1.8, near0 = 2.5, ne
         #ifdef USE_INSTANCING
           sw = modelMatrix * instanceMatrix;
         #endif
+        #ifdef USE_BATCHING
+          sw = modelMatrix * batchingMatrix;
+        #endif
         vec4 sp = sw * vec4(position, 1.0);
         vec3 sn = normalize(mat3(sw) * normal);
         vec3 sv = normalize(cameraPosition - sp.xyz);

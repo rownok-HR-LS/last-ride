@@ -138,6 +138,9 @@ export function addLampLight(sh, { ground = false } = {}) {
         #ifdef USE_INSTANCING
           lw = instanceMatrix * lw;
         #endif
+        #ifdef USE_BATCHING
+          lw = batchingMatrix * lw;
+        #endif
         vLampW = (modelMatrix * lw).xyz;
       }`);
   sh.fragmentShader = sh.fragmentShader

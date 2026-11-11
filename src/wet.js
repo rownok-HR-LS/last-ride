@@ -31,6 +31,9 @@ export function wetten(mat) {
           #ifdef USE_INSTANCING
             gw = instanceMatrix * gw;
           #endif
+          #ifdef USE_BATCHING
+            gw = batchingMatrix * gw;
+          #endif
           vGroundW = (modelMatrix * gw).xyz;
         }`);
     sh.fragmentShader = sh.fragmentShader
