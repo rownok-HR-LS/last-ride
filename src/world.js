@@ -17,6 +17,7 @@ import { dressBuildings } from './buildings.js';
 import { buildKit, kitDraws, boothVariant, BOOTH_GAMES } from './kit.js';
 import { buildDecals } from './decals.js';
 import { whenCompiled } from './stage.js';
+import { bunting } from './motion.js';
 import { compressed } from './ktx.js';
 
 // ------------------------------------------------------------------ materials
@@ -539,6 +540,8 @@ export function buildWorld(scene) {
     }
     scene.add(kit);
     dressBooths(kit);
+    // the tents' bunting flaps in the wind (src/motion.js); the kit's tent dressing leaves it out
+    bunting(PROPS.filter((p) => p.type === 'gametent')).then((b) => b && scene.add(b)).catch((e) => console.warn('bunting', e));
   }).catch((e) => console.warn('building kit', e));
   plantTrees(scene, parkTrees, { shadows: true, living: 0.15 });
 

@@ -7,6 +7,7 @@ import { Builder, mat } from './world.js';
 import { ringTex } from './textures.js';
 import { loadModel, mergeStatic } from './models.js';
 import { kitPart } from './kit.js';
+import { windAmp } from './motion.js';
 
 /** Copy a geometry with plain float attributes (compressed int16 ones clamp when transformed). */
 function floatGeo(src) {
@@ -559,7 +560,9 @@ export class Rides {
     this.gondolas.forEach((g, i) => {
       const a = snap.ferris.angle + (i / F.n) * Math.PI * 2;
       g.position.set(F.x + Math.cos(a) * F.r, F.hubY + Math.sin(a) * F.r, F.z);
-      g.rotation.z = Math.sin(time * 1.3 + i) * (snap.ferris.driver ? 0.25 : 0.04);
+      // the empty cabins rock in the wind: a creak on a still night, swinging in a thunderstorm
+      const gust = 0.6 + 0.4 * Math.sin(time * 0.35 + i * 0.7);
+      g.rotation.z = Math.sin(time * 1.3 + i) * (snap.ferris.driver ? 0.25 : 0.012 + 0.1 * windAmp.value * gust);
     });
 
     // coaster train

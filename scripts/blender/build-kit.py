@@ -24,6 +24,8 @@ from kitlib import Kit, rod  # noqa: E402
 
 args = sys.argv[sys.argv.index('--') + 1:]
 LAYOUT, OUT = args[0], args[1]
+# optional: only rebuild these kits (e.g. tentdress)
+ONLY = set(args[2:])
 layout = json.load(open(LAYOUT))
 T = 0.4  # wall thickness
 DOOR = 3.0
@@ -421,21 +423,7 @@ def tentdress():
     K = Kit()
     rr = random.Random(77)
     eave_r, eave_y = 3.95, 2.3
-    # pennant bunting hanging in loops round the eave
-    loops = 12
-    for i in range(loops):
-        a0 = i * 2 * math.pi / loops
-        for k in range(5):
-            t = (k + 0.5) / 5
-            a = a0 + t * 2 * math.pi / loops
-            sag = math.sin(t * math.pi) * 0.35
-            x, z = math.cos(a) * (eave_r + 0.08), math.sin(a) * (eave_r + 0.08)
-            y = eave_y - sag
-            col = BALLOONS[(i * 5 + k) % len(BALLOONS)]
-            tri = [(-0.13, 0.0), (0.13, 0.0), (0.0, -0.3)]
-            # a flag facing outward: build it in its own plane, then turn it round the tent
-            bm_pts = [(x + math.sin(a) * px * -1, y + py, z + math.cos(a) * px) for px, py in tri]
-            flag(K, col, bm_pts)
+    # (the pennant bunting round the eave is drawn by the game, flapping in the wind: src/motion.js bunting())
     # guy ropes from the eave out to stakes in the ground
     for i in range(8):
         a = (i + 0.5) * 2 * math.pi / 8
@@ -622,15 +610,25 @@ def watertower():
 
 
 for b in layout['buildings']:
-    building(b).export(f"{OUT}/kit_{b['style']}.glb")
-trailer().export(f'{OUT}/kit_trailer.glb')
-gate().export(f'{OUT}/kit_arch.glb')
+    if not ONLY or b['style'] in ONLY:
+        building(b).export(f'{OUT}/kit_{b['style']}.glb')
+if not ONLY or 'trailer' in ONLY:
+    trailer().export(f'{OUT}/kit_trailer.glb')
+if not ONLY or 'arch' in ONLY:
+    gate().export(f'{OUT}/kit_arch.glb')
 for v in ('ringtoss', 'darts', 'milk', 'gallery', 'prize'):
-    booth(v).export(f'{OUT}/kit_booth_{v}.glb')
-tentdress().export(f'{OUT}/kit_tentdress.glb')
-fence(1).export(f'{OUT}/kit_fence_a.glb')
-fence(2).export(f'{OUT}/kit_fence_b.glb')
+    if not ONLY or f'booth_{v}' in ONLY:
+        booth(v).export(f'{OUT}/kit_booth_{v}.glb')
+if not ONLY or 'tentdress' in ONLY:
+    tentdress().export(f'{OUT}/kit_tentdress.glb')
+if not ONLY or 'fence_a' in ONLY:
+    fence(1).export(f'{OUT}/kit_fence_a.glb')
+if not ONLY or 'fence_b' in ONLY:
+    fence(2).export(f'{OUT}/kit_fence_b.glb')
 for k in ('popcorn', 'candy', 'hotdog'):
-    cart(k).export(f'{OUT}/kit_cart_{k}.glb')
-kiosk().export(f'{OUT}/kit_kiosk.glb')
-watertower().export(f'{OUT}/kit_watertower.glb')
+    if not ONLY or f'cart_{k}' in ONLY:
+        cart(k).export(f'{OUT}/kit_cart_{k}.glb')
+if not ONLY or 'kiosk' in ONLY:
+    kiosk().export(f'{OUT}/kit_kiosk.glb')
+if not ONLY or 'watertower' in ONLY:
+    watertower().export(f'{OUT}/kit_watertower.glb')

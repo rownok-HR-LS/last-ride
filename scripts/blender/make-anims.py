@@ -300,7 +300,47 @@ def death_twist():
     rig.bake('death_twist', 2.2, pose)
 
 
+def possess_ride():
+    """A ghost inside a bumper car or a coaster car: hunched into it, both hands clawed round the front as if
+    gripping the wheel, head thrown back, the whole body shuddering with the stolen power."""
+    rig = Rig('breath_idle.fbx')
+    dur = 1.6
+
+    def pose(r, t):
+        w = 2 * math.pi * t / dur
+        jit = math.sin(w * 9) * 0.5 + math.sin(w * 13 + 1.1) * 0.5  # the shudder (whole cycles in the loop)
+        spine(r, 0.55 + math.sin(w) * 0.05 + jit * 0.02, math.sin(w * 2) * 0.05, jit * 0.03)
+        headturn(r, -0.55 + math.sin(w + 0.8) * 0.08, math.sin(w) * 0.12, jit * 0.05)
+        for side, s in (('Right', 1), ('Left', -1)):
+            ph = 0 if s > 0 else 2.1
+            arm_to(r, side, (0.5 + math.sin(w + ph) * 0.03, 0.26 * s, 0.82 + jit * 0.015 * s), (-0.3, 0.9 * s, 1.0))
+            # knees drawn up, sunk into the seat
+            leg_to(r, side, (0.18, 0.14 * s, 0.42), (0.9, 0.15 * s, 0.7))
+    rig.bake('possess_ride', dur, pose, loop=True)
+
+
+def possess_wheel():
+    """A ghost at the foot of the Ferris wheel it has taken: floating, back arched, both arms raised high toward the
+    wheel, fingers spread, swaying as it drags the wheel round."""
+    rig = Rig('breath_idle.fbx')
+    dur = 3.0
+
+    def pose(r, t):
+        w = 2 * math.pi * t / dur
+        jit = math.sin(w * 11) * 0.5 + math.sin(w * 17 + 0.7) * 0.5
+        spine(r, -0.3 + math.sin(w) * 0.06, math.sin(w * 0.5) * 0.1, math.sin(w + 1.0) * 0.06)
+        headturn(r, -0.6 + math.sin(w + 0.4) * 0.07, math.sin(w * 0.5 + 0.5) * 0.12, 0.0)
+        for side, s in (('Right', 1), ('Left', -1)):
+            ph = 0 if s > 0 else math.pi
+            arm_to(r, side, (0.22 + math.sin(w + ph) * 0.06, 0.5 * s, 1.95 + math.sin(w * 2 + ph) * 0.05 + jit * 0.01),
+                   (-0.5, 0.8 * s, 1.2))
+            # legs trail below, a little apart
+            leg_to(r, side, (-0.16 + math.sin(w + ph + 1) * 0.04, 0.13 * s, 0.08), (0.8, 0.15 * s, 0.55))
+    rig.bake('possess_wheel', dur, pose, loop=True)
+
+
 CLIPS = {
+    'possess_ride': possess_ride, 'possess_wheel': possess_wheel,
     'spike_stab': spike_stab, 'mallet_whack': mallet_whack,
     'saw_idle': lambda: saw('saw_idle', 0.6, 0.0), 'saw_rev': lambda: saw('saw_rev', 0.8, 0.22),
     'ghost_float': ghost_float, 'fall_flail': fall_flail, 'death_kneel': death_kneel, 'death_twist': death_twist,

@@ -8,6 +8,7 @@ import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.j
 import { ktx2 } from './ktx.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { cullable, lodLimit } from './cull.js';
+import { loadMotion, attachMotion, motionMaterial } from './motion.js';
 
 const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).setKTX2Loader(ktx2());
 const cache = new Map();
@@ -208,6 +209,22 @@ function instance(parent, src, mats, keep) {
   return out;
 }
 
+/** Give the police tape model's ribbon the baked flutter (once: the merged model is shared). */
+async function tieTape(src) {
+  if (src.userData.motion) return;
+  src.userData.motion = true;
+  const m = await loadMotion('tape');
+  src.updateMatrixWorld(true);
+  const toRoot = new THREE.Matrix4().copy(src.matrixWorld).invert();
+  src.traverse((o) => {
+    if (!o.isMesh || !/tape/i.test(o.material?.name || '')) return;
+    const toModel = new THREE.Matrix4().multiplyMatrices(toRoot, o.matrixWorld);
+    if (!attachMotion(o.geometry, m, toModel)) return;
+    const toLocal = new THREE.Matrix3().setFromMatrix4(toModel).invert();
+    o.material = motionMaterial(o.material.clone(), m, toLocal);
+  });
+}
+
 /**
  * Many placements of the same model as instanced meshes: [{ x, z, rot, w, d, ... }].
  * name may pick one piece of a model: 'light_poles#LightPole_01_2'.
@@ -217,6 +234,8 @@ export async function placeModels(parent, name, list) {
   const [file, part] = name.split('#');
   const src = part ? await loadModel(file) : await loadMerged(file);
   const keep = (o) => within(o, part);
+  // the police tape's runs flutter between their stakes (src/motion.js)
+  if (file === 'police_tape') await tieTape(src).catch((e) => console.warn('tape motion', e));
   const mats = list.map((o) => fitMatrix(src, o, keep));
   const lod = !part && FAR_MODELS[file];
   const near = instance(parent, src, mats, keep);

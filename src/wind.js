@@ -1,5 +1,7 @@
 // The wind in the plants: grass, ferns, bushes and tree crowns sway, more the higher up they are, in slow gusts.
-// The client advances windTime every frame.
+// The client advances windTime every frame; the night's wind (motion.js windAmp) sets how hard they move.
+
+import { windAmp } from './motion.js';
 
 export const windTime = { value: 0 };
 
@@ -12,8 +14,9 @@ export function sway(mat, amp) {
   mat.onBeforeCompile = (sh, renderer) => {
     prev?.call(mat, sh, renderer);
     sh.uniforms.windTime = windTime;
+    sh.uniforms.windAmp = windAmp;
     sh.vertexShader = sh.vertexShader
-      .replace('#include <common>', '#include <common>\nuniform float windTime;')
+      .replace('#include <common>', '#include <common>\nuniform float windTime;\nuniform float windAmp;')
       .replace('#include <begin_vertex>', `#include <begin_vertex>
         {
           vec3 wp = position;
@@ -24,7 +27,8 @@ export function sway(mat, amp) {
           float ph = wp.x * 0.35 + wp.z * 0.27;
           float gust = 0.55 + 0.45 * sin(windTime * 0.33 + wp.x * 0.015 + wp.z * 0.01);
           float sw = (sin(windTime * 1.5 + ph) * 0.65 + sin(windTime * 3.4 + ph * 1.7) * 0.35) * gust;
-          float k = max(position.y, 0.0) * ${amp.toFixed(4)};
+          // harder in a storm, barely on a still night
+          float k = max(position.y, 0.0) * ${amp.toFixed(4)} * (0.3 + 0.7 * windAmp);
           transformed.x += sw * k;
           transformed.z += sw * k * 0.55;
         }`);

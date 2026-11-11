@@ -23,11 +23,13 @@ import { Intro } from './intro.js';
 import { cullInstances, setCullScale } from './cull.js';
 import { freed } from './ktx.js';
 import { setStage, whenCompiled, needsCompile } from './stage.js';
+import { ShadowProxy } from './shadowproxy.js';
 import { Bus } from './bus.js';
 import { Projectiles } from './projectiles.js';
 import { weaponModel, projectileModel, itemModel } from './weapons.js';
 import * as audio from './audio.js';
 import { windTime } from './wind.js';
+import { motionTime, windAmp, NIGHT_WIND } from './motion.js';
 import { sceneWet } from './wet.js';
 import { PauseMenu } from './menu.js';
 import { loadSettings } from './settings.js';
@@ -99,6 +101,12 @@ function rayBus(bus, ox, oy, oz, dx, dy, dz, maxT) {
     if (t0 > t1) return Infinity;
   }
   return t0;
+}
+
+/** The night's wind: eases toward its strength and plays the baked cloth motion faster when it blows harder. */
+function blowWind(dt, target) {
+  windAmp.value += (target - windAmp.value) * Math.min(1, dt * 0.4);
+  motionTime.value = (motionTime.value + dt * (0.55 + 0.45 * windAmp.value)) % 10000;
 }
 
 export class Client {
@@ -217,7 +225,13 @@ export class Client {
     this.ready = whenCompiled(this.scene).then(() => {
       this.compiled = true;
     });
-    const sceneAdd = this.scene.add.bind(this.scene);
+    const addNow = this.scene.add.bind(this.scene);
+    // still scenery hands its moonlight shadow to one simplified stand-in (src/shadowproxy.js)
+    this.shadowProxy = new ShadowProxy(this, this.moonLight);
+    const sceneAdd = (o) => {
+      addNow(o);
+      this.shadowProxy.adopt(o);
+    };
     const sceneRemove = this.scene.remove.bind(this.scene);
     const waiting = new Set();
     this.scene.add = (...objs) => {
@@ -442,6 +456,7 @@ export class Client {
     this.rain.update(dt, cam, { amount: 0.85, flash, bus: null });
     groundRain.time.value = t % 1000;
     windTime.value = t % 1000;
+    blowWind(dt, NIGHT_WIND.storm);
     groundRain.amount.value = 0.85;
     sceneWet.value = 0.85;
     this.lamps.update([], t, cam.position.x, cam.position.z, 1);
@@ -1387,6 +1402,7 @@ export class Client {
     this.rain.update(dt, this.camera, { amount: rainAmount, flash: this.weather.flash, bus: snap.bus });
     groundRain.time.value = this.time % 1000;
     windTime.value = this.time % 1000;
+    blowWind(dt, NIGHT_WIND[snap.night] ?? NIGHT_WIND.storm);
     groundRain.amount.value = rainAmount;
     // (on a dry night the park is still wet from the rain before)
     sceneWet.value = Math.max(rainAmount, 0.35);

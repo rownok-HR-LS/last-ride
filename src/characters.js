@@ -151,13 +151,14 @@ export function setCharacterRim(v) {
 function lookShader(sh) {
   const L = this.userData.look;
   Object.assign(sh.uniforms, { rimAmount, lookWet: L.wet, lookBlood: L.blood, lookGrime: L.grime, lookSeed: L.seed, lookTint: L.tint, lookHit: L.hit || { value: 0 }, lookDye: L.dye || { value: new THREE.Vector4() } });
-  sh.vertexShader = `attribute vec3 bodyP;\nvarying vec3 vBody;\n${sh.vertexShader}`.replace(
+  sh.vertexShader = `attribute vec3 bodyP;\nattribute vec2 mouthP;\nvarying vec3 vBody;\nvarying vec2 vMouth;\n${sh.vertexShader}`.replace(
     '#include <begin_vertex>',
-    '#include <begin_vertex>\n  vBody = bodyP;',
+    '#include <begin_vertex>\n  vBody = bodyP;\n  vMouth = mouthP;',
   );
   sh.fragmentShader = `uniform float rimAmount; uniform float lookWet; uniform float lookBlood; uniform float lookGrime;
     uniform float lookSeed; uniform vec3 lookTint; uniform float lookHit; uniform vec4 lookDye;
     varying vec3 vBody;
+    varying vec2 vMouth;
     float lkH(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
     float lkN(vec3 p) {
       vec3 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
@@ -175,6 +176,9 @@ function lookShader(sh) {
     .replace('#include <map_fragment>', `#include <map_fragment>
       {
         vec3 c = diffuseColor.rgb;
+        // teeth an old yellowed white, the tongue and the inside of the mouth a dark red
+        c = mix(c, vec3(0.42, 0.37, 0.28), clamp(vMouth.x, 0.0, 1.0));
+        c = mix(c, vec3(0.16, 0.035, 0.03), clamp(vMouth.y, 0.0, 1.0));
         float lum = dot(c, vec3(0.299, 0.587, 0.114));
         // judge colours the way they look on screen (gamma space), not in linear light
         vec3 g = sqrt(max(c, 0.0));
@@ -253,6 +257,22 @@ function addBodyCoords(scene, box, k) {
       out[i * 3 + 2] = (v.z - cz) * k;
     }
     o.geometry.setAttribute('bodyP', new THREE.BufferAttribute(out, 3));
+    // the teeth and tongue (rigs that have them): their patch of the merged texture came out wrong (purple), so the
+    // look shader paints them; seen once the jaw opens to shout (Character.face)
+    const mouth = new Float32Array(n * 2);
+    const bones = o.skeleton?.bones || [];
+    const kind = bones.map((b) => (/Teeth|Tooth/i.test(b.name) ? 1 : /Tongue/i.test(b.name) ? 2 : 0));
+    if (kind.some((k) => k)) {
+      const si = o.geometry.attributes.skinIndex;
+      const sw = o.geometry.attributes.skinWeight;
+      for (let i = 0; i < n; i++) {
+        for (let j = 0; j < 4; j++) {
+          const k = kind[si.getComponent(i, j)];
+          if (k) mouth[i * 2 + k - 1] += sw.getComponent(i, j);
+        }
+      }
+    }
+    o.geometry.setAttribute('mouthP', new THREE.BufferAttribute(mouth, 2));
   });
 }
 
@@ -824,6 +844,12 @@ export class Character {
     this.overW = 0;
     this.flinch = 0;
     this.isGhost = false;
+    // the jaw (Character.face): the scanned riders' rigs open it turning one way, the CC rigs the other
+    // (the scans' mouths are only painted inside, so they open a little less; Agnes's pursed lips don't part at all)
+    const jaw = this.outfit === 'agnes' ? null : Object.values(this.bones).find((b) => /(^|_)jaw$/i.test(b.name)) || this.bones.CC_Base_JawRoot;
+    this.jaw = jaw ? { bone: jaw, rest: jaw.quaternion.clone(), sign: /^CC_/.test(jaw.name) ? 1 : -1, scale: /^CC_/.test(jaw.name) ? 0.85 : 0.75 } : null;
+    this.jawOpen = 0;
+    this.facePhase = r() * 6.28;
   }
 
   action(name) {
@@ -1078,6 +1104,9 @@ export class Character {
     let overSpeed = 1;
     // ghosts hang limp in the air, swaying
     if (ghost && this.clips.ghost_float) over = 'ghost_float';
+    // ...unless they have taken a ride: hunched into a car gripping it, or arms raised to the Ferris wheel
+    if (ghost && (p.possess === 'car' || p.possess === 'coaster') && this.clips.possess_ride) over = 'possess_ride';
+    if (ghost && p.possess === 'ferris' && this.clips.possess_wheel) over = 'possess_wheel';
     if (!ghost) {
       // sitting on the tour bus (riders) or behind its wheel (the driver)
       if (opts.seat && this.clips[opts.seat]) over = opts.seat;
@@ -1268,6 +1297,7 @@ export class Character {
       this.updateTrail(p, dt, melee && w !== 'fists' && !!p.atk && p.atk.u > 0.22 && p.atk.u < 0.85 && this.hitstop <= 0);
     }
     this.headLook(p, dt, ghost || p.state !== 'alive' || !!this.over || !!opts.seat ? null : opts.lookAt);
+    this.face(p, dt, time, ghost);
     // the wraith's eyes burn when it uses a power (and always for other ghosts)
     this.eyes.visible = ghost && (opts.eyes ?? true);
     if (this.eyes.visible && this.bones.Head) {
@@ -1275,6 +1305,32 @@ export class Character {
       this.bones.Head.getWorldScale(s);
       this.eyes.scale.setScalar(1 / (s.x || 1));
     }
+  }
+
+  /**
+   * The face, through the jaw (the scans have no face shapes, but most rigs have a jaw bone): a shout on a swing,
+   * louder on a heavy one; a gasp when hit; panting when sprinting or badly hurt; a ghost's slow wail; a dead
+   * rider's slack jaw; otherwise just breathing.
+   */
+  face(p, dt, time, ghost) {
+    const J = this.jaw;
+    if (!J) return;
+    let open = 0.015 + 0.012 * Math.sin(time * 1.9 + this.facePhase);
+    if (ghost && p.possess) open = 0.27 + 0.04 * Math.sin(time * 14 + this.facePhase); // a silent scream as it rides
+    else if (ghost) open = 0.1 + 0.16 * Math.max(0, Math.sin(time * 1.3 + this.facePhase));
+    else if (p.state !== 'alive') open = 0.3;
+    else {
+      if (p.sprint) open = Math.max(open, 0.07 + 0.04 * Math.sin(time * 9 + this.facePhase));
+      if (p.hp != null && p.hp < 35) open = Math.max(open, 0.06 + 0.035 * Math.sin(time * 5.5 + this.facePhase));
+      if (p.atk) {
+        const u = Math.min(1, Math.max(0, (p.atk.u - 0.05) / 0.6));
+        open = Math.max(open, (p.atk.heavy ? 0.3 : 0.17) * Math.sin(u * Math.PI));
+      }
+      open = Math.max(open, this.flinch * 0.24);
+    }
+    this.jawOpen += (open - this.jawOpen) * Math.min(1, dt * 16);
+    J.bone.quaternion.copy(J.rest);
+    J.bone.rotateZ(J.sign * this.jawOpen * J.scale);
   }
 
   /**
@@ -1405,6 +1461,8 @@ export class Character {
 }
 
 /** A body left behind where a survivor died (when nobody stole it). Plays a death animation, then sinks away. */
+const DEAD = { state: 'dead' };
+
 export class Corpse {
   /** look: { seed, wet, blood, wear } of the rider who fell, so the body keeps their clothes, dye, dirt and blood. */
   constructor(outfit, x, y, z, yaw, scene, look = null) {
@@ -1423,6 +1481,7 @@ export class Corpse {
   update(dt) {
     this.t += dt;
     this.char.mixer.update(dt);
+    this.char.face(DEAD, dt, this.t, false);
     if (this.t > 9) this.char.root.position.y -= dt * 0.3;
     if (this.t > 13) {
       this.scene.remove(this.char.root);
