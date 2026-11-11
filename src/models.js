@@ -287,7 +287,8 @@ export function brokenPieces(file, insideColor) {
         if (!o.isMesh) return;
         // the chunk is the named node (a mesh with several materials comes in as a group of meshes)
         let node = o;
-        while (node.parent && node.parent !== g.scene && !/^chunk_/.test(node.name)) node = node.parent;
+        // (its meshes are named chunk_3_1, chunk_3_2...: only the node itself is chunk_3)
+        while (node.parent && node.parent !== g.scene && !/^chunk_\d+$/.test(node.name)) node = node.parent;
         if (!chunks.has(node)) chunks.set(node, { center: node.getWorldPosition(new THREE.Vector3()), parts: [] });
         // plain float positions in the model's space (packed ones clamp if transformed)
         const geo = new THREE.BufferGeometry();
