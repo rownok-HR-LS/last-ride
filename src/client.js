@@ -23,7 +23,7 @@ import { Guide } from './guide.js';
 import { Intro } from './intro.js';
 import { cullInstances, setCullScale } from './cull.js';
 import { freed } from './ktx.js';
-import { setStage, whenCompiled, needsCompile } from './stage.js';
+import { setStage, whenCompiled, needsCompile, watchAdds } from './stage.js';
 import { ShadowProxy } from './shadowproxy.js';
 import { Bus } from './bus.js';
 import { Projectiles } from './projectiles.js';
@@ -269,6 +269,10 @@ export class Client {
       this.compiled = true;
       // the physics engine for ragdolls comes in once the menu is up (deaths fall back to animations until then)
       setTimeout(() => loadRagdolls(), 1500);
+      // models that arrive later inside groups already in the park (far versions, ride parts, effects) don't pass
+      // through scene.add: build their shaders in the background as soon as they're added (watchAdds), so the
+      // first frame that shows them doesn't stall while the driver builds them
+      watchAdds(this.scene);
     });
     const addNow = this.scene.add.bind(this.scene);
     // still scenery hands its moonlight shadow to one simplified stand-in (src/shadowproxy.js)
@@ -1603,7 +1607,8 @@ export class Client {
       const behind = !seat && cd > 8 && (cdx * fwdX + cdz * fwdZ) / cd < -0.35;
       const culled = cd > 130 || behind;
       ch.root.visible = !hidden && !culled;
-      ch.detail(Math.hypot(cd, p.y - this.camera.position.y));
+      // ghosts are see-through wisps: the simplified body is plenty for them unless one is right in your face
+      ch.detail(Math.hypot(cd, p.y - this.camera.position.y) + (p.state === 'ghost' && p.id !== this.myId ? 18 : 0));
       if (culled) {
         c.tag.visible = false;
         if (c.reveal) c.reveal.visible = false;
