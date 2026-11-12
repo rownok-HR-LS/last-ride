@@ -1022,6 +1022,8 @@ body.pad .slot kbd, body.pad .item kbd:empty, body.pad .power kbd:empty { displa
 .lb-names span { padding: 3px 10px; border-radius: 999px; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.15); font: 600 13px/1.4 var(--hud, sans-serif); letter-spacing: 0.06em; text-transform: uppercase; color: #f1ece2; }
 .lb-names span.you { border-color: #ffe14f; color: #ffe14f; }
 .lb-buttons { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 8px; }
+.lobby-sign .lb-watch { margin-top: 10px; }
+.lobby-sign .lb-watch[hidden] { display: none; }
 
 /* ================================================================ every sign in the style of the menu and the HUD */
 /* (the pause sign, settings, the results, the bus stop, the prize counter and the death card: dark glass panels,

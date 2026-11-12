@@ -3,9 +3,9 @@
 /** The park runs at 60 ticks a second; riders hear about it 20 times a second. */
 export const TICK = 1 / 60;
 export const SNAP_EVERY = 3;
-/** The first bus waits this long for riders; after a ride ends, the next one leaves sooner. */
-export const BUS_WAIT = 30;
-export const BUS_AGAIN = 20;
+/** The bus waits this long at the stop for others to board (a friend with an invite link), then leaves. */
+export const BUS_WAIT = 15;
+export const BUS_AGAIN = 15;
 /** How far behind the server other riders are drawn, so their motion is smooth between updates. */
 export const INTERP = 0.1;
 

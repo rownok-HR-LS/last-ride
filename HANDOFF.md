@@ -268,3 +268,14 @@ Chrome blocks these sites from posting to localhost, so downloads always go thro
   reflections both drop NaN/Inf pixels.
 - How it was found: step `attractFrame(0.05)` reading a few pixels back each frame until one is all zero, rewind
   `client.time` to that moment, then hide scene children one at a time (skip lights: hiding one recompiles everything).
+
+## Several rides at once (2026-11-13)
+
+- The server is now a `Park` (server/room.js) of up to 4 `Room`s (MAX_RIDES; one ride is ~1% of a desktop core).
+  Each Room is one ride with its own bus stop and a 4-letter code. The bus waits 15 s (BUS_WAIT/BUS_AGAIN).
+- Joining: an invite code's ride first (watching if it has left; then first in line for its next bus), else a bus
+  already counting down with seats, else an empty stop, else a new stop. Nobody is made to watch any more.
+- "Watch a ride under way" at the stop (`{t:'watch'}`) moves you into the busiest running ride's line.
+- Over the limit the bus is held ("All the buses are out") until a ride ends.
+- Invite links are `?ride=CODE`; old `?ride` links still just get in line. Health JSON adds `rides`.
+- Tests: node scripts/roomtest.mjs (32 checks incl. several rides), scripts/nettest.mjs against a local server.

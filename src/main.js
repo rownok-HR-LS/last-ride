@@ -269,15 +269,15 @@ async function title() {
   setTimeout(showLive, 250);
   play.disabled = false;
   practice.disabled = false;
-  play.innerHTML = 'Ride online <small>Public ride · the bus leaves every half minute</small>';
+  play.innerHTML = 'Ride online <small>Your bus leaves in 15 seconds · bots fill the seats</small>';
   // how many are in the park right now (from the server's wake-up answer)
   parkInfo.then((info) => {
     if (info && typeof info.online === 'number' && !play.disabled) {
-      play.querySelector('small').textContent = info.online ? `${info.online} in the park · the bus leaves every half minute` : 'Nobody in the park yet · bots fill the seats';
+      play.querySelector('small').textContent = info.online ? `${info.online} in the park · your bus leaves in 15 seconds` : 'Nobody in the park yet · bots fill the seats';
     }
   });
 
-  const start = async (online, resume = null) => {
+  const start = async (online, resume = null, code = null) => {
     if (play.disabled) return;
     // sound (and the music box) starts right here, on the press itself: a browser only lets a page start audio
     // during a click or key press, and waiting for the riders first could take longer than it allows
@@ -295,7 +295,7 @@ async function title() {
     const { Online } = await import('./online.js');
     const ride = new Online(app, client, profile);
     if (import.meta.env.DEV) window.__online = ride;
-    ride.join(resume);
+    ride.join(resume, code);
   };
   play.addEventListener('click', () => start(true));
   // came back from a refresh in the middle of a ride: straight back to your rider
@@ -309,10 +309,13 @@ async function title() {
   } catch {
     /* no session storage */
   }
-  // an invite link (?ride): straight to the bus stop, where the friend who sent it is waiting
-  if (!resumed && new URLSearchParams(location.search).has('ride')) {
+  // an invite link (?ride=CODE): straight to the friend's ride (their bus stop, or watching their ride until the next
+  // bus); an old link without a code just gets in line
+  const invite = new URLSearchParams(location.search);
+  if (!resumed && invite.has('ride')) {
+    const code = invite.get('ride') || null;
     history.replaceState(null, '', location.pathname + location.search.replace(/[?&]ride(=[^&]*)?/, '').replace(/^&/, '?'));
-    start(true);
+    start(true, null, code);
   }
   practice.addEventListener('click', () => start(false));
   nick.addEventListener('keydown', (e) => {

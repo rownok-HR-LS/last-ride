@@ -67,7 +67,7 @@ export class Online {
    * Connect and get in line for the next bus. A server that was asleep gets up to WAKE_FOR to wake: we keep knocking
    * and keep trying, and say so, instead of giving up at the first refusal.
    */
-  async join(resume = null) {
+  async join(resume = null, code = null) {
     this.show(resume ? 'Back to your ride…' : 'Calling the park…', '', '');
     const t0 = Date.now();
     const waited = () => `${Math.round((Date.now() - t0) / 1000)}s`;
@@ -95,7 +95,8 @@ export class Online {
     this.wire(conn);
     // after a refresh mid-ride the ticket takes your rider back from the bot (or, if the ride is gone, gets in line)
     if (resume) conn.send({ t: 'rejoin', ticket: resume, name: this.profile.name, outfit: this.profile.outfit, look: this.profile.look });
-    else conn.send({ t: 'join', name: this.profile.name, outfit: this.profile.outfit, look: this.profile.look });
+    // an invite link's code puts you on your friend's ride
+    else conn.send({ t: 'join', name: this.profile.name, outfit: this.profile.outfit, look: this.profile.look, ride: code });
     this.client.onAgain = () => this.again();
     this.render();
   }
@@ -163,7 +164,8 @@ export class Online {
         this.wire(conn);
         if (riding) conn.send({ t: 'rejoin', ticket: this.ticket, name: this.profile.name, outfit: this.profile.outfit, look: this.profile.look });
         else {
-          conn.send({ t: 'join', name: this.profile.name, outfit: this.profile.outfit, look: this.profile.look });
+          // back to the same ride's stop (or the ride being watched), if it is still there
+          conn.send({ t: 'join', name: this.profile.name, outfit: this.profile.outfit, look: this.profile.look, ride: this.status?.code });
           this.banner(null);
           if (this.mode !== 'ride') this.toLobby();
         }
@@ -220,12 +222,19 @@ export class Online {
     const m = this.status;
     if (this.mode !== 'lobby' || !m) return;
     const others = Math.max(0, m.waiting - 1);
-    if (m.busIn != null) {
-      this.show('The bus leaves in', clock(m.busIn), `${others ? `${others} other rider${others > 1 ? 's' : ''} waiting` : 'You are first in line'} · bots fill the empty seats · ${m.online} in the park`, m.names);
+    const line = others ? `${others} other rider${others > 1 ? 's' : ''} waiting` : 'You are first in line';
+    if (m.held) {
+      // every ride the server can run is out
+      this.show('All the buses are out', '…', `Yours leaves as soon as one comes back · ${line}`, m.names);
+    } else if (m.busIn != null) {
+      this.show('The bus leaves in', clock(m.busIn), `${line} · bots fill the empty seats · ${m.online} in the park`, m.names);
     } else if (m.ride) {
       // a ride is under way (you just finished yours, or you will board after it)
       this.show(m.ride.phase === 'end' ? 'The ride is over' : 'A ride is under way', m.ride.phase === 'end' ? '…' : `${m.ride.alive} alive`, `The next bus leaves when it is over · ${m.online} in the park`);
     } else this.show('Waiting for the bus', '…', `${m.online} in the park`);
+    // watching a ride already under way is a choice, never the only way in
+    const watch = this.sign.querySelector('.lb-watch');
+    if (watch) watch.hidden = !(m.watchable > 0 && !m.ride);
   }
 
   /** names: who is in line for this bus (from the server), shown as a row of tickets. */
@@ -239,11 +248,18 @@ export class Online {
         <div class="lb-names"></div>
         <p class="fine center lb-info"></p>
         <div class="lb-buttons"><button class="ticket cream lb-invite">Copy invite link</button><button class="ticket dark lb-leave">Leave the stop</button></div>
+        <button class="ticket dark lb-watch" hidden>Watch a ride under way</button>
       </div>`;
       this.sign.querySelector('.lb-leave').addEventListener('click', () => this.toMenu());
-      // ride with a friend: one public ride, so a link that heads straight for the stop is all it takes
+      // off this stop, watching another ride as a ghost; you board that ride's next bus when it ends
+      this.sign.querySelector('.lb-watch').addEventListener('click', (e) => {
+        e.currentTarget.hidden = true;
+        this.conn?.send({ t: 'watch' });
+      });
+      // ride with a friend: the link carries this ride's code, so your friend boards your bus (or watches your ride
+      // and boards the next one with you)
       this.sign.querySelector('.lb-invite').addEventListener('click', (e) => {
-        const url = `${location.origin}${location.pathname}?ride`;
+        const url = `${location.origin}${location.pathname}?ride=${encodeURIComponent(this.status?.code ?? '')}`;
         const b = e.currentTarget;
         const done = (ok) => {
           b.textContent = ok ? 'Link copied · send it to a friend' : url;

@@ -1,19 +1,19 @@
-// LAST RIDE game server: one public ride over WebSockets. Run with `npm start` (PORT defaults to 8090).
+// LAST RIDE game server: the park's rides over WebSockets. Run with `npm start` (PORT defaults to 8090).
 import http from 'node:http';
 import { WebSocketServer } from 'ws';
-import { Room } from './room.js';
+import { Park } from './room.js';
 import { TICK } from '../shared/net.js';
 
 const PORT = +process.env.PORT || 8090;
 // a shorter wait at the stop when testing: BUS_WAIT=5 in the environment, or --bus=5
 const busArg = +(process.argv.find((a) => a.startsWith('--bus='))?.slice(6) ?? 0);
 const bus = +process.env.BUS_WAIT || busArg || undefined;
-const room = new Room({ busWait: bus, busAgain: bus });
+const park = new Park({ busWait: bus, busAgain: bus });
 
 // a plain page for health checks (Render pings it to know the server is up)
 const server = http.createServer((req, res) => {
   res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*' });
-  res.end(JSON.stringify({ game: 'last-ride', online: room.humans(), riding: !!room.game, busIn: room.busIn }));
+  res.end(JSON.stringify(park.info()));
 });
 
 const wss = new WebSocketServer({
@@ -26,7 +26,7 @@ const wss = new WebSocketServer({
 wss.on('connection', (ws) => {
   ws.alive = true;
   ws.on('pong', () => (ws.alive = true));
-  room.connect(ws);
+  park.connect(ws);
 });
 
 // drop connections that stopped answering
@@ -47,7 +47,7 @@ function loop() {
   const now = performance.now();
   let n = 0;
   while (now >= next && n < 5) {
-    room.update();
+    park.update();
     next += TICK * 1000;
     n++;
   }
