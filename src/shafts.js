@@ -29,7 +29,9 @@ export function softShaft(mat, { bright = 'bottom', power = 1.8, near0 = 2.5, ne
         // are metres away but it still fills the view)
         vec3 sc = (sw * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
         vShaftNear = smoothstep(${near0.toFixed(2)}, ${near1.toFixed(2)}, distance(cameraPosition.xz, sc.xz));`);
-    const along = bright === 'top' ? 'vShaftV' : '(1.0 - vShaftV)';
+    // (clamped: at the rim the interpolated value can come out a hair below zero, and pow() of a negative number is
+    // not a number; one such pixel, drawn additively, went through the bloom and blacked out the whole frame)
+    const along = bright === 'top' ? 'clamp(vShaftV, 0.0, 1.0)' : 'clamp(1.0 - vShaftV, 0.0, 1.0)';
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>\n${vars}`)
       .replace('#include <opaque_fragment>', `diffuseColor.a *= pow(${along}, ${power.toFixed(2)}) * vShaftEdge * vShaftEdge * vShaftNear;\n#include <opaque_fragment>`);

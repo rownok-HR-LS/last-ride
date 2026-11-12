@@ -257,3 +257,14 @@ Chrome blocks these sites from posting to localhost, so downloads always go thro
   the next arrival gets a bus instead of watching bots. A real refresh mid-ride still resumes.
 - Testing live: never leave an online test ride running (close it with Leave the park). One public ride: anyone who
   arrives while it runs can only watch as a ghost until it ends.
+
+## Black frames (2026-11-13)
+
+- The menu went fully black about 56 s in (and could stay black for seconds); loot beams could do the same in a ride.
+  Cause: `softShaft` (src/shafts.js) did `pow(vShaftV, 2.4)`; at a cone's rim the interpolated value can be a hair
+  below zero, pow() of a negative is not a number, and one such additive pixel is blurred by the bloom over the whole
+  frame (and the puddle reflections could then mirror it back into later frames). Fixed with a clamp.
+- Guards in src/post.js so no single broken pixel can do that again: the bloom's bright pass and the kept frame for
+  reflections both drop NaN/Inf pixels.
+- How it was found: step `attractFrame(0.05)` reading a few pixels back each frame until one is all zero, rewind
+  `client.time` to that moment, then hide scene children one at a time (skip lights: hiding one recompiles everything).

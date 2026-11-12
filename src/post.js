@@ -206,7 +206,10 @@ export function createPost(renderer, scene, camera) {
       void main() {
         float zd = texture2D(tDepth, vUv).x;
         float z = zd > 0.99999 ? 1e5 : -perspectiveDepthToViewZ(zd, near, far);
-        gl_FragColor = vec4(texture2D(tColor, vUv).rgb, z);
+        vec3 c = texture2D(tColor, vUv).rgb;
+        // a broken pixel (not a number) must not be kept: the ground would mirror it back into every later frame
+        if (any(isnan(c)) || any(isinf(c))) c = vec3(0.0);
+        gl_FragColor = vec4(c, z);
       }`,
     depthTest: false,
     depthWrite: false,
@@ -250,6 +253,16 @@ export function createPost(renderer, scene, camera) {
   // (after the glow, so the halos and light cones are in the copy the puddles mirror)
   composer.addPass(new KeepPass());
   const bloom =new UnrealBloomPass(new THREE.Vector2(size.x / 2, size.y / 2), 0.42, 0.5, 0.86);
+  // one broken pixel (not a number) anywhere in the frame would be blurred by the bloom over the whole screen, a
+  // black frame: the bloom leaves such pixels out
+  {
+    const hp = bloom.materialHighPassFilter;
+    const read = 'vec4 texel = texture2D( tDiffuse, vUv );';
+    if (hp?.fragmentShader.includes(read)) {
+      hp.fragmentShader = hp.fragmentShader.replace(read, `${read}\n\tif ( any( isnan( texel ) ) || any( isinf( texel ) ) ) texel = vec4( 0.0 );`);
+      hp.needsUpdate = true;
+    } else console.warn('bloom: no guard against broken pixels');
+  }
   composer.addPass(bloom);
   const grade = new ShaderPass(GradeShader);
   grade.uniforms.near.value = camera.near;
