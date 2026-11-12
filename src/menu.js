@@ -51,7 +51,7 @@ export function settingsBoard(settings, { onChange, onBack }) {
     ultra: 'Full screen sharpness and the finest shadows. For strong graphics cards.',
     high: 'Full sharpness and every effect.',
     medium: 'A little softer, lighter rain, simpler shadows.',
-    low: 'For older computers and laptops: softer picture, light rain, no ambient shading, reflections or lamp glow.',
+    low: 'For older computers and laptops: softer picture, light rain, no ambient shading, reflections or lamp glow. Smaller ground and wall textures from the next start.',
   };
   const changed = () => {
     saveSettings(s);

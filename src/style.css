@@ -793,6 +793,11 @@ body.touch .hud-top-right { right: max(14px, env(safe-area-inset-right)); }
 .title2.ready .t-load { opacity: 0; }
 .t-bar { height: 2px; background: rgba(241,223,182,0.18); overflow: hidden; }
 .t-bar i { display: block; height: 100%; width: 0; background: #f1dfb6; box-shadow: 0 0 10px rgba(255,200,120,0.6); transition: width 0.4s ease; }
+.t-status { display: block; margin-top: 8px; font: 600 12px/1.3 var(--hud, sans-serif); letter-spacing: 0.18em; text-transform: uppercase; color: #cdbfa6; text-shadow: 0 1px 3px #000; min-height: 1.3em; }
+.title2.ready .t-status { opacity: 0; }
+/* pressed Ride before the park was in: only the photo of it stays, behind the bus stop, until the live park fades in */
+.title2.boarding { z-index: 1; }
+.title2.boarding > :not(.t-still) { display: none; }
 .t-tip { display: block; margin-top: 10px; font: 400 14px/1.45 var(--typewriter); color: #d8c7a3; text-shadow: 0 1px 3px #000; min-height: 2.9em; }
 
 /* the prize counter in the park-sign style: prizes as torn tickets with the price punched in */
@@ -1125,7 +1130,9 @@ body.pad .slot kbd, body.pad .item kbd:empty, body.pad .power kbd:empty { displa
   .title2.modern .t-logo { top: 10px; max-width: calc(100vw - min(310px, 46vw) - 36px); }
   .title2.modern .t-name { font-size: 34px; }
   .title2.modern .t-sub { font-size: 10px; letter-spacing: 0.2em; }
-  .title2.modern .t-load { display: none; }
+  /* (the loading bar stays: the buttons work while the park loads, so it should say how far along it is) */
+  .title2.modern .t-load { margin-top: 6px; width: 100%; }
+  .title2.modern .t-tip { display: none; }
 }
 /* touch: the kill feed keeps clear of the chat button at the top of the right-hand controls */
 body.touch .feed { margin-right: 60px; }

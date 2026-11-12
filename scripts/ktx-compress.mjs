@@ -4,7 +4,9 @@
 //   everything -> ETC1S (normal maps at a finer quality): files stay near WebP size, which UASTC would triple
 // Needs KTX-Software's `ktx` (C:\Program Files\KTX-Software\bin). The originals are kept once in
 // assets-src/webp-originals so a re-run starts from them, not from a compressed copy.
-// Usage: node scripts/ktx-compress.mjs [models|tex|all] [file filter]
+// tex-half: a half-size copy of each photo material in public/tex/<name>/half/, for phones and the Low setting
+// (src/textures.js picks it).
+// Usage: node scripts/ktx-compress.mjs [models|tex|tex-half|all] [file filter]
 import { execFileSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -27,7 +29,7 @@ const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies(
 
 /** Encode one image (any format sharp reads) to KTX2 bytes. */
 let n = 0;
-async function encode(bytes, { srgb, normal = false, quality = 128, flip = false }) {
+async function encode(bytes, { srgb, normal = false, quality = 128, flip = false, scale = 1 }) {
   const id = `${process.pid}_${n++}`;
   const png = path.join(TMP, `${id}.png`);
   const out = path.join(TMP, `${id}.ktx2`);
@@ -35,8 +37,8 @@ async function encode(bytes, { srgb, normal = false, quality = 128, flip = false
   if (flip) img = img.flip();
   const meta = await sharp(bytes).metadata();
   // block compression wants sides that are multiples of 4
-  const w = Math.max(4, Math.round(meta.width / 4) * 4);
-  const h = Math.max(4, Math.round(meta.height / 4) * 4);
+  const w = Math.max(4, Math.round((meta.width * scale) / 4) * 4);
+  const h = Math.max(4, Math.round((meta.height * scale) / 4) * 4);
   if (w !== meta.width || h !== meta.height) img = img.resize(w, h, { fit: 'fill' });
   await img.png().toFile(png);
   // say how the PNG's values are meant, or data (normals, roughness) gets "converted" from sRGB and spoilt
@@ -87,7 +89,7 @@ async function model(file) {
   console.log(`${file}: ${done} textures, ${kb(a)} -> ${kb(b)}`);
 }
 
-async function photoTextures() {
+async function photoTextures(half = false) {
   for (const name of readdirSync('public/tex')) {
     const dir = `public/tex/${name}`;
     if (!statSync(dir).isDirectory()) continue;
@@ -100,8 +102,9 @@ async function photoTextures() {
         copyFileSync(src, keep);
       }
       // TextureLoader flipped these on upload; a compressed texture can't be, so flip the picture instead
-      const data = await encode(readFileSync(keep), { srgb, normal, quality: normal ? 220 : 128, flip: true });
-      writeFileSync(`${dir}/${file}.ktx2`, data);
+      const data = await encode(readFileSync(keep), { srgb, normal, quality: normal ? 220 : 128, flip: true, scale: half ? 0.5 : 1 });
+      if (half) mkdirSync(`${dir}/half`, { recursive: true });
+      writeFileSync(half ? `${dir}/half/${file}.ktx2` : `${dir}/${file}.ktx2`, data);
       before += statSync(keep).size;
       after += data.length;
     }
@@ -117,6 +120,7 @@ if (what === 'models' || what === 'all') {
   for (const f of files) await model(f);
 }
 if (what === 'tex' || what === 'all') await photoTextures();
+if (what === 'tex-half' || what === 'all') await photoTextures(true);
 console.log(`total ${kb(before)} -> ${kb(after)}`);
 
 // the decal sheet and the horizon strip (colour with alpha), flipped like the photo textures

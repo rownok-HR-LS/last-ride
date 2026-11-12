@@ -1,6 +1,7 @@
 // The online ride from the browser's side: the bus stop sign while you wait, boarding when the bus leaves,
 // watching a ride already under way, and back to the stop afterwards.
 import { NetGame, connect, wakeServer } from './net.js';
+import { loading } from './loading.js';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 /** How long a sleeping server gets to wake before we give up, and how long a dropped rider keeps trying. */
@@ -25,9 +26,20 @@ const clock = (s) => {
 };
 
 export class Online {
+  /**
+   * client: the park (a Client), or a promise of it while it is still loading: you can wait at the stop meanwhile,
+   * and if the bus leaves first you board as soon as the park is in.
+   */
   constructor(app, client, profile) {
     this.app = app;
-    this.client = client;
+    this.client = null;
+    this.clientReady = Promise.resolve(client).then((c) => {
+      this.client = c;
+      // "Leave the park" and "Main menu" (src/client.js toMenu), and "Ride again" on the results
+      c.onLeave = () => this.leave();
+      c.onAgain = () => this.again();
+      return c;
+    });
     this.profile = profile;
     this.mode = 'lobby';
     this.status = null;
@@ -38,8 +50,6 @@ export class Online {
     addEventListener('pagehide', () => {
       if (!this.left && this.mode === 'ride' && this.ticket) keepTicket(this.ticket);
     });
-    // "Leave the park" and "Main menu" (src/client.js toMenu)
-    client.onLeave = () => this.leave();
   }
 
   /**
@@ -97,7 +107,6 @@ export class Online {
     if (resume) conn.send({ t: 'rejoin', ticket: resume, name: this.profile.name, outfit: this.profile.outfit, look: this.profile.look });
     // an invite link's code puts you on your friend's ride
     else conn.send({ t: 'join', name: this.profile.name, outfit: this.profile.outfit, look: this.profile.look, ride: code });
-    this.client.onAgain = () => this.again();
     this.render();
   }
 
@@ -194,7 +203,19 @@ export class Online {
   /** The bus left with you on it (or you are watching): start once the first update is in. */
   board(game, mode) {
     this.mode = mode;
+    let off = null;
     const go = () => {
+      if (this.net !== game) return off?.();
+      // the bus left before the park finished loading: say so, and get on as soon as it is in
+      if (!this.client) {
+        off ??= loading.on((u) => {
+          if (this.net === game && !this.client) {
+            this.show(mode === 'watch' ? 'Joining the ride' : 'Boarding', `${Math.round(u * 100)}%`, 'Loading the park · the ride has started, you join it in a moment');
+          }
+        });
+        return setTimeout(go, 100);
+      }
+      off?.();
       if (!game.ready) return setTimeout(go, 30);
       this.sign.classList.remove('show');
       this.client.hudRoot.style.visibility = '';
@@ -214,7 +235,7 @@ export class Online {
     this.mode = 'lobby';
     this.banner(null);
     // the last ride's HUD has no business behind the bus stop sign
-    if (this.client.game) this.client.hudRoot.style.visibility = 'hidden';
+    if (this.client?.game) this.client.hudRoot.style.visibility = 'hidden';
     this.render();
   }
 

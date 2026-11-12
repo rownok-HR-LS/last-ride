@@ -8,6 +8,7 @@ import { CREDITS } from './credits.js';
 import { loadSettings } from './settings.js';
 import { settingsBoard } from './menu.js';
 import { loadProgress, saveProgress, levelOf, dailies, looksFor } from './progress.js';
+import { loading } from './loading.js';
 
 const app = document.getElementById('app');
 let parkInfo = Promise.resolve(null);
@@ -63,7 +64,7 @@ async function title() {
     <div class="t-logo">
       <div class="t-name">Last Ride</div>
       <div class="t-sub">Midnight Wonderland Tours · closed 1987</div>
-      <div class="t-load"><div class="t-bar"><i></i></div><span class="t-tip"></span></div>
+      <div class="t-load"><div class="t-bar"><i></i></div><span class="t-status"></span><span class="t-tip"></span></div>
     </div>
     <div class="tm-rider">
       <div class="tm-pols" role="listbox" aria-label="Riders">${OUTFITS.map((o, i) => `<button class="tm-pol" role="option" data-id="${o.id}" style="--tilt:${((i * 37) % 9) - 4}deg" title="${o.name}"><img src="./riders/${o.id}.webp" alt="${o.name}" decoding="async" /></button>`).join('')}</div>
@@ -79,9 +80,9 @@ async function title() {
         <input class="t-nick" maxlength="16" placeholder="Your name" aria-label="Your name" />
         <div class="tm-level"><b class="tm-lv"></b><div class="tm-xp"><i></i></div><small class="tm-xp-n"></small></div>
       </div>
-      <button class="tm-play t-play" disabled>Loading the park…</button>
+      <button class="tm-play t-play">Ride online <small>Your bus leaves in 15 seconds · bots fill the seats</small></button>
       <div class="tm-practice-row">
-        <button class="tm-btn t-practice" disabled>Practice</button>
+        <button class="tm-btn t-practice">Practice</button>
         <div class="tm-seg t-diff">${['easy', 'normal', 'hard'].map((d) => `<button data-d="${d}">${d[0].toUpperCase()}${d.slice(1)}</button>`).join('')}</div>
       </div>
       <div class="tm-row">
@@ -216,10 +217,15 @@ async function title() {
   // relative to the page, so it works under the GitHub Pages sub-path too
   el.querySelector('.t-still').style.backgroundImage = 'url(./title_still.webp)';
   const bar = el.querySelector('.t-bar i');
-  const step = (what, u) => {
-    play.textContent = what;
-    if (u !== undefined) bar.style.width = `${Math.round(u * 100)}%`;
+  const statusEl = el.querySelector('.t-status');
+  // the bar and the line under it say how far the park has loaded; the buttons work all along
+  const step = (what) => {
+    statusEl.textContent = what;
   };
+  const offBar = loading.on((u) => {
+    bar.style.width = `${Math.round(u * 100)}%`;
+    if (!loading.done) step(`Loading the park… ${Math.round(u * 100)}%`);
+  });
   // a tip every few seconds while it loads
   const tipEl = el.querySelector('.t-tip');
   let tip = Math.floor(Math.random() * TIPS.length);
@@ -228,48 +234,6 @@ async function title() {
   };
   nextTip();
   const tipTimer = setInterval(nextTip, 4500);
-  // the riders, the fonts, the bus and the ground textures all download at once
-  step('Loading the park…', 0);
-  // your rider and the bus driver first; the other riders load while you are on the menu
-  const riders = loadCharacters((u) => step(`Loading the park… ${Math.round(u * 100)}%`, u * 0.9), [profile.outfit, 'eric']);
-  const fonts = Promise.all([document.fonts.load('80px Rye'), document.fonts.load('900 80px Cinzel'), document.fonts.load('600 20px "Barlow Condensed"')]).catch(() => {
-    /* fall back to Impact */
-  });
-  // the bus carries everyone in the opening shots, so it has to be there from the first frame
-  const bus = import('./bus.js').then((m) => m.preloadBus()).catch((e) => console.warn('bus model', e));
-  // the signs paint over the rust photo, so make sure the textures are in first
-  const textures = import('./textures.js').then((tex) => {
-    ['rusty_metal_02', 'damaged_plaster', 'forrest_ground_01', 'cobblestone_floor_08'].forEach((n) => tex.pbr(n));
-    tex.photoTex('rusty_metal_02');
-    return tex.texturesReady();
-  });
-  // the trees come baked (growing them here took seconds), and the park is planted from them
-  const trees = import('./trees.js').then((m) => m.preloadTrees());
-  // the weapons, loot and chests modelled in Blender
-  const weapons = import('./weapons.js').then((m) => m.preloadWeapons());
-  const clientModule = import('./client.js');
-  // the bus driver is one of the riders, so the park is built once they are all in
-  await Promise.all([fonts, bus, textures, riders, trees, weapons]);
-  const { Client } = await clientModule;
-  client = new Client(app, profile, settings, { attract: true });
-  window.__lr = client;
-  // the canvas goes under the sign
-  app.insertBefore(client.renderer.domElement, app.firstChild);
-  ridersReady = true;
-  client.showcase(profile.outfit, profile.look);
-  // the park's shaders compile in the background first (client.ready), so the page never freezes for them
-  step('Getting the park ready…', 0.97);
-  await client.ready;
-  // the still of the park fades into the live one, and the loading line goes
-  step('', 1);
-  clearInterval(tipTimer);
-  // (a timer too, in case the frame callback is held back, e.g. a tab in the background)
-  const showLive = () => el.classList.add('ready');
-  requestAnimationFrame(showLive);
-  setTimeout(showLive, 250);
-  play.disabled = false;
-  practice.disabled = false;
-  play.innerHTML = 'Ride online <small>Your bus leaves in 15 seconds · bots fill the seats</small>';
   // how many are in the park right now (from the server's wake-up answer)
   parkInfo.then((info) => {
     if (info && typeof info.online === 'number' && !play.disabled) {
@@ -277,8 +241,69 @@ async function title() {
     }
   });
 
+  // The park loads and builds behind the photo while you choose: the menu works from the first moment, and the live
+  // park fades in over the photo when it is ready. Pressing Ride before then goes straight to the bus stop, which
+  // keeps loading (src/online.js); Practice counts it in on its button.
+  const parkReady = (async () => {
+    // the riders, the fonts, the bus and the ground textures all download at once
+    // your rider and the bus driver first; the other riders load while you are on the menu
+    const riders = loadCharacters((u) => loading.set(u * 0.3), [profile.outfit, 'eric']);
+    const fonts = Promise.all([document.fonts.load('80px Rye'), document.fonts.load('900 80px Cinzel'), document.fonts.load('600 20px "Barlow Condensed"')]).catch(() => {
+      /* fall back to Impact */
+    });
+    // the bus carries everyone in the opening shots, so it has to be there from the first frame
+    const bus = import('./bus.js').then((m) => m.preloadBus()).catch((e) => console.warn('bus model', e));
+    // the signs paint over the rust photo, so make sure the textures are in first
+    const textures = import('./textures.js').then((tex) => {
+      ['rusty_metal_02', 'damaged_plaster', 'forrest_ground_01', 'cobblestone_floor_08'].forEach((n) => tex.pbr(n));
+      tex.photoTex('rusty_metal_02');
+      return tex.texturesReady();
+    });
+    // the trees come baked (growing them here took seconds), and the park is planted from them
+    const trees = import('./trees.js').then((m) => m.preloadTrees());
+    // the weapons, loot and chests modelled in Blender
+    const weapons = import('./weapons.js').then((m) => m.preloadWeapons());
+    const clientModule = import('./client.js');
+    // the bus driver is one of the riders, so the park is built once they are all in
+    await Promise.all([fonts, bus, textures, riders, trees, weapons]);
+    // testing on the dev server: ?slowpark=20 holds the park back 20 seconds, as a slow connection would
+    const slow = import.meta.env.DEV ? +new URLSearchParams(location.search).get('slowpark') : 0;
+    if (slow > 0) {
+      for (let i = 1; i <= slow * 2; i++) {
+        await new Promise((r) => setTimeout(r, 500));
+        loading.set(0.3 + (0.65 * i) / (slow * 2));
+      }
+    }
+    const { Client } = await clientModule;
+    client = new Client(app, profile, settings, { attract: true });
+    window.__lr = client;
+    // the canvas goes under the sign
+    app.insertBefore(client.renderer.domElement, app.firstChild);
+    ridersReady = true;
+    client.showcase(profile.outfit, profile.look);
+    // the park's shaders compile in the background first (client.ready), so the page never freezes for them
+    step('Getting the park ready…');
+    await client.ready;
+    // the still of the park fades into the live one, and the loading line goes
+    loading.finish();
+    offBar();
+    step('');
+    clearInterval(tipTimer);
+    // (a timer too, in case the frame callback is held back, e.g. a tab in the background)
+    const showLive = () => el.classList.add('ready');
+    requestAnimationFrame(showLive);
+    setTimeout(showLive, 250);
+    return client;
+  })();
+  parkReady.catch((e) => {
+    console.error('park', e);
+    step('The park did not load. Reload the page to try again.');
+  });
+
+  let starting = false;
   const start = async (online, resume = null, code = null) => {
-    if (play.disabled) return;
+    if (starting) return;
+    starting = true;
     // sound (and the music box) starts right here, on the press itself: a browser only lets a page start audio
     // during a click or key press, and waiting for the riders first could take longer than it allows
     initAudio();
@@ -286,14 +311,29 @@ async function title() {
     practice.disabled = true;
     profile.name = nick.value.trim().slice(0, 16) || 'Rider';
     saveProfile(profile);
-    // everyone on the bus needs their model (usually long in by now)
     (online ? play : practice).textContent = 'Boarding…';
-    await whenAllRiders();
-    el.remove();
-    if (!online) return client.start(profile);
-    // wait at the bus stop over the live park, then board when the bus leaves
+    // everyone on the bus needs their model (usually long in by now), and the park has to be built
+    const ready = parkReady.then(async (c) => {
+      await whenAllRiders();
+      return c;
+    });
+    if (!online) {
+      const off = loading.on((u) => {
+        if (!loading.done) practice.textContent = `Boarding… ${Math.round(u * 100)}%`;
+      });
+      await ready;
+      off();
+      el.remove();
+      return client.start(profile);
+    }
+    // straight to the bus stop; until the live park is in, the photo of it stays behind the sign
+    if (client?.compiled) el.remove();
+    else {
+      el.classList.add('boarding');
+      ready.then(() => setTimeout(() => el.remove(), 1500));
+    }
     const { Online } = await import('./online.js');
-    const ride = new Online(app, client, profile);
+    const ride = new Online(app, ready, profile);
     if (import.meta.env.DEV) window.__online = ride;
     ride.join(resume, code);
   };

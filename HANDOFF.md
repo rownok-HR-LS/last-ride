@@ -279,3 +279,17 @@ Chrome blocks these sites from posting to localhost, so downloads always go thro
 - Over the limit the bus is held ("All the buses are out") until a ride ends.
 - Invite links are `?ride=CODE`; old `?ride` links still just get in line. Health JSON adds `rides`.
 - Tests: node scripts/roomtest.mjs (32 checks incl. several rides), scripts/nettest.mjs against a local server.
+
+## Faster start (2026-11-13)
+
+- The title's buttons work at once, over the photo of the park (title_still.webp); the park loads and builds behind
+  it (main.js `parkReady`) and fades in. src/loading.js gives a rough, forward-only percentage (three.js's loading
+  manager) for the bar, the Practice button and the bus stop.
+- Ride online before the park is in: straight to the bus stop (title gets class `boarding`: only the photo stays).
+  If the bus leaves first, the sign shows "Boarding 80%" and you join the ride (intro partway) when the park is in.
+  Online takes the client as a promise (`Online.clientReady`). Dev only: `?slowpark=20` holds the park back 20 s.
+- scripts/shrink-models.mjs (run after ktx-compress models): animations packed with meshopt filters (max error
+  0.9 degrees, 2 mm), riders' normals/UVs/weights quantized (positions left alone), bus simplified to half.
+  24.0 -> 20.1 MB. Originals in assets-src/glb-originals.
+- Phones/tablets and the Low setting load half-size ground and wall textures (public/tex/<name>/half, made by
+  `node scripts/ktx-compress.mjs tex-half`): 7.6 -> 2.4 MB. `?halftex` forces them on a desktop.

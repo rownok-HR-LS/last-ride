@@ -383,6 +383,21 @@ export function shade(hex, l) {
 const loader = new THREE.TextureLoader();
 const pending = [];
 
+/**
+ * Phones, tablets and the Low setting load the half-size copies (public/tex/<name>/half, made by
+ * scripts/ktx-compress.mjs tex-half): a quarter of the pixels to download and to keep in graphics memory. Decided
+ * once, when the page loads (a change of setting applies from the next start).
+ */
+const HALF = (() => {
+  try {
+    const touch = matchMedia('(pointer: coarse)').matches || (navigator.maxTouchPoints > 0 && !matchMedia('(pointer: fine)').matches);
+    const low = JSON.parse(localStorage.getItem('last-ride-settings') || '{}').quality === 'low';
+    return touch || low || /[?&]halftex/.test(location.search);
+  } catch {
+    return false;
+  }
+})();
+
 /** Resolves once every photo texture requested so far has loaded. */
 export function texturesReady() {
   return Promise.all(pending);
@@ -403,7 +418,7 @@ export function pbr(name) {
       t.anisotropy = 8;
       t.flipY = false;
       if (srgb) t.colorSpace = THREE.SRGBColorSpace;
-      ktx2().load(`./tex/${name}/${file}.ktx2`, (k) => {
+      ktx2().load(`./tex/${name}/${HALF ? 'half/' : ''}${file}.ktx2`, (k) => {
         Object.assign(t, { image: k.image, mipmaps: k.mipmaps, format: k.format, type: k.type, colorSpace: k.colorSpace, minFilter: k.minFilter, magFilter: k.magFilter });
         t.generateMipmaps = false;
         freeAfterUpload(t);
