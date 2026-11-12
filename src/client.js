@@ -10,6 +10,7 @@ import {
 import { FERRIS, REGIONS, trackAt, pathDistance, PARK_EDGE, BREAKABLES } from '../shared/map.js';
 import { shatter, stepDebris, debrisCount } from './debris.js';
 import { updateScares } from './scares.js';
+import { buildClouds } from './clouds.js';
 import { buildWorld, buildSky, groundRain, SKY_SCALE } from './world.js';
 import { Rain, sheltered } from './rain.js';
 import { Rides } from './rides.js';
@@ -201,6 +202,8 @@ export class Client {
     this.scene = scene;
     this.camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 2500);
     const sky = buildSky(scene, renderer);
+    // storm clouds drifting over the sky photo (src/clouds.js)
+    this.clouds = buildClouds(scene);
     this.moonLight = sky.moonLight;
     this.moonDir = sky.moonDir;
     this.hemi = sky.hemi;
@@ -533,6 +536,7 @@ export class Client {
     this.hemi.intensity = 1.15 + flash * 1.6;
     if (this.scene.environment) this.scene.environmentIntensity = 0.65 + flash * 0.8;
     this.scene.backgroundIntensity = (0.6 + flash * 1.6) * SKY_SCALE;
+    this.clouds.update(dt, cam, 'storm', flash);
     this.moonLight.intensity = 2.1 + flash * 5;
     this.moonLight.position.copy(cam.position).addScaledVector(this.moonDir, 120);
     this.moonLight.target.position.copy(cam.position);
@@ -1779,6 +1783,7 @@ export class Client {
     this.hemi.intensity = 1.15 - inside * 0.95 + flash * 1.6;
     if (this.scene.environment) this.scene.environmentIntensity = 0.65 - inside * 0.5 + flash * 0.8;
     this.scene.backgroundIntensity = (0.6 * (this.night?.sky ?? 1) + flash * 1.6) * SKY_SCALE;
+    this.clouds.update(dt, cam, snap.night, flash, 0.45 + 0.55 * (this.night?.sky ?? 1));
     this.moonLight.intensity = (2.1 - inside * 1.7) * (this.night?.moon ?? 1) + flash * 5;
     setCharacterRim(1 - inside);
     if (this.cine) {

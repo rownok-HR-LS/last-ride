@@ -73,7 +73,6 @@ export async function exportCasters(client, postTo) {
   // take their shadows away and they would be missing from the new one)
   await client.shadowProxy?.ready;
   client.shadowProxy?.set(false);
-  restoreAllInstances();
   const scene = client.scene;
   scene.updateMatrixWorld(true);
   const movers = moverRoots(client);
@@ -85,6 +84,10 @@ export async function exportCasters(client, postTo) {
   const moved = [];
   for (const [o, m] of before) if (!o.matrixWorld.equals(m) && stillCaster(o, movers, scene) === true) moved.push(o);
   for (const o of moved) movers.add(o);
+  // every copy of every culled batch back in place, right before reading them (while the export waited, the
+  // game went on culling what the camera can't see)
+  restoreAllInstances();
+  scene.updateMatrixWorld(true);
   const tiles = new Map();
   const tileOf = (x, z) => {
     const k = `${Math.floor(x / TILE)}_${Math.floor(z / TILE)}`;
