@@ -41,10 +41,14 @@ export async function shatter(scene, id, dx, dz, force) {
   });
   if (!chunks) return;
   const P = physics();
-  place.matrix.decompose(_p, _q, _s);
   if (P) P.addPark(b.x, b.z, 10);
   const rnd = () => Math.random() - 0.5;
-  for (const ch of chunks) {
+  // (a stack of crates is several copies of the model: fewer pieces from each, so a tall stack isn't a hundred)
+  const copies = place.matrices || [place.matrix];
+  const share = copies.length > 1 ? Math.max(0.45, 1.4 / copies.length) : 1;
+  for (const matrix of copies) for (const ch of chunks) {
+    if (share < 1 && Math.random() > share) continue;
+    matrix.decompose(_p, _q, _s);
     const g = new THREE.Group();
     for (const part of ch.parts) {
       const geo = part.geometry.clone();
@@ -54,7 +58,7 @@ export async function shatter(scene, id, dx, dz, force) {
       m.receiveShadow = true;
       g.add(m);
     }
-    const wc = ch.center.clone().applyMatrix4(place.matrix);
+    const wc = ch.center.clone().applyMatrix4(matrix);
     g.position.copy(wc);
     g.quaternion.copy(_q);
     scene.add(g);

@@ -78,7 +78,8 @@ export async function buildKit(Builder, hasMaterial) {
   }
   if (PROPS.some((p) => p.type === 'track')) jobs.push(load('coaster').then((g) => place(g, { x: 0, z: 0, rot: 0 })));
   // inside the walk-in buildings: mirrors, cabinets, coffins, the dark ride's track (shared/map.js inside())
-  const interiors = PROPS.filter((p) => p.type === 'interior');
+  // (the ones that move, the dangling skeletons and the stalled ride cars, are drawn by src/scares.js)
+  const interiors = PROPS.filter((p) => p.type === 'interior' && !MOVING_INTERIORS.has(p.kind));
   for (const kind of new Set(interiors.map((p) => p.kind))) {
     jobs.push(load(kind).then((g) => interiors.filter((p) => p.kind === kind).forEach((p) => place(g, { x: p.x, z: p.z, rot: p.rot || 0 }))));
   }
@@ -88,6 +89,9 @@ export async function buildKit(Builder, hasMaterial) {
   B.build(group);
   return group;
 }
+
+/** Interior pieces that move as a whole, so they stay out of the merged kit. */
+export const MOVING_INTERIORS = new Set(['skeleton', 'ridecar']);
 
 /** Which game a booth plays: the prize counters hand out prizes, the rest take turns. */
 export const BOOTH_GAMES = { ringtoss: 'RING TOSS', darts: 'BALLOON DARTS', milk: 'MILK BOTTLES', gallery: 'SHOOTING GALLERY' };

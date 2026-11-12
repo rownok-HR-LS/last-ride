@@ -9,6 +9,7 @@ import {
 } from '../shared/items.js';
 import { FERRIS, REGIONS, trackAt, pathDistance, PARK_EDGE, BREAKABLES } from '../shared/map.js';
 import { shatter, stepDebris, debrisCount } from './debris.js';
+import { updateScares } from './scares.js';
 import { buildWorld, buildSky, groundRain, SKY_SCALE } from './world.js';
 import { Rain, sheltered } from './rain.js';
 import { Rides } from './rides.js';
@@ -1509,6 +1510,7 @@ export class Client {
     this.corpses = this.corpses.filter((c) => c.update(dt, near));
     stepRagdolls(dt);
     stepDebris(dt, near);
+    updateScares(dt, snap.players);
     this.syncBroken(snap);
     this.rides.update(snap, dt, this.time);
     this.fx.update(dt, this.time, snap.zone);

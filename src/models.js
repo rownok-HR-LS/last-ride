@@ -244,7 +244,15 @@ export async function placeModels(parent, name, list) {
   const mats = list.map((o) => fitMatrix(src, o, keep));
   // props that break: which copy is which, and where it stands (for its pieces)
   const ids = list.some((o) => o.brk != null) ? Int32Array.from(list, (o) => o.brk ?? -1) : null;
-  if (ids) list.forEach((o, i) => o.brk != null && BREAK_PLACES.set(o.brk, { file, matrix: mats[i] }));
+  if (ids) {
+    list.forEach((o, i) => {
+      if (o.brk == null) return;
+      // (a crate stack is several copies, one per layer: all of them break together)
+      const at = BREAK_PLACES.get(o.brk);
+      if (at) at.matrices.push(mats[i]);
+      else BREAK_PLACES.set(o.brk, { file, matrix: mats[i], matrices: [mats[i]] });
+    });
+  }
   const lod = !part && FAR_MODELS[file];
   const near = instance(parent, src, mats, keep);
   for (const [mesh, max] of near) {
@@ -276,7 +284,7 @@ export async function placementOf(file, o) {
   return { matrix: fitMatrix(src, o, () => true), ymin: box.min.y, ymax: box.max.y, src };
 }
 
-/** Where each breakable prop stands: id -> { file, matrix } (the placement matrix of its model). */
+/** Where each breakable prop stands: id -> { file, matrix, matrices } (the placement matrix of each of its copies). */
 export const BREAK_PLACES = new Map();
 
 const pieceCache = new Map();

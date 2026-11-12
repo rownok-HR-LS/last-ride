@@ -20,6 +20,7 @@ import { whenCompiled } from './stage.js';
 import { bunting, lightStrings } from './motion.js';
 import { buildFlags, buildDoorFlaps } from './flags.js';
 import { buildSigns } from './signs.js';
+import { buildScares } from './scares.js';
 import { compressed } from './ktx.js';
 
 // ------------------------------------------------------------------ materials
@@ -297,30 +298,16 @@ function booth(B, p, spots = modelSpots) {
   }
 }
 
-function crate(B, p) {
+/**
+ * A stack of shipping crates: copies of the Blender crate (scripts/blender/build-crate.py), one per layer, each
+ * stretched to the stack's size and turned a little on the one below. Drawn as instanced models, not merged into
+ * the world, so a stack can break (shared/game.js breakProp; all its layers share the stack's id).
+ */
+function crate(B, p, spots) {
   const layers = Math.max(1, Math.round(p.h / 1.4));
   const lh = p.h / layers;
   for (let i = 0; i < layers; i++) {
-    const ry = i * 0.3;
-    const y0 = lh * i;
-    const P = { x: p.x, z: p.z, rot: (p.rot || 0) + ry };
-    B.add('crate', new THREE.BoxGeometry(p.s - 0.06, lh - 0.04, p.s - 0.06), P, 0, y0 + lh / 2, 0);
-    // a shipping crate's frame: corner posts, rims top and bottom, a brace across each side
-    const e = p.s / 2 - 0.04;
-    const t = 0.1;
-    for (const sx of [-1, 1]) for (const sz of [-1, 1]) B.box('trim', P, sx * e, y0 + lh / 2, sz * e, t, lh, t);
-    for (const y of [y0 + 0.05, y0 + lh - 0.05]) {
-      for (const s of [-1, 1]) {
-        B.box('trim', P, 0, y, s * e, p.s, t, t);
-        B.box('trim', P, s * e, y, 0, t, t, p.s);
-      }
-    }
-    const diag = Math.atan2(lh - 0.2, p.s - 0.2);
-    const len = Math.hypot(lh - 0.2, p.s - 0.2);
-    for (const s of [-1, 1]) {
-      B.box('trim', P, 0, y0 + lh / 2, s * (e + 0.02), len, 0.09, 0.05, 0, 0, s * diag);
-      B.box('trim', P, s * (e + 0.02), y0 + lh / 2, 0, 0.05, 0.09, len, 0, s * diag, 0);
-    }
+    spots.push(['crate', { x: p.x, z: p.z, y: lh * i, rot: (p.rot || 0) + i * 0.3, w: p.s, d: p.s, h: lh, uniform: false, brk: p.brk }]);
   }
 }
 
@@ -535,6 +522,8 @@ export function buildWorld(scene) {
   buildDoorFlaps().then((f) => f && scene.add(f)).catch((e) => console.warn('door flaps', e));
   // the rides' names on boards swinging from chains (src/signs.js)
   buildSigns(Builder).then((g) => scene.add(g)).catch((e) => console.warn('signs', e));
+  // the buildings' moving scares: dropping skeletons, coffin lids, a lurching ride car (src/scares.js)
+  buildScares(Builder).then((g) => scene.add(g)).catch((e) => console.warn('scares', e));
   const outside = new THREE.Group();
   X.build(outside);
   scene.add(outside);

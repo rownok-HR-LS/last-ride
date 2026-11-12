@@ -149,6 +149,10 @@ if GLOWS:
                 (xl.x, yl.x, zl.x, 0), (xl.y, yl.y, zl.y, 0), (xl.z, yl.z, zl.z, 0), (0, 0, 0, 1)))
             scene.collection.objects.link(o)
             signs += 1
+        elif g['kind'] == 'room':
+            # a lamp inside a building (shared/map.js INTERIOR_LIGHTS): saturated, its own power
+            point(b((g['x'], g['y'], g['z'])), g['power'], col, 0.12)
+            bulbs += 1
         else:
             point(b((g['x'], g['y'], g['z'])), BULB_POWER, col, 0.06)
             bulbs += 1

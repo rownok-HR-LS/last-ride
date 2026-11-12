@@ -66,7 +66,7 @@ export class Game {
     this.nextProj = 1;
     this.flares = [];
     // breakable props: their health this ride, and which are broken (their colliders are switched off)
-    this.propHp = BREAKABLES.map((b) => BREAKABLE_MODELS[b.model].hp);
+    this.propHp = BREAKABLES.map((b) => b.hp ?? BREAKABLE_MODELS[b.model].hp);
     this.broken = new Set();
     for (const b of BREAKABLES) b.col.off = false;
     this.salts = [];

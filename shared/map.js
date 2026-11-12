@@ -29,6 +29,8 @@ export const BREAKABLE_MODELS = {
   barricade: { hp: 40, loot: 0, chunks: 7, inside: '#b89a6a' },
   missing_board: { hp: 40, loot: 0, chunks: 8, inside: '#a88a5c' },
   tour_board: { hp: 30, loot: 0, chunks: 6, inside: '#a88a5c' },
+  // the shipping crates (a stack has this much for each crate in it): sturdy, the park's main cover
+  crate: { hp: 80, loot: 0.3, chunks: 14, inside: '#b89466' },
 };
 /** Every breakable prop: { id, model, x, z, rot, w, d, h, col } (col: its collider, switched off once broken). */
 export const BREAKABLES = [];
@@ -217,9 +219,29 @@ function inside(kind, b, lx, lz, rot = 0, solid = null) {
   if (solid) addBox(x, z, solid[0], solid[1], 0, solid[2], rot);
 }
 
+/**
+ * The lamps inside the walk-in buildings: { x, y, z, color, power }. Each is a hanging fixture (kit_hanglamp_*) and a
+ * light in the lamp-light bake (scripts/room-lights.mjs adds them to the bake's glows), a different colour per
+ * building: the Funhouse sickly green and pink, the Tunnel of Terror deep red, the Arcade cold blue.
+ */
+export const INTERIOR_LIGHTS = [];
+const ROOM_LIGHT = {
+  hanglamp_fg: ['#4dff7c', 340], hanglamp_fp: ['#ff4fa8', 340], hanglamp_t: ['#ff2412', 300], hanglamp_a: ['#4aa0ff', 320],
+};
+function roomLight(kit, b, lx, lz) {
+  inside(kit, b, lx, lz);
+  const [color, power] = ROOM_LIGHT[kit];
+  INTERIOR_LIGHTS.push({ x: b.cx + lx, y: 3.2, z: b.cz + lz, color, power });
+}
+
 function crate(x, z, s, h, rot = 0) {
-  prop({ type: 'crate', x, z, s, h, rot });
+  const pr = prop({ type: 'crate', x, z, s, h, rot });
   addBox(x, z, s, s, 0, h, rot);
+  // breakable: the whole stack goes at once (src/world.js draws it as copies of the Blender crate)
+  const entry = { model: 'crate', x, z, rot, w: s, d: s, h };
+  breakable(entry);
+  pr.brk = entry.brk;
+  BREAKABLES[entry.brk].hp = BREAKABLE_MODELS.crate.hp * Math.max(1, Math.round(h / 1.4));
 }
 
 function tree(x, z, s) {
@@ -477,6 +499,11 @@ CHEST_SPOTS.push({ x: -29, z: -86, rot: 0 }, { x: -11, z: -87, rot: 0 }, { x: -2
   inside('clown', b, -2.9, 6.3, Math.PI, [0.75, 0.5, 2.2]);
   inside('fortune', b, -10.6, 1.8, Math.PI / 2, [1.3, 0.95, 2.4]);
   decor('boxes', b.cx + 4.6, b.cz - 5.1, 0);
+  roomLight('hanglamp_fp', b, -9.5, 0.5);
+  roomLight('hanglamp_fg', b, -1, -4.6);
+  roomLight('hanglamp_fg', b, 0, 3.5);
+  roomLight('hanglamp_fp', b, 5.5, -5.2);
+  roomLight('hanglamp_fg', b, 9, 2.5);
 }
 
 // Tunnel of Terror (dark-ride building)
@@ -498,6 +525,10 @@ CHEST_SPOTS.push({ x: 30, z: -88, rot: 0 }, { x: 50, z: -88, rot: 0 }, { x: 40, 
   inside('coffin', b, 11.3, 1.2, 0, [0.75, 2.0, 0.55]);
   inside('coffin', b, 2.6, 5.4, Math.PI / 2, [0.75, 2.0, 0.55]);
   for (const [x, z] of [[-8, 3.4], [8, -1.2], [0.5, -5.6], [-11, -5.4], [11, 4.4]]) inside('skeleton', b, x, z, (x + z) % 6.28);
+  roomLight('hanglamp_t', b, -10, -1);
+  roomLight('hanglamp_t', b, 0, 1);
+  roomLight('hanglamp_t', b, 10.3, 1.5);
+  roomLight('hanglamp_t', b, -3.5, -5.8);
 }
 
 // Arcade hall
@@ -518,6 +549,10 @@ CHEST_SPOTS.push({ x: -86, z: 87, rot: Math.PI }, { x: -74, z: 87, rot: Math.PI 
   inside('claw', b, 8.1, -5.3, 0, [1.15, 1.15, 2.2]);
   inside('counter', b, 6.5, 5.7, Math.PI, [2.5, 0.75, 1.1]);
   decor('trash_bags', b.cx - 8.4, b.cz + 5.6, 0.7);
+  roomLight('hanglamp_a', b, -5, 3.5);
+  roomLight('hanglamp_a', b, 4.5, 3);
+  roomLight('hanglamp_a', b, -3, -4);
+  roomLight('hanglamp_a', b, 5, -3.5);
 }
 
 // Free Fall drop tower

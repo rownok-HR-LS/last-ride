@@ -738,21 +738,46 @@ def fortune_booth():
     K.box('dark', (0, 1.35, -0.42), (1.2, 1.5, 0.05), bevel=0.0)
     # the dummy, its turban and the ball
     K.box('#6a2a4a', (0, 1.25, -0.12), (0.5, 0.6, 0.3), bevel=0.04)
-    K.ball('skin', (0, 1.72, -0.12), 0.15, segs=10)
-    K.ball('#d9b45a', (0, 1.86, -0.12), 0.16, segs=10)
+    # (her head is its own piece, fortune_head: it turns to look at you, src/scares.js)
+    K.cyl('skin', (0, 1.58, -0.12), 0.05, 0.08, segs=8)
     K.ball('bulbCyan', (0, 1.05, 0.15), 0.1, segs=10)
     K.box('#e9d9a0', (0, 2.25, 0.46), (1.0, 0.18, 0.02), bevel=0.0)
     return K
 
 
 def coffin():
-    """A coffin prop lying on the floor, its lid knocked askew."""
+    """A coffin prop lying on the floor, open at the top (its lid is coffin_lid, which creaks open: src/scares.js)."""
     K = Kit()
-    K.box('woodDark', (0, 0.22, 0), (0.62, 0.44, 1.95), bevel=0.04, segs=2)
-    K.box('woodDark', (0, 0.2, 0.75), (0.74, 0.4, 0.3), bevel=0.04, segs=2)
-    K.box('#5a2a1a', (0.08, 0.47, 0.05), (0.66, 0.05, 1.9), rot=(0, 0.12, 0.08), bevel=0.01)
-    K.box('gold', (0.08, 0.5, 0.35), (0.06, 0.02, 0.4), rot=(0, 0.12, 0.08), bevel=0.0)
-    K.box('gold', (0.08, 0.5, 0.35), (0.25, 0.02, 0.06), rot=(0, 0.12, 0.08), bevel=0.0)
+    K.box('woodDark', (0, 0.06, 0), (0.62, 0.12, 1.95), bevel=0.02)
+    for x in (-0.29, 0.29):
+        K.box('woodDark', (x, 0.24, 0), (0.05, 0.4, 1.95), bevel=0.01)
+    for z in (-0.95, 0.95):
+        K.box('woodDark', (0, 0.24, z), (0.62, 0.4, 0.05), bevel=0.01)
+    # what's inside: a dummy under a grey sheet
+    K.box('#8f8a80', (0, 0.22, -0.1), (0.44, 0.16, 1.4), bevel=0.05, segs=2)
+    K.ball('#8f8a80', (0, 0.28, 0.68), 0.13, segs=8)
+    return K
+
+
+def coffin_lid():
+    """The coffin's lid, built round its hinge (the long edge at x = -0.31, y = 0.45): flat, a cross on top."""
+    K = Kit()
+    K.box('#5a2a1a', (0.33, 0.025, 0), (0.68, 0.05, 1.98), bevel=0.01)
+    K.box('gold', (0.33, 0.055, 0.3), (0.06, 0.02, 0.45), bevel=0.0)
+    K.box('gold', (0.33, 0.055, 0.4), (0.26, 0.02, 0.06), bevel=0.0)
+    return K
+
+
+def fortune_head():
+    """The fortune teller's head and turban, built round the neck."""
+    K = Kit()
+    K.ball('skin', (0, 0.12, 0), 0.15, segs=10)
+    K.ball('#d9b45a', (0, 0.26, 0), 0.16, segs=10)
+    K.ball('#d0322a', (0, 0.3, 0.14), 0.035, segs=6)
+    # two dark eyes and a painted smile
+    for x in (-0.055, 0.055):
+        K.ball('dark', (x, 0.14, 0.135), 0.022, segs=6)
+    K.box('#7a1c16', (0, 0.06, 0.14), (0.07, 0.012, 0.01), bevel=0.0)
     return K
 
 
@@ -794,6 +819,17 @@ def skeleton_hanging():
     return K
 
 
+
+def hanglamp(bulb, ceiling):
+    """A bare coloured bulb under a dented enamel shade, on a cord from the ceiling (the bulb hangs at 3.25 m)."""
+    K = Kit()
+    rod(K, 'dark', (0, 3.5, 0), (0, ceiling - 0.05, 0), 0.012, segs=4)
+    K.cyl('#3a3f3a', (0, 3.42, 0), 0.3, 0.2, segs=12, r2=0.05)
+    K.cyl('iron', (0, 3.36, 0), 0.04, 0.08, segs=8)
+    K.ball(bulb, (0, 3.25, 0), 0.075, segs=8)
+    return K
+
+
 for b in layout['buildings']:
     if not ONLY or b['style'] in ONLY:
         building(b).export(f'{OUT}/kit_{b['style']}.glb')
@@ -824,6 +860,13 @@ if not ONLY or 'signboard' in ONLY:
 for i in range(4):
     if not ONLY or f'cabinet_{i}' in ONLY:
         arcade_cabinet(i).export(f'{OUT}/kit_cabinet_{i}.glb')
+for name, bulb, ceiling in (('hanglamp_fg', 'bulbGreen', 7.5), ('hanglamp_fp', 'bulbPink', 7.5), ('hanglamp_t', 'bulbRed', 8.0),
+                            ('hanglamp_a', 'bulbCyan', 6.5)):
+    if not ONLY or name in ONLY:
+        hanglamp(bulb, ceiling).export(f'{OUT}/kit_{name}.glb')
+for name, fn in (('coffin_lid', coffin_lid), ('fortune_head', fortune_head)):
+    if not ONLY or name in ONLY:
+        fn().export(f'{OUT}/kit_{name}.glb')
 for name, fn in (('claw', claw_machine), ('counter', change_counter), ('mirror', mirror_warped), ('clown', clown_cutout),
                  ('fortune', fortune_booth), ('coffin', coffin), ('ridecar', ride_car), ('rail', rail_segment),
                  ('skeleton', skeleton_hanging)):
