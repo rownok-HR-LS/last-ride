@@ -125,6 +125,10 @@ export class Room {
           }
         }
         break;
+      case 'leave':
+        // walked away on purpose ("Leave the park", "Main menu"): nobody to keep the ride open for
+        c.left = true;
+        break;
       case 'ping':
         this.send(c, { t: 'pong', at: m.at });
         break;
@@ -137,8 +141,8 @@ export class Room {
     // a rider who walks away mid-ride is taken over by a bot, so the ride goes on as it was
     if (this.game && c.pid !== null) {
       this.game.toBot(c.pid);
-      // and the ride is kept going a while in case they are only reconnecting
-      this.graceUntil = Date.now() + COME_BACK_MS;
+      // and the ride is kept going a while in case they are only reconnecting (not if they said goodbye)
+      if (!c.left) this.graceUntil = Date.now() + COME_BACK_MS;
     }
     c.pid = null;
     this.status(true);

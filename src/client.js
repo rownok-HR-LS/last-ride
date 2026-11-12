@@ -270,7 +270,7 @@ export class Client {
       settings,
       onChange: (s) => this.applySettings(s),
       onResume: () => this.resume(),
-      onQuit: () => location.reload(),
+      onQuit: () => this.toMenu(),
     });
     // phones and tablets get on-screen controls
     if (isTouch()) this.touch = new Touch(container, this);
@@ -576,6 +576,17 @@ export class Client {
     if (g.phase !== 'live') return;
     this.paused = true;
     this.pauseMenu.show();
+  }
+
+  /**
+   * "Leave the park" / "Main menu": back to the title. Online, the ride is told first (src/online.js leave), so the
+   * refresh-recovery ticket is thrown away: without that the reload looked like a dropped line and put you straight
+   * back in the ride you had just left, with no intro and usually dead.
+   */
+  toMenu() {
+    this.onLeave?.();
+    // a moment for the goodbye to reach the server
+    setTimeout(() => location.reload(), this.onLeave ? 150 : 0);
   }
 
   resume() {
@@ -1591,7 +1602,7 @@ export class Client {
       const mine = snap.standings.find((s) => s.id === this.myId);
       if (mine) this.rideAward = award(loadProgress(), { ...this.rideStats, place: mine.place, of: snap.standings.length, kills: mine.kills, ghostKills: mine.ghostKills, revives: mine.revives, dmg: mine.dmg, alive: mine.alive });
     }
-    this.hud.endScreen(snap, () => (this.online ? this.onAgain?.() : this.newMatch()), () => location.reload(), this.rideAward);
+    this.hud.endScreen(snap, () => (this.online ? this.onAgain?.() : this.newMatch()), () => this.toMenu(), this.rideAward);
 
     // post
     this.hurt = Math.max(0, this.hurt - dt * 0.8);

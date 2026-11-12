@@ -247,3 +247,13 @@ Chrome blocks these sites from posting to localhost, so downloads always go thro
   - Storm sky (src/clouds.js): scripts/blender/render-clouds.py renders a volumetric cloud slab from below in Cycles (density = 4D noise on a torus, so it tiles; slab 3 tiles wide, ortho camera on the middle one): a moon-lit pass (RGB + alpha) and a lit-from-inside pass; scripts/pack-clouds.mjs -> public/tex/clouds.webp (R moonlit, G cover, B lightning). Two layers drift over a dome that follows the camera (renderOrder -20, no depth write), cover by night (thunder .95, storm .82, drizzle .66, fog .6, moon .24), speed with windAmp, lit by weather.flash.
   - Shadow stand-in re-exported (crates and scares now cast their own). exportCasters restored culled copies too early (the game re-culled during its 2 s wait and two thirds of the scenery went missing): it now restores right before reading.
   - Playtest: full autopilot match clean (median 10.3 ms, 7 of 25,088 frames over 50 ms); contacts.mjs, roomtest, nettest pass. shared/ changed: going live needs Render Manual Deploy as well as deploy-pages.
+
+## Leaving an online ride (2026-11-13)
+
+- Bug: "Leave the park" (pause menu) and "Main menu" (results sign) reloaded the page mid-ride; the pagehide handler
+  kept the refresh-recovery ticket, so the reload rejoined the ride just left: no intro, and usually dead (a ghost).
+- Fix: `Client.toMenu()` calls `Online.leave()` first (drops the ticket, sends `{t:'leave'}`), then reloads. The server
+  (`server/room.js`) skips the 35 s come-back grace for a rider who said goodbye, so an empty ride closes at once and
+  the next arrival gets a bus instead of watching bots. A real refresh mid-ride still resumes.
+- Testing live: never leave an online test ride running (close it with Leave the park). One public ride: anyone who
+  arrives while it runs can only watch as a ghost until it ends.

@@ -36,8 +36,31 @@ export class Online {
     app.appendChild(this.sign);
     // leaving the page mid-ride (a refresh): the clock for coming back starts now
     addEventListener('pagehide', () => {
-      if (this.mode === 'ride' && this.ticket) keepTicket(this.ticket);
+      if (!this.left && this.mode === 'ride' && this.ticket) keepTicket(this.ticket);
     });
+    // "Leave the park" and "Main menu" (src/client.js toMenu)
+    client.onLeave = () => this.leave();
+  }
+
+  /**
+   * Walking away on purpose: the ticket is thrown away (so the page reload that follows does not bring you back to
+   * this ride), and the server is told, so it does not hold an empty ride open waiting for you.
+   */
+  leave() {
+    this.left = true;
+    this.ticket = null;
+    keepTicket(null);
+    try {
+      this.conn?.send({ t: 'leave' });
+    } catch {
+      /* the line is already down */
+    }
+  }
+
+  /** Leave, then back to the title. */
+  toMenu() {
+    this.leave();
+    setTimeout(() => location.reload(), 150);
   }
 
   /**
@@ -187,6 +210,7 @@ export class Online {
 
   toLobby() {
     this.mode = 'lobby';
+    this.banner(null);
     // the last ride's HUD has no business behind the bus stop sign
     if (this.client.game) this.client.hudRoot.style.visibility = 'hidden';
     this.render();
@@ -216,7 +240,7 @@ export class Online {
         <p class="fine center lb-info"></p>
         <div class="lb-buttons"><button class="ticket cream lb-invite">Copy invite link</button><button class="ticket dark lb-leave">Leave the stop</button></div>
       </div>`;
-      this.sign.querySelector('.lb-leave').addEventListener('click', () => location.reload());
+      this.sign.querySelector('.lb-leave').addEventListener('click', () => this.toMenu());
       // ride with a friend: one public ride, so a link that heads straight for the stop is all it takes
       this.sign.querySelector('.lb-invite').addEventListener('click', (e) => {
         const url = `${location.origin}${location.pathname}?ride`;
@@ -247,7 +271,7 @@ export class Online {
       <p class="fine center">${esc(info)}</p>
       <button class="ticket lb-leave">Back to the menu</button>
     </div>`;
-    this.sign.querySelector('.lb-leave').addEventListener('click', () => location.reload());
+    this.sign.querySelector('.lb-leave').addEventListener('click', () => this.toMenu());
     this.sign.classList.add('show');
     document.exitPointerLock?.();
   }
