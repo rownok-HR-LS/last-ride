@@ -366,3 +366,12 @@ sounds; lightning that lights the park, rides that light up, lived-in details (B
   (fallback "keep today's hair"). This is the third hair try (volume under cards 11-11, edge cards 11-14, strips
   11-14): the scans' hair is baked into one shell and texture, so overlays sit on top of it instead of replacing it.
   Real hair would need the scan's hair cut away and repainted first. The scripts are not in the repo.
+
+## Bus intro fixes (2026-11-14)
+
+- Branches through the cabin in the shot up the aisle: the roadside crowns overhang the road. bus.js busClip: six
+  planes round the bus body (moved by Bus.update) on the tree materials with clipIntersection, so no tree is drawn
+  inside the bus (renderer.localClippingEnabled on). Checked A/B on the same frame.
+- Riders sank into the seat behind them: updateCharacters seated them from the bus's previous frame (0.15 m at
+  60 fps, more on slow machines). Bus.update now runs before updateCharacters.
+- Client only: push + deploy-pages, no Render step.

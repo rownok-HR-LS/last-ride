@@ -199,6 +199,8 @@ export class Client {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.shadowMap.enabled = true;
+    // (trees are cut away inside the tour bus: bus.js busClip)
+    renderer.localClippingEnabled = true;
     // PCF from the start: three swaps the removed soft mode for PCF only at the first shadow pass, and any shader
     // built before that expected the wrong kind of shadow texture (those draws failed and riders vanished)
     renderer.shadowMap.type = THREE.PCFShadowMap;
@@ -1608,6 +1610,8 @@ export class Client {
     }
     if (!me || me.state !== 'ghost' || me.possess) this.power = null;
 
+    // the bus first: riders sit in its seats, and placed from last frame's bus they sank back into the seat behind
+    this.bus.update(snap.bus, true, dt, { cabin: this.cine ? this.cine.cabin : 0 });
     this.updateCharacters(snap, dt);
     // loose bodies can be shoved by riders walking into them and by bumper cars
     const near = this.corpses.length || debrisCount() ? this.bodyPushers(snap, dt) : null;
@@ -1646,7 +1650,6 @@ export class Client {
     updateNeon(this.time);
     updateTentFlaps(snap.players, dt);
     updateLampLight(snap.blackouts, this.intro.power(snap));
-    this.bus.update(snap.bus, true, dt, { cabin: this.cine ? this.cine.cabin : 0 });
     // the tour's driver never leaves his seat
     const ds = this.bus.driverSeat(this.driverPos || (this.driverPos = new THREE.Vector3()));
     this.driver.root.position.copy(ds);

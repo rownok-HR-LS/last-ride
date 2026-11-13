@@ -7,6 +7,24 @@ import { ktx2 } from './ktx.js';
 import { glow } from './textures.js';
 
 const LENGTH = 10.8; // metres
+
+/**
+ * The bus as a box the trees are not drawn inside (src/trees.js gives their materials these planes, kept where the
+ * bus is by Bus.update): the roadside crowns reach over the road, and a branch through the cabin showed in the
+ * intro's shot up the aisle. A point is cut only when it is inside all six (clipIntersection). Until the bus is
+ * placed every plane keeps everything.
+ */
+export const busClip = Array.from({ length: 6 }, () => new THREE.Plane(new THREE.Vector3(0, 1, 0), 1e6));
+/** The box in the body's own frame: [normal pointing out, distance out from the middle]. */
+const CLIP_BOX = [[1, 0, 0, 1.4], [-1, 0, 0, 1.4], [0, 1, 0, 3.5], [0, -1, 0, 0.1], [0, 0, 1, LENGTH / 2 + 0.15], [0, 0, -1, LENGTH / 2 + 0.15]];
+function placeClip(body, on) {
+  for (let i = 0; i < 6; i++) {
+    const [x, y, z, d] = CLIP_BOX[i];
+    const p = busClip[i];
+    if (!on) p.set(p.normal.set(0, 1, 0), 1e6);
+    else p.set(p.normal.set(x, y, z), -d).applyMatrix4(body.matrixWorld);
+  }
+}
 // the model's nose points along +z; the game's yaw 0 faces -z
 const MODEL_YAW = Math.PI;
 const BEAM = 22; // how far the visible beams reach (m)
@@ -184,7 +202,10 @@ export class Bus {
     this.root.visible = visible;
     this.root.position.set(bus.x, 0.05, bus.z);
     this.root.rotation.y = bus.yaw;
-    if (!visible) return;
+    if (!visible) {
+      placeClip(this.body, false);
+      return;
+    }
     this.time += dt;
     const t = this.time;
     const moving = Math.min(1, (bus.v || 0) / 6);
@@ -193,6 +214,7 @@ export class Bus {
     this.body.rotation.x = (Math.sin(t * 0.9 + 2) * 0.006 + Math.sin(t * 5.3) * 0.002) * moving;
     this.body.position.y = (Math.abs(Math.sin(t * 6.1)) * 0.012 + Math.max(0, Math.sin(t * 1.7)) * 0.01) * moving;
     this.root.updateMatrixWorld(true);
+    placeClip(this.body, true);
     for (const b of this.beams) b.material.uniforms.time.value = t;
     // a failing tube: mostly on, now and then it stutters
     const flick = Math.sin(t * 13) * Math.sin(t * 7.3) > 0.82 ? 0.15 : 1;

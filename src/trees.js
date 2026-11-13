@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { sway } from './wind.js';
 import { cullable, lodLimit } from './cull.js';
 import { ktx2 } from './ktx.js';
+import { busClip } from './bus.js';
 
 /** [preset, seed, tweak]. Every variant is normalised to 1 m tall and scaled per instance. */
 export const DEAD = [
@@ -49,6 +50,9 @@ export async function preloadTrees() {
       mat.roughness = 1;
       mat.metalness = 0;
       if (mat.name === 'needles') mat.side = THREE.DoubleSide;
+      // never drawn inside the tour bus (branches over the road reached through its cabin)
+      mat.clippingPlanes = busClip;
+      mat.clipIntersection = true;
       swayed.set(mat, sway(mat, mat.name === 'needles' ? 0.011 : 0.008));
     }
     const v = (out[lod][kind][+i] ??= { parts: [], tris: 0 });
