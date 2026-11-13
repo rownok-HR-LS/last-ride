@@ -961,6 +961,9 @@ function buildBackdrop(scene) {
     // far enough back that crowns overhang the verge, not the bus
     const x = side * (10 + rr() * rr() * 90);
     const z = PARK_EDGE + 6 + rr() * 360;
+    // none right by the gate: a big oak there reached a branch across it and down into the ground (spikes by the
+    // bus stop); skipping keeps every other tree where it was
+    if (Math.hypot(x, z - PARK_EDGE) < 26) continue;
     (Math.abs(x) < 24 ? near : far).push({ x, z, h: 8 + rr() * 13, rot: rr() * 6 });
   }
   plantTrees(scene, near, { living: 0.35 });

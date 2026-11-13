@@ -30,7 +30,7 @@ export function settingsBoard(settings, { onChange, onBack }) {
     <p class="fine q-note"></p>
     <h3>Sound</h3>
     ${VOLUMES.map(([id, n]) => `<label class="row">${n}<input type="range" min="0" max="1" step="0.05" data-vol="${id}"><output></output></label>`).join('')}
-    <h3>Mouse</h3>
+    <h3><span class="t-off">Mouse</span><span class="t-on">Looking</span></h3>
     <label class="row">Sensitivity<input type="range" min="0.3" max="2.5" step="0.05" data-sens><output></output></label>
     <label class="row">Look<span class="choices"><button class="choice" data-inv="0">Normal</button><button class="choice" data-inv="1">Inverted</button></span><span></span></label>
     <h3>Camera</h3>
@@ -41,9 +41,9 @@ export function settingsBoard(settings, { onChange, onBack }) {
     <label class="row">HUD size<span class="choices">${[['small', 'Small'], ['normal', 'Normal'], ['large', 'Large']].map(([id, n]) => `<button class="choice" data-ui="${id}">${n}</button>`).join('')}</span><span></span></label>
     <label class="row">Sound captions<span class="choices"><button class="choice" data-cap="1">On</button><button class="choice" data-cap="0">Off</button></span><span></span></label>
     <p class="fine">Captions show important sounds nearby on screen (footsteps, shots, fighting, the rides) and where they come from.</p>
-    <h3>Keys</h3>
-    <div class="keys">${ACTIONS.map(([id, n]) => `<span>${n}</span><button class="key" data-act="${id}"></button>`).join('')}</div>
-    <p class="fine">Click a key, then press the new one. Esc cancels. Number keys pick weapons, items and powers.</p>
+    <h3 class="t-off">Keys</h3>
+    <div class="keys t-off">${ACTIONS.map(([id, n]) => `<span>${n}</span><button class="key" data-act="${id}"></button>`).join('')}</div>
+    <p class="fine t-off">Click a key, then press the new one. Esc cancels. Number keys pick weapons, items and powers.</p>
     <div class="board-buttons"><button class="ticket cream reset">Reset</button><button class="ticket back">Back</button></div>
   </div>`);
   const notes = {

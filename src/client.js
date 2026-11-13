@@ -1614,7 +1614,7 @@ export class Client {
     if (!me || me.state !== 'ghost' || me.possess) this.power = null;
 
     // the bus first: riders sit in its seats, and placed from last frame's bus they sank back into the seat behind
-    this.bus.update(snap.bus, true, dt);
+    this.bus.update(snap.bus, true, dt, snap.phase === 'launch');
     this.updateCharacters(snap, dt);
     // loose bodies can be shoved by riders walking into them and by bumper cars
     const near = this.corpses.length || debrisCount() ? this.bodyPushers(snap, dt) : null;

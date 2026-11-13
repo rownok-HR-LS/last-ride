@@ -1161,3 +1161,17 @@ body.touch .feed { margin-right: 60px; }
   .screen-fade, .title2.leaving { transition: none; }
   .lobby-layer.show, .lobby-layer.show .lobby-sign, .endscreen.show .end-board tr, .endscreen.show .end-awards li { animation: none; }
 }
+
+/* phone pass (2026-11-14) */
+body.touch .t-off { display: none !important; }
+body:not(.touch) .t-on { display: none !important; }
+.touch-ui.cine .t-pad, .touch-ui.cine [data-t="map"] { visibility: hidden; }
+body.touch .feed { margin-right: 100px; }
+@media (max-height: 520px) {
+  body.touch .hud .death-card { bottom: auto; top: 30%; min-width: 0; padding: 12px 22px 10px; }
+  body.touch .banner { top: 11%; }
+  body.touch .banner .big { font-size: 34px; }
+  body.touch .banner .small { font-size: 14px; }
+  .end-sign { padding-bottom: 0; }
+  .end-sign .board-buttons { position: sticky; bottom: 0; margin: 12px 0 0; padding: 10px 0 14px; background: rgba(12,10,14,0.97); box-shadow: 0 -14px 14px -6px rgba(12,10,14,0.97); z-index: 1; }
+}

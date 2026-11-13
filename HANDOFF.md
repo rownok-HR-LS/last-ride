@@ -396,3 +396,15 @@ sounds; lightning that lights the park, rides that light up, lived-in details (B
   Checked before/after from 3.5 m with src/tools/props.js (props(['bench', ...], tag)): no visible change.
 - Left alone: Spice and the old lady are big from hair and clothing geometry (already partly quantized); thinning it
   would show on riders seen up close. Bus, big top and the riders' 2048 atlases are looked at closely.
+
+## Phone pass (2026-11-14)
+
+- Played a practice ride at 740x360 (touch emulation) on Low, menu to results. Fixed: Settings on touch says
+  "Looking" and hides the keyboard keys (.t-on/.t-off, body.touch); the intro says "Tap to skip" and hides the
+  touch pad and Map (touch-ui.cine) so captions are clear; guide tips say "tap E" (prompts.js press()), the ghost's
+  fast button is named (TOUCH.fast), the Bear Trap tip says "tap it"; kill feed clear of the chat button; on short
+  touch screens the death card and the banner sit above the buttons and the results' Ride again / Main menu stay
+  pinned at the card's bottom.
+- Spikes in the ground by the bus stop: a 19 m roadside oak at (-12.9, 122.8) reached a branch across the gate and
+  into the ground. world.js skips roadside trees within 26 m of the gate (others keep their places). The road
+  cut-away (bus.js busClip) now only runs during the intro.

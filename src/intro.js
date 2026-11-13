@@ -119,7 +119,7 @@ export class Intro {
     this.el.className = 'intro';
     this.el.innerHTML = `<div class="fade"></div><div class="bar top"></div><div class="bar bottom"></div>
       <div class="subtitle"></div><div class="intro-title"><b>LAST RIDE</b><span>Midnight Wonderland Tours · 20 seats</span></div>
-      <div class="skip">Press <kbd>Enter</kbd> to skip</div>`;
+      <div class="skip"><span class="t-off">Press <kbd>Enter</kbd> to skip</span><span class="t-on">Tap to skip</span></div>`;
     root.append(this.el);
     this.sub = this.el.querySelector('.subtitle');
     this.title = this.el.querySelector('.intro-title');

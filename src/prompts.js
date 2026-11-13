@@ -33,7 +33,10 @@ export function usingTouch() {
 const TOUCH = {
   interact: 'E', prizes: 'E', reload: 'R', jump: '⤒', slide: '⤓', up: '⤒', down: '⤓', attack: 'the attack button', aim: 'the aim button',
   cancel: 'the aim button', map: 'Map', weapons: '⇄', powers: '↯', pause: '☰', move: 'the left stick', look: 'drag to look', close: '✕',
+  fast: '»',
 };
+/** "press E", or "tap E" on a touch screen. */
+export const press = (action) => `${usingTouch() ? 'tap' : 'press'} ${keyOf(action)}`;
 
 const PAD = {
   interact: 'X', prizes: 'X', jump: 'A', slide: 'B', dodge: 'LB', reload: 'RB', sprint: 'L3', shoulder: 'R3', map: 'View',

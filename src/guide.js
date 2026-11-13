@@ -1,7 +1,7 @@
 // Tells the player what to do next: an objective line, on-screen markers, a ghost tutorial and a controls card.
 import * as THREE from 'three';
 import { icon as svgIcon } from './icons.js';
-import { keyOf, usingPad, usingTouch } from './prompts.js';
+import { keyOf, press, usingPad, usingTouch } from './prompts.js';
 import { FERRIS, STATION, PRIZE_BOOTHS } from '../shared/map.js';
 
 const TUT_KEY = 'last-ride-ghost-tutorial';
@@ -162,11 +162,11 @@ export class Guide {
         const tz = cz + (p.z - cz) * k * 0.8;
         this.place(n++, cam, tx, p.y + 1.5, tz, 'storm', `${dist(tx, tz)} m`, 'zone');
       } else if (!armed) {
-        this.setObjective('Find a weapon', `You only have your fists. Look for glowing weapons and gold chests, walk up and press ${keyOf('interact')}.`);
+        this.setObjective('Find a weapon', `You only have your fists. Look for glowing weapons and gold chests, walk up and ${press('interact')}.`);
         const near = this.nearestLoot(client, p, (l) => l.kind === 'chest' || l.kind === 'weapon');
         if (near) this.place(n++, cam, near.x, near.y + 1, near.z, near.kind === 'chest' ? 'chest' : 'weapon', `${dist(near.x, near.z)} m`, near.kind === 'weapon' ? `r${near.rarity}` : 'chest');
       } else if (me.tickets >= 30 && booth) {
-        this.setObjective(`Spend your tickets · ${svgIcon('ticket')} ${me.tickets}`, `A Prize Counter sells chainsaws, crossbows and blessed relics. Walk up and press ${keyOf('prizes')}.`);
+        this.setObjective(`Spend your tickets · ${svgIcon('ticket')} ${me.tickets}`, `A Prize Counter sells chainsaws, crossbows and blessed relics. Walk up and ${press('prizes')}.`);
         this.place(n++, cam, booth.x, 4.5, booth.z, 'ticket', `Prize Counter · ${dist(booth.x, booth.z)} m`, 'chest');
       } else if (p.hp < 60 && (me.items.bandage || me.items.medkit)) {
         this.setObjective('Heal up', usingTouch() ? `Use your ${me.items.medkit ? 'medkit' : 'bandage'} (tap it in your items) somewhere safe` : `Press ${me.items.medkit ? '5 for a medkit' : '4 for a bandage'} somewhere safe`);
@@ -247,7 +247,7 @@ export class Guide {
     }
     // keys and buttons named for whatever the player is holding (see prompts.js)
     const gh = svgIcon('ghost');
-    const trap = usingPad() ? '↑' : '1';
+    const trap = usingPad() ? '↑' : usingTouch() ? 'tap it' : '1';
     const use = usingPad() ? `press ${keyOf('attack')} on` : usingTouch() ? 'tap attack on' : 'click';
     const lets = `${keyOf('interact')} lets go.`;
     const step = {
@@ -255,7 +255,7 @@ export class Guide {
       1: me.riseT > 0
         ? [`${gh} Rising from the grave… ${Math.ceil(me.riseT)}s`, `Then pick the Bear Trap (${trap}) and ${use} the ground in front of a survivor.`]
         : [`${gh} Use a power`, `Pick the Bear Trap (${trap}), then ${use} the ground in front of a survivor (${svgIcon('target')} markers).`],
-      2: [`${gh} Possess a ride`, `Rides hit hardest. Fly to a ${svgIcon('ferris')} ${svgIcon('coaster')} ${svgIcon('car')} marker and press ${keyOf('interact')}.`],
+      2: [`${gh} Possess a ride`, `Rides hit hardest. Fly to a ${svgIcon('ferris')} ${svgIcon('coaster')} ${svgIcon('car')} marker and ${press('interact')}.`],
       3: [`${gh} You control the ride!`, me.possess?.kind === 'ferris' ? `Aim at a survivor and ${use} to fling a gondola. ${lets}` : me.possess?.kind === 'car' ? `Drive into survivors. ${lets}` : 'Hold on. Anyone on the track gets hit.'],
     }[this.tut];
     if (step) this.setObjective(step[0], step[1]);

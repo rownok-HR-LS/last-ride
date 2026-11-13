@@ -211,6 +211,8 @@ export class Touch {
     const me = c.snap?.me;
     const hide = !!(c.attract || !me || c.snap.phase === 'end' || c.pauseMenu.open || c.hud.prizesOpen);
     this.el.classList.toggle('hidden', hide);
+    // during the intro only the menu button shows: the buttons covered its captions, and a tap anywhere skips it
+    this.el.classList.toggle('cine', !!c.intro?.active);
     if (hide) return;
     const state = me.spectator ? 'watch' : me.state;
     const key = `${state}:${me.booth >= 0}`;

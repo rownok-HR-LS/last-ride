@@ -12,8 +12,8 @@ const LENGTH = 10.8; // metres
 /**
  * A box the trees are not drawn inside (src/trees.js gives their materials these planes, kept up to date by
  * Bus.update): the roadside crowns reach over the road, and in the intro branches showed through the cabin and
- * across the bus from the drone and crane shots. While the bus is out on the straight road through the woods the box
- * is the air over that road (the bus is in it); inside the park it is the bus itself. A point is cut only when it is
+ * across the bus from the drone and crane shots. During the intro the box is the air over the road through the woods
+ * (the bus is in it); otherwise it is the bus itself. A point is cut only when it is
  * inside all six (clipIntersection). Until the bus is placed every plane keeps everything.
  */
 export const busClip = Array.from({ length: 6 }, () => new THREE.Plane(new THREE.Vector3(0, 1, 0), 1e6));
@@ -21,9 +21,10 @@ export const busClip = Array.from({ length: 6 }, () => new THREE.Plane(new THREE
 const CLIP_BOX = [[1, 0, 0, 1.4], [-1, 0, 0, 1.4], [0, 1, 0, 3.5], [0, -1, 0, 0.1], [0, 0, 1, LENGTH / 2 + 0.15], [0, 0, -1, LENGTH / 2 + 0.15]];
 /** The road through the woods in world space (x = 0 from the gate out): [normal pointing out, distance from the origin]. */
 const ROAD_BOX = [[1, 0, 0, 5], [-1, 0, 0, 5], [0, 1, 0, 40], [0, -1, 0, 1], [0, 0, 1, 520], [0, 0, -1, -(PARK_EDGE + 2)]];
-function placeClip(body, on) {
-  // (on the straight from the woods to the park's main avenue, so the cut does not jump back as the bus passes the gate)
-  const road = on && Math.abs(body.matrixWorld.elements[12]) < 1 && body.matrixWorld.elements[14] > 40;
+function placeClip(body, on, intro) {
+  // only for the intro's cameras, and the whole way to the gate (so the cut does not jump back as the bus arrives); in
+  // play the branches stay whole: one that reaches down over the gate was left as spikes in the ground
+  const road = on && intro && Math.abs(body.matrixWorld.elements[12]) < 1 && body.matrixWorld.elements[14] > 40;
   for (let i = 0; i < 6; i++) {
     const p = busClip[i];
     if (!on) p.set(p.normal.set(0, 1, 0), 1e6);
@@ -208,7 +209,8 @@ export class Bus {
     this.cabin.intensity = level * 3.2 * (this.flick ?? 1);
   }
 
-  update(bus, visible, dt = 0) {
+  /** intro: the opening cinematic is on (the trees over the road are cleared for its cameras). */
+  update(bus, visible, dt = 0, intro = false) {
     this.root.visible = visible;
     this.root.position.set(bus.x, 0.05, bus.z);
     this.root.rotation.y = bus.yaw;
@@ -224,7 +226,7 @@ export class Bus {
     this.body.rotation.x = (Math.sin(t * 0.9 + 2) * 0.006 + Math.sin(t * 5.3) * 0.002) * moving;
     this.body.position.y = (Math.abs(Math.sin(t * 6.1)) * 0.012 + Math.max(0, Math.sin(t * 1.7)) * 0.01) * moving;
     this.root.updateMatrixWorld(true);
-    placeClip(this.body, true);
+    placeClip(this.body, true, intro);
     for (const b of this.beams) b.material.uniforms.time.value = t;
     // a failing tube: mostly on, now and then it sags (not out: in the intro the riders went black and seemed to vanish)
     this.flick = Math.sin(t * 13) * Math.sin(t * 7.3) > 0.88 ? 0.6 : 1;
