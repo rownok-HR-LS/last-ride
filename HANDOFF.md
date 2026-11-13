@@ -375,3 +375,8 @@ sounds; lightning that lights the park, rides that light up, lived-in details (B
 - Riders sank into the seat behind them: updateCharacters seated them from the bus's previous frame (0.15 m at
   60 fps, more on slow machines). Bus.update now runs before updateCharacters.
 - Client only: push + deploy-pages, no Render step.
+- Riders "not solid, vanish and reappear" in the aisle shot (pre-existing): the shot's depth of field (aperture
+  0.12, focus 5 m) smeared the riders a seat away into the seats behind (see-through), and the failing cabin tube
+  dropped to 15% about 6% of the time (riders went black). Aisle shot now sharp (aperture 0); the tube sags to 60%,
+  rarer. Cabin light is set by Bus.cabinLight after the camera picks its shot (with Bus.update now before the
+  riders it was a frame late and the shot's first frame was dark).

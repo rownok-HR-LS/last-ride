@@ -197,8 +197,12 @@ export class Bus {
     return this.body.localToWorld(out.set(DRIVER[0], FLOOR, DRIVER[1]));
   }
 
-  /** opts.cabin: how bright the cabin light is (0..1). */
-  update(bus, visible, dt = 0, opts = {}) {
+  /** How bright the cabin light is (0..1), set once the camera has chosen its shot (the intro's aisle shot turns it on). */
+  cabinLight(level) {
+    this.cabin.intensity = level * 3.2 * (this.flick ?? 1);
+  }
+
+  update(bus, visible, dt = 0) {
     this.root.visible = visible;
     this.root.position.set(bus.x, 0.05, bus.z);
     this.root.rotation.y = bus.yaw;
@@ -216,9 +220,8 @@ export class Bus {
     this.root.updateMatrixWorld(true);
     placeClip(this.body, true);
     for (const b of this.beams) b.material.uniforms.time.value = t;
-    // a failing tube: mostly on, now and then it stutters
-    const flick = Math.sin(t * 13) * Math.sin(t * 7.3) > 0.82 ? 0.15 : 1;
-    this.cabin.intensity = (opts.cabin || 0) * 3.2 * flick;
+    // a failing tube: mostly on, now and then it sags (not out: in the intro the riders went black and seemed to vanish)
+    this.flick = Math.sin(t * 13) * Math.sin(t * 7.3) > 0.88 ? 0.6 : 1;
     // the bus drives through still air, so the dust streams back past the lamps
     const pos = this.dust.geometry.attributes.position;
     const a = pos.array;

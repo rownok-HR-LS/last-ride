@@ -88,8 +88,9 @@ const SHOTS = [
     cam: (u, b) => ({ pos: [-3.5 + u * 1.2, 1.4 + u * 0.2, 74 + u * 5], look: [b.x * 0.3, 4.6 - u * 0.8, b.z], focus: 36 }),
   },
   {
-    // inside, creeping up the aisle past the other riders toward the driver
-    at: 20.3, fov: 50, shake: 0.9, aperture: 0.12, cabin: 1, interior: 1,
+    // inside, creeping up the aisle past the other riders toward the driver (kept sharp: the riders a seat away were
+    // nearer than the focus, and the blur smeared them into the seats behind so they looked see-through)
+    at: 20.3, fov: 50, shake: 0.9, aperture: 0, cabin: 1, interior: 1,
     cam: (u, b) => ({ pos: b.at(-2.6 + u * 1.4, 0.05, 2.85), look: b.at(16, -0.4, 2.45), focus: 5 }),
   },
   {

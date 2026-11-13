@@ -1613,7 +1613,7 @@ export class Client {
     if (!me || me.state !== 'ghost' || me.possess) this.power = null;
 
     // the bus first: riders sit in its seats, and placed from last frame's bus they sank back into the seat behind
-    this.bus.update(snap.bus, true, dt, { cabin: this.cine ? this.cine.cabin : 0 });
+    this.bus.update(snap.bus, true, dt);
     this.updateCharacters(snap, dt);
     // loose bodies can be shoved by riders walking into them and by bumper cars
     const near = this.corpses.length || debrisCount() ? this.bodyPushers(snap, dt) : null;
@@ -1889,6 +1889,7 @@ export class Client {
     const shake = this.shake * this.shake * 0.4 * shakeK;
 
     this.cine = this.intro.update(snap, cam);
+    this.bus.cabinLight(this.cine ? this.cine.cabin : 0);
     // indoors (the shot up the bus aisle) there is no open sky: the cabin light does the lighting
     const inside = this.cine?.interior ? 1 : 0;
     // lightning floods the sky (only a glimmer of it reaches inside)
