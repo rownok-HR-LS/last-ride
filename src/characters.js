@@ -291,7 +291,7 @@ const EYES = {
   victor: { from: 'body', x: 0.032, y: 1.648, z: 0.062, rx: 0.017, ry: 0.0105, lid: '#a8725c', setLid: true },
   // her eyeballs are a separate part in flat colours: the lid over them is this skin colour (sRGB)
   // (her rig's eye joints sit above her painted eyes)
-  agnes: { lid: '#9a6a54', dy: -0.008 },
+  agnes: { lid: '#7a4a38', dy: -0.008, rx: 0.021, ry: 0.0135 },
   dale: { from: 'head', x: 0.032, y: 0.072, z: 0.088 },
   marcus: { from: 'head', x: 0.032, y: 0.072, z: 0.088 },
   denise: { from: 'head', x: 0.03, y: 0.07, z: 0.085, rx: 0.015 },
@@ -378,7 +378,8 @@ function addEyes(o, outfit, toBody, centresOut = []) {
     for (const i of front) {
       const ex = (body.getX(i) - c.x) / E.rx;
       const ey = (body.getY(i) - c.y) / E.ry;
-      if (Math.hypot(ex, ey) > 3) continue;
+      // (a low-detail face has big triangles: mark a wider ring, so the ones over the eye are wholly marked)
+      if (Math.hypot(ex, ey) > (n < 20000 ? 6 : 3)) continue;
       eyeP[i * 3] = ex;
       eyeP[i * 3 + 1] = ey;
       eyeP[i * 3 + 2] = 1;

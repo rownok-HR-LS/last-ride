@@ -343,3 +343,17 @@ sounds; lightning that lights the park, rides that light up, lived-in details (B
   puddleField(renderer) reads the puddle noise back from the GPU so footsteps splash (fx.puddleSplash) where water
   is drawn.
 - Going live needs deploy-pages AND Render (shared/game.js, shared/map.js changed).
+
+## Leftovers round (2026-11-14)
+
+- Fence: the perimeter's 12 m panels are breakable props (scripts/fence-panels.mjs copies kit_fence_a/b out as
+  fence_panel_a/b with world materials, convert-env + fracture-props cut them in 16). shared/map.js fence loop:
+  DECOR entry + breakable panel collider + an unbreakable edge wall 0.5 m outside (the park edge holds). kit.js skips
+  fences with decor. Shadow stand-in re-baked (100 tiles, 508k triangles) without them.
+- Tent flaps: flags.js buildTentFlaps/updateTentFlaps: two dark red cloth flaps per game tent doorway (the scan's
+  door faces its +z, r 3.42, 2.3 m high), hinged outside, pushed aside by riders within ~2 m.
+- Hair edges: tried strand cards along the scanned riders' hairline/nape (built at load from hairP). Looked like
+  scratches and bristles even when shortened and laid flat (cards on a shell cannot soften a view-dependent
+  outline): removed. Strand shading stays.
+- Agnes's lids: low-detail faces mark a wider ring round each eye (n < 20000), her eye area larger, lid colour darker.
+- Going live needs deploy-pages AND Render (shared/map.js changed).
