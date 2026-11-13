@@ -357,3 +357,12 @@ sounds; lightning that lights the park, rides that light up, lived-in details (B
   outline): removed. Strand shading stays.
 - Agnes's lids: low-detail faces mark a wider ring round each eye (n < 20000), her eye area larger, lid colour darker.
 - Going live needs deploy-pages AND Render (shared/map.js changed).
+
+## Hair strips attempt (2026-11-14)
+
+- Rebuilt Eric's and Carla's hair as real strand strips in Blender (strands grown over the scan's hair shell, cut-out
+  strand texture, coloured from the scan, lit with the scalp's normals, ~1,500 strands each). Close-ups: a dark, flat
+  helmet over the scan's own hair, worse than today's strand shading at every angle. Removed as agreed with the user
+  (fallback "keep today's hair"). This is the third hair try (volume under cards 11-11, edge cards 11-14, strips
+  11-14): the scans' hair is baked into one shell and texture, so overlays sit on top of it instead of replacing it.
+  Real hair would need the scan's hair cut away and repainted first. The scripts are not in the repo.
