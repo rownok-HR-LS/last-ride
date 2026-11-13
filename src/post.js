@@ -209,6 +209,8 @@ export function createPost(renderer, scene, camera) {
         vec3 c = texture2D(tColor, vUv).rgb;
         // a broken pixel (not a number) must not be kept: the ground would mirror it back into every later frame
         if (any(isnan(c)) || any(isinf(c))) c = vec3(0.0);
+        // (and a clamp: some graphics drivers drop the checks above; min and max treat a broken value as missing)
+        c = min(max(c, vec3(0.0)), vec3(64.0));
         gl_FragColor = vec4(c, z);
       }`,
     depthTest: false,
@@ -259,7 +261,8 @@ export function createPost(renderer, scene, camera) {
     const hp = bloom.materialHighPassFilter;
     const read = 'vec4 texel = texture2D( tDiffuse, vUv );';
     if (hp?.fragmentShader.includes(read)) {
-      hp.fragmentShader = hp.fragmentShader.replace(read, `${read}\n\tif ( any( isnan( texel ) ) || any( isinf( texel ) ) ) texel = vec4( 0.0 );`);
+      // (the check, and a clamp: some graphics drivers drop the check; min and max treat a broken value as missing)
+      hp.fragmentShader = hp.fragmentShader.replace(read, `${read}\n\tif ( any( isnan( texel ) ) || any( isinf( texel ) ) ) texel = vec4( 0.0 );\n\ttexel = min( max( texel, vec4( 0.0 ) ), vec4( 64.0 ) );`);
       hp.needsUpdate = true;
     } else console.warn('bloom: no guard against broken pixels');
   }

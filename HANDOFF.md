@@ -293,3 +293,24 @@ Chrome blocks these sites from posting to localhost, so downloads always go thro
   24.0 -> 20.1 MB. Originals in assets-src/glb-originals.
 - Phones/tablets and the Low setting load half-size ground and wall textures (public/tex/<name>/half, made by
   `node scripts/ktx-compress.mjs tex-half`): 7.6 -> 2.4 MB. `?halftex` forces them on a desktop.
+
+## Eyelids, Victor's mouth, scanned hair (2026-11-13)
+
+- Blinking (the user chose natural blinks, a squint when hit, eyes shut when dead): characters.js addEyes() finds
+  each eye (rig eye joints; EYES table for riders without them or whose joints miss the painted eye: victor `from:
+  'body'`, agnes `dy`), marks the face points around it (eyeP: across/up the eye, -1..1) and, for each, the texture
+  position of a real skin point just above the eye (lidUv). The vertex shader reads that skin colour from a blurred
+  mip (vLid), so the lid is smooth even on scans textured in many small pieces; parts with no skin of their own
+  (Agnes's eyeballs) or bad skin above (Victor's low brows) use the set colour EYES[].lid. lookShader slides it down
+  over the eye with a lash line; Character.eyelids() drives look.blink (2-6 s blinks, sometimes double; 0.45 s squint
+  at 72% after hit(); 1 when dead, so corpses). Dev: `?eyes=0.7` holds every rider's lids; src/tools/faces.js takes
+  face close-ups on the title (front/three-quarter/back).
+- Victor's upper teeth and gums sat 5.5 cm in front of his lips: SCAN_FIXES moves those loose pieces back at load.
+- Scanned hair (the user chose strand shading): SCAN_HAIR + addHair() mark the scalp of the one-piece scans (hairP:
+  around the head, down from the crown, weight; face, temples, ears and neck excluded; the angle's wrap is at the
+  forehead and faded there). lookShader darkens fine strands and sets a dull, strand-varied roughness instead of the
+  glossy dark-hair default. Agnes, Walter, Balthazar (real hair strands) are left alone.
+- Black frames, again: the bloom's NaN guard (isnan) is dropped by this machine's driver; post.js now also clamps
+  (min/max) in the bloom's bright pass and the kept reflection frame. Agnes's hair, close up, made the NaN.
+- Weak spots: Agnes's lids are pale (her caricature face doesn't line up with her rig); the four crowd riders' lids
+  are soft discs (blurry scans); long hair below the ears isn't stranded.

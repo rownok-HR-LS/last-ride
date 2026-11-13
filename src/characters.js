@@ -152,15 +152,18 @@ export function setCharacterRim(v) {
  */
 function lookShader(sh) {
   const L = this.userData.look;
-  Object.assign(sh.uniforms, { rimAmount, lookWet: L.wet, lookBlood: L.blood, lookGrime: L.grime, lookSeed: L.seed, lookTint: L.tint, lookHit: L.hit || { value: 0 }, lookDye: L.dye || { value: new THREE.Vector4() } });
-  sh.vertexShader = `attribute vec3 bodyP;\nattribute vec2 mouthP;\nvarying vec3 vBody;\nvarying vec2 vMouth;\n${sh.vertexShader}`.replace(
+  Object.assign(sh.uniforms, { rimAmount, lookWet: L.wet, lookBlood: L.blood, lookGrime: L.grime, lookSeed: L.seed, lookTint: L.tint, lookHit: L.hit || { value: 0 }, lookDye: L.dye || { value: new THREE.Vector4() }, lookBlink: L.blink || { value: 0 }, lookLid: L.lid || { value: new THREE.Color(0.5, 0.33, 0.25) } });
+  sh.vertexShader = `attribute vec3 bodyP;\nattribute vec2 mouthP;\nattribute vec3 eyeP;\nattribute vec2 lidUv;\nattribute vec3 hairP;\nvarying vec3 vHair;\nvarying vec3 vBody;\nvarying vec2 vMouth;\nvarying vec3 vEye;\nvarying vec3 vLid;\nuniform vec3 lookLid;\n#ifdef USE_MAP\nuniform sampler2D map;\n#endif\n${sh.vertexShader}`.replace(
     '#include <begin_vertex>',
-    '#include <begin_vertex>\n  vBody = bodyP;\n  vMouth = mouthP;',
+    '#include <begin_vertex>\n  vBody = bodyP;\n  vMouth = mouthP;\n  vEye = eyeP;\n  vHair = hairP;\n  #ifdef USE_MAP\n  vLid = eyeP.z < 0.5 ? vec3(0.0) : lidUv.x < 0.0 ? lookLid : textureLod(map, lidUv, 2.0).rgb;\n  #else\n  vLid = vec3(0.0);\n  #endif',
   );
   sh.fragmentShader = `uniform float rimAmount; uniform float lookWet; uniform float lookBlood; uniform float lookGrime;
-    uniform float lookSeed; uniform vec3 lookTint; uniform float lookHit; uniform vec4 lookDye;
+    uniform float lookSeed; uniform vec3 lookTint; uniform float lookHit; uniform vec4 lookDye; uniform float lookBlink;
     varying vec3 vBody;
     varying vec2 vMouth;
+    varying vec3 vEye;
+    varying vec3 vLid;
+    varying vec3 vHair;
     float lkH(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
     float lkN(vec3 p) {
       vec3 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
@@ -173,11 +176,37 @@ function lookShader(sh) {
       float ca = cos(a);
       return c * ca + cross(k, c) * sin(a) + k * dot(k, c) * (1.0 - ca);
     }
-    float lkMud; float lkBl; float lkSkin; float lkLum;
+    float lkMud; float lkBl; float lkSkin; float lkLum; float lkStrand;
     ${sh.fragmentShader}`
     .replace('#include <map_fragment>', `#include <map_fragment>
       {
         vec3 c = diffuseColor.rgb;
+        // eyelids (Character.face): the scans' eyes are painted on, with no lids. A blink slides the skin from just
+        // above the eye (vLid: its colour, read in the vertex shader) down over it, from the top, with a dark lash line
+        // along its edge. vEye: where this point is across the eye (x) and up it (y), -1..1; z: on an eye at all.
+        #ifdef USE_MAP
+        if (vEye.z > 0.99 && lookBlink > 0.002) {
+          float r = length(vEye.xy);
+          float inside = 1.0 - smoothstep(0.92, 1.12, r);
+          // the lid's edge comes down from the top, curving lower in the middle, like a real lid
+          float edge = mix(1.05, -1.1, lookBlink) - (1.0 - vEye.x * vEye.x) * 0.18 * lookBlink;
+          float lid = smoothstep(edge - 0.08, edge + 0.08, vEye.y) * inside;
+          vec3 skin = vLid * diffuse;
+          float lash = (1.0 - smoothstep(0.0, 0.16, abs(vEye.y - edge))) * smoothstep(0.1, 0.3, lookBlink) * inside;
+          c = mix(c, skin * 0.93, lid);
+          c *= 1.0 - lash * 0.6;
+        }
+        #endif
+        // scanned hair: fine strands running down from the crown (vHair: around the head, down from the crown, how
+        // much hair), a little darker between them, so it reads as hair rather than a painted shell
+        lkStrand = 0.5;
+        if (vHair.z > 0.01) {
+          float sa = vHair.x * 95.0;
+          float sd = vHair.y * 5.0;
+          float st = lkN(vec3(sa, sd, lookSeed)) * 0.6 + lkN(vec3(sa * 2.7, sd * 1.7, lookSeed + 9.0)) * 0.4;
+          lkStrand = st;
+          c *= mix(1.0, 0.72 + 0.5 * st, vHair.z);
+        }
         // teeth an old yellowed white, the tongue and the inside of the mouth a dark red
         c = mix(c, vec3(0.42, 0.37, 0.28), clamp(vMouth.x, 0.0, 1.0));
         c = mix(c, vec3(0.16, 0.035, 0.03), clamp(vMouth.y, 0.0, 1.0));
@@ -219,6 +248,8 @@ function lookShader(sh) {
     .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
       // skin has a soft sheen; cloth is matte; dark leather, shoes and hair a little glossier
       roughnessFactor *= mix(mix(0.9, 0.6, 1.0 - smoothstep(0.02, 0.12, lkLum)), 0.5, lkSkin);
+      // scanned hair: no plastic shine; a soft sheen that varies strand by strand
+      roughnessFactor = mix(roughnessFactor, 0.58 + 0.3 * (1.0 - lkStrand), vHair.z);
       roughnessFactor = mix(roughnessFactor, 0.95, lkMud * (1.0 - lookWet));
       roughnessFactor = mix(roughnessFactor, 0.25, lookWet * 0.9);
       roughnessFactor = mix(roughnessFactor, 0.22, lkBl);`)
@@ -243,8 +274,246 @@ function lookShader(sh) {
   addLampLight(sh);
 }
 
+/**
+ * Where each rider's eyes are, for the eyelids, when the rig has no eye joints: from the head joint, in body
+ * metres (x across, y up, z forward). The rest come from their rigs' eye joints (moved dy up or down where those
+ * don't sit on the painted eyes). rx/ry: half the eye's width and height (a little larger than the painted eye, so
+ * the lid covers its rim); up: how far above the eye the lid's skin is taken, in eye-heights.
+ */
+const EYES_TEST = (() => {
+  const v = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('eyes') : null;
+  return v === null ? null : Math.max(0, Math.min(1, +v || 0));
+})();
+const EYES = {
+  default: { rx: 0.0185, ry: 0.0118, up: 1.35, dy: 0 },
+  // measured on his face (body metres): eye height, and just behind the eye's surface
+  // (his brows sit low and dark, right on the eye: the lid is a set skin colour instead)
+  victor: { from: 'body', x: 0.032, y: 1.648, z: 0.062, rx: 0.017, ry: 0.0105, lid: '#a8725c', setLid: true },
+  // her eyeballs are a separate part in flat colours: the lid over them is this skin colour (sRGB)
+  // (her rig's eye joints sit above her painted eyes)
+  agnes: { lid: '#9a6a54', dy: -0.008 },
+  dale: { from: 'head', x: 0.032, y: 0.072, z: 0.088 },
+  marcus: { from: 'head', x: 0.032, y: 0.072, z: 0.088 },
+  denise: { from: 'head', x: 0.03, y: 0.07, z: 0.085, rx: 0.015 },
+  ruth: { from: 'head', x: 0.03, y: 0.07, z: 0.085, rx: 0.015 },
+};
+
+/**
+ * The eyelids' map (Character.face, lookShader): for each point on the face around an eye, where it is across and up
+ * that eye (eyeP, -1..1, z = 1 on an eye), and how far away in the texture the skin above the eye is (lidUv), so a
+ * blink can slide that skin down over the painted eye.
+ */
+function addEyes(o, outfit, toBody, centresOut = []) {
+  const n = o.geometry.attributes.position.count;
+  const eyeP = new Float32Array(n * 3);
+  const lidUv = new Float32Array(n * 2);
+  o.geometry.setAttribute('eyeP', new THREE.BufferAttribute(eyeP, 3));
+  o.geometry.setAttribute('lidUv', new THREE.BufferAttribute(lidUv, 2));
+  const uv = o.geometry.attributes.uv;
+  const body = o.geometry.attributes.bodyP;
+  if (!uv) return 0;
+  const E = { ...EYES.default, ...(EYES[outfit] || {}) };
+  // the eye centres, in body metres
+  const centres = [];
+  const bones = o.skeleton?.bones || [];
+  const at = (b) => toBody(b.getWorldPosition(new THREE.Vector3()));
+  if (E.from !== 'head') {
+    for (const side of [/(^|_)eye_?l$|L_Eye$/i, /(^|_)eye_?r$|R_Eye$/i]) {
+      const b = bones.find((x) => side.test(x.name));
+      if (b) centres.push(at(b).add(new THREE.Vector3(0, E.dy, 0)));
+    }
+  }
+  if (E.from === 'body') {
+    centres.length = 0;
+    for (const sx of [-1, 1]) centres.push(new THREE.Vector3(sx * E.x, E.y, E.z));
+  }
+  if (centres.length < 2) {
+    centres.length = 0;
+    const head = bones.find((x) => /Head$/.test(x.name));
+    if (!head) return 0;
+    const h = at(head);
+    for (const sx of [-1, 1]) centres.push(new THREE.Vector3(h.x + sx * E.x, h.y + E.y, h.z + E.z));
+  }
+  centresOut.push(...centres);
+  // the face points around each eye: in front of the eyeball's centre (eye joints sit inside the head; the back of
+  // the head is far behind)
+  let marked = 0;
+  for (const c of centres) {
+    const near = [];
+    for (let i = 0; i < n; i++) {
+      const dx = body.getX(i) - c.x;
+      const dy = body.getY(i) - c.y;
+      const dz = body.getZ(i) - c.z;
+      if (Math.abs(dx) < 0.05 && Math.abs(dy) < 0.05 && dz > -0.012 && dz < 0.06) near.push(i);
+    }
+    const front = near;
+    // the skin the lid is made of: real face points just above the eye (scanned faces are textured in many small
+    // pieces, so it has to be an actual point there, not a step across the texture)
+    const skin = front.filter((i) => {
+      const ex = (body.getX(i) - c.x) / E.rx;
+      const ey = (body.getY(i) - c.y) / E.ry;
+      return ey > 1.1 && ey < 3.2 && Math.abs(ex) < 1.8;
+    });
+    if (E.setLid) skin.length = 0;
+    if (!skin.length && !E.lid) continue;
+    // for a point at (x, y) across the eye: the skin point nearest to just past the top of the eye, above it
+    const lidAt = (x, y) => {
+      // (-1, -1): use the set colour (lookShader)
+      if (!skin.length) return [-1, -1];
+      const tx = c.x + x * 0.9;
+      const ty = c.y + E.ry * E.up + y * 0.25;
+      let best = skin[0];
+      let bd = Infinity;
+      for (const j of skin) {
+        const d = (body.getX(j) - tx) ** 2 + (body.getY(j) - ty) ** 2;
+        if (d < bd) {
+          bd = d;
+          best = j;
+        }
+      }
+      return [uv.getX(best), uv.getY(best)];
+    };
+    // every face point near the eye carries where it is across and up it (so the lid's edge is right on the
+    // triangles at the rim too); only those close to it are marked as on the eye
+    for (const i of front) {
+      const ex = (body.getX(i) - c.x) / E.rx;
+      const ey = (body.getY(i) - c.y) / E.ry;
+      if (Math.hypot(ex, ey) > 3) continue;
+      eyeP[i * 3] = ex;
+      eyeP[i * 3 + 1] = ey;
+      eyeP[i * 3 + 2] = 1;
+      const [lu, lv] = lidAt(body.getX(i) - c.x, body.getY(i) - c.y);
+      lidUv[i * 2] = lu;
+      lidUv[i * 2 + 1] = lv;
+      marked++;
+    }
+  }
+  return marked;
+}
+
+/**
+ * Repairs to a scan, in body metres, by the loose pieces of a mesh (its separately modelled parts): each piece whose
+ * bounds lie inside box (min, max), and that reaches forward past front if given, is moved by d. Victor's upper teeth and gums came 5.5 cm in front of his lips: back in line with his
+ * lower teeth.
+ */
+const SCAN_FIXES = {
+  victor: [{ min: [-0.046, 1.565, -0.05], max: [0.046, 1.625, 0.14], front: 0.078, d: [0, -0.008, -0.056] }],
+};
+
+function fixScan(o, outfit, k) {
+  const fixes = SCAN_FIXES[outfit];
+  const g = o.geometry;
+  if (!fixes || !g.index) return;
+  const body = g.attributes.bodyP;
+  const pos = g.attributes.position;
+  const n = pos.count;
+  // the loose pieces: points joined by triangles
+  const parent = new Int32Array(n);
+  for (let i = 0; i < n; i++) parent[i] = i;
+  const find = (x) => {
+    while (parent[x] !== x) x = parent[x] = parent[parent[x]];
+    return x;
+  };
+  const idx = g.index.array;
+  for (let i = 0; i < idx.length; i += 3) {
+    const a = find(idx[i]);
+    parent[find(idx[i + 1])] = a;
+    parent[find(idx[i + 2])] = a;
+  }
+  const pieces = new Map();
+  for (let i = 0; i < n; i++) {
+    const r = find(i);
+    if (!pieces.has(r)) pieces.set(r, []);
+    pieces.get(r).push(i);
+  }
+  // body metres -> this mesh's own space (the bind pose's rotation and scale, and the body scale k)
+  const inv = new THREE.Matrix3().setFromMatrix4(o.matrixWorld).invert();
+  for (const f of fixes) {
+    const local = new THREE.Vector3(...f.d).divideScalar(k).applyMatrix3(inv);
+    for (const list of pieces.values()) {
+      const inside = list.every((i) => [0, 1, 2].every((c) => body.getComponent(i, c) >= f.min[c] && body.getComponent(i, c) <= f.max[c]));
+      // (front: only pieces reaching at least this far forward)
+      if (!inside || (f.front != null && !list.some((i) => body.getZ(i) > f.front))) continue;
+      for (const i of list) {
+        pos.setXYZ(i, pos.getX(i) + local.x, pos.getY(i) + local.y, pos.getZ(i) + local.z);
+        body.setXYZ(i, body.getX(i) + f.d[0], body.getY(i) + f.d[1], body.getZ(i) + f.d[2]);
+      }
+    }
+  }
+  pos.needsUpdate = true;
+  body.needsUpdate = true;
+  g.computeBoundingSphere();
+}
+
+/**
+ * The scanned riders whose hair is part of their one-piece scan (a shiny shell, like plastic): the look shader gives
+ * it fine strands running down from the crown and a duller sheen (hairP). front: where the hairline is above the
+ * eyes; nape: how far below the eyes it reaches at the back; all in body metres. The character-kit riders (Agnes,
+ * Walter, Balthazar) have real strands of hair and are left alone.
+ */
+const SCAN_HAIR = {
+  eric: { front: 0.052 },
+  claudia: { front: 0.058 },
+  nathan: { front: 0.05 },
+  carla: { front: 0.056 },
+  sophia: { front: 0.058 },
+  manuel: { front: 0.05 },
+  victor: { front: 0.068 },
+  dale: { front: 0.05 },
+  marcus: { front: 0.05 },
+  denise: { front: 0.055 },
+  ruth: { front: 0.055 },
+};
+
+/**
+ * hairP: for each point on the scalp, where it is around the head (x, radians, 0 at the back so the seam is on the
+ * face) and down from the crown (y, radians), and how much of it is hair (z, 0..1, soft at the edges).
+ */
+function addHair(o, outfit, centres) {
+  const n = o.geometry.attributes.position.count;
+  const hairP = new Float32Array(n * 3);
+  o.geometry.setAttribute('hairP', new THREE.BufferAttribute(hairP, 3));
+  const H = SCAN_HAIR[outfit];
+  if (!H || centres.length < 2) return 0;
+  const body = o.geometry.attributes.bodyP;
+  const ex = (centres[0].x + centres[1].x) / 2;
+  const ey = (centres[0].y + centres[1].y) / 2;
+  const ez = (centres[0].z + centres[1].z) / 2;
+  // the middle of the skull: behind and a little above the eyes
+  const hx = ex;
+  const hy = ey + 0.025;
+  const hz = ez - 0.075;
+  const nape = H.nape ?? 0.045;
+  const smooth = (a, b, x) => {
+    const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+    return t * t * (3 - 2 * t);
+  };
+  let marked = 0;
+  for (let i = 0; i < n; i++) {
+    const x = body.getX(i) - hx;
+    const y = body.getY(i) - ey;
+    const z = body.getZ(i) - hz;
+    const r = Math.hypot(x, y + 0.025, z);
+    if (r > 0.17 || y < -nape - 0.03) continue;
+    // the face: in front, below the hairline
+    const face = smooth(0.035, 0.06, z) * (1 - smooth(H.front - 0.012, H.front + 0.008, y));
+    // the temples and ears: skin up to a little above the eyes at the sides, ahead of the back of the head
+    const ear = smooth(0.035, 0.055, Math.abs(x)) * (1 - smooth(0.022, 0.045, y)) * smooth(-0.045, -0.015, z);
+    const neck = 1 - smooth(-nape - 0.02, -nape + 0.01, y);
+    const around = Math.atan2(x, -z);
+    // (the angle wraps round at the middle of the forehead: fade out there, or the wrap shows as a line)
+    const w = Math.max(0, 1 - Math.max(face, ear, neck)) * (1 - smooth(2.7, 3.05, Math.abs(around)));
+    if (w <= 0.01) continue;
+    hairP[i * 3] = around;
+    hairP[i * 3 + 1] = Math.acos(Math.max(-1, Math.min(1, (y + 0.025) / (r || 1))));
+    hairP[i * 3 + 2] = w;
+    marked++;
+  }
+  return marked;
+}
+
 /** Bake each vertex's bind-pose position (metres above the feet, centred) for the look masks. */
-function addBodyCoords(scene, box, k) {
+function addBodyCoords(scene, box, k, outfit) {
   const cx = (box.min.x + box.max.x) / 2;
   const cz = (box.min.z + box.max.z) / 2;
   const v = new THREE.Vector3();
@@ -259,6 +528,7 @@ function addBodyCoords(scene, box, k) {
       out[i * 3 + 2] = (v.z - cz) * k;
     }
     o.geometry.setAttribute('bodyP', new THREE.BufferAttribute(out, 3));
+    fixScan(o, outfit, k);
     // the teeth and tongue (rigs that have them): their patch of the merged texture came out wrong (purple), so the
     // look shader paints them; seen once the jaw opens to shout (Character.face)
     const mouth = new Float32Array(n * 2);
@@ -275,6 +545,13 @@ function addBodyCoords(scene, box, k) {
       }
     }
     o.geometry.setAttribute('mouthP', new THREE.BufferAttribute(mouth, 2));
+    // the eyelids
+    const toBody = (w) => w.set((w.x - cx) * k, (w.y - box.min.y) * k, (w.z - cz) * k);
+    const centres = [];
+    o.userData.eyePoints = addEyes(o, outfit, toBody, centres);
+    // the scanned hair (not the separate, see-through strands some riders have)
+    const mat = Array.isArray(o.material) ? o.material[0] : o.material;
+    o.userData.hairPoints = mat.transparent || mat.alphaTest > 0 ? (addHair(o, null, []), 0) : addHair(o, outfit, centres);
   });
 }
 
@@ -645,7 +922,7 @@ export async function loadCharacters(onProgress, first = OUTFITS.map((o) => o.id
     const head = scene.getObjectByName('mixamorigHead');
     const headY = head ? head.getWorldPosition(new THREE.Vector3()).y - box.min.y : 0;
     const h = headY > 0 ? headY / 0.86 : box.max.y - box.min.y || 1.8;
-    addBodyCoords(scene, box, PLAYER_HEIGHT / h);
+    addBodyCoords(scene, box, PLAYER_HEIGHT / h, o.id);
     const own = {};
     for (const c of animSrc.clips) {
       const clip = retarget(c, animSrc.rig, rig);
@@ -776,6 +1053,9 @@ export class Character {
       grime: { value: 0.35 + r() * 0.6 },
       seed: { value: r() * 50 },
       hit: { value: 0 },
+      // the eyelids: 0 open, 1 shut (Character.face), and their set colour where a part has no skin to borrow
+      blink: { value: 0 },
+      lid: { value: new THREE.Color(EYES[this.outfit]?.lid || '#8a604c') },
       // hue turn, value scale, how much of the cloth it applies to (some riders keep their scan's colours)
       tint: { value: new THREE.Vector3((r() - 0.5) * 3.2, 0.62 + r() * 0.55, r() < 0.15 ? 0 : 0.6 + r() * 0.4) },
       // an earned clothing dye (rgb linear, w how much): set by wear()
@@ -852,6 +1132,11 @@ export class Character {
     this.jaw = jaw ? { bone: jaw, rest: jaw.quaternion.clone(), sign: /^CC_/.test(jaw.name) ? 1 : -1, scale: /^CC_/.test(jaw.name) ? 0.85 : 0.75 } : null;
     this.jawOpen = 0;
     this.facePhase = r() * 6.28;
+    // blinking: the next blink in a few seconds, its progress, and a squint after a hit
+    this.blinkIn = 1 + r() * 4;
+    this.blinkT = -1;
+    this.blinkTwice = false;
+    this.squint = 0;
   }
 
   action(name) {
@@ -1323,6 +1608,7 @@ export class Character {
    * rider's slack jaw; otherwise just breathing.
    */
   face(p, dt, time, ghost) {
+    this.eyelids(p, dt, ghost);
     const J = this.jaw;
     if (!J) return;
     let open = 0.015 + 0.012 * Math.sin(time * 1.9 + this.facePhase);
@@ -1341,6 +1627,41 @@ export class Character {
     this.jawOpen += (open - this.jawOpen) * Math.min(1, dt * 16);
     J.bone.quaternion.copy(J.rest);
     J.bone.rotateZ(J.sign * this.jawOpen * J.scale);
+  }
+
+  /**
+   * The eyelids: a quick blink every 2 to 6 seconds (now and then two in a row), squeezed most of the way shut for a
+   * moment after a hit, and shut on the dead. A ghost is the wraith, whose eyes burn instead.
+   * (A test hook: ?eyes=0.7 holds every rider's lids that far shut.)
+   */
+  eyelids(p, dt, ghost) {
+    let shut = 0;
+    if (ghost) shut = 0;
+    else if (p.state !== 'alive') shut = 1;
+    else {
+      this.blinkIn -= dt;
+      if (this.blinkIn <= 0 && this.blinkT < 0) {
+        this.blinkT = 0;
+        this.blinkTwice = Math.random() < 0.15;
+        this.blinkIn = 2 + Math.random() * 4;
+      }
+      if (this.blinkT >= 0) {
+        // down in 60 ms, a moment shut, up in 90 ms
+        const t = (this.blinkT += dt);
+        shut = t < 0.06 ? t / 0.06 : t < 0.09 ? 1 : Math.max(0, 1 - (t - 0.09) / 0.09);
+        if (t > 0.18) {
+          this.blinkT = -1;
+          if (this.blinkTwice) {
+            this.blinkTwice = false;
+            this.blinkIn = 0.08;
+          }
+        }
+      }
+      this.squint = Math.max(0, this.squint - dt);
+      shut = Math.max(shut, Math.min(1, this.squint / 0.15) * 0.72);
+    }
+    if (EYES_TEST !== null) shut = EYES_TEST;
+    this.look.blink.value = shut;
   }
 
   /**
@@ -1456,6 +1777,8 @@ export class Character {
   hit() {
     this.flinch = 1;
     this.look.hit.value = 1;
+    // eyes squeezed shut for a moment
+    this.squint = 0.45;
   }
 
   /** World position of a launcher's mouth (where projectiles appear to leave). */
