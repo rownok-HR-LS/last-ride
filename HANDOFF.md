@@ -314,3 +314,32 @@ Chrome blocks these sites from posting to localhost, so downloads always go thro
   (min/max) in the bloom's bright pass and the kept reflection frame. Agnes's hair, close up, made the NaN.
 - Weak spots: Agnes's lids are pale (her caricature face doesn't line up with her rig); the four crowd riders' lids
   are soft discs (blurry scans); long hair below the ears isn't stranded.
+
+## Polish round: fights, menus, sound, park (2026-11-13)
+
+The user chose: heavier impacts + clearer effects; smooth transitions + livelier results; music that builds + park
+sounds; lightning that lights the park, rides that light up, lived-in details (Blender), wetter ground.
+- Fights: Character hitstop 0.13 s heavy; Client.impact(heavy, taken, dir) kicks the camera along the blow; impact
+  sound has a low thump + a bone crack on heavy blows; fx.strike(.., mat) sparks off a blocked metal weapon, wood
+  splinters (WOOD set: mallet, spike), bigger blood on heavy; Corpse.onLand -> dust + 'bodyfall'.
+- Bus: placeBus took a zero heading at the end of the route (bus turned round, riders put off inside it): fixed in
+  shared/game.js. Bus orbit camera rises over the roof when pulled in; a ghost's camera stays out of the bus.
+- Menus: src/fade.js (fade to/from black: practice start, boarding, Ride again, back to the menu); title fades,
+  bus stop slides in; results count up (countUp in hud.js), rows stagger in, awards (.end-awards).
+- Sound: score.build (storm stage + fallen) quickens the waltz and adds a pulse; score.few (<= 5 alive) switches to a
+  darker waltz with a clock. audio.spot(name, kind, pos, vol, range): placed loops with an HRTF panner: generator,
+  neon, speaker (calliope through a blown speaker). Client.parkSounds picks the nearest of each (GENERATORS, SPEAKERS,
+  the neon signs); the Ferris wheel creaks while it turns.
+- Lightning: each flash bends moonDir toward flashDir (shadow map redrawn while it does); a close strike sometimes
+  hits the Ferris wheel / Free Fall / big top / water tower (Client.strike: tube bolt with forks, the muzzle light
+  borrowed as the strike light, sparks). On the title the depth of field blurs the bolt away; in play it shows.
+- Ride lights: Rides.updateBulbs: Ferris rim bulbs flicker, chase when possessed; the real carousel's own emissive
+  bulbs run a chase (shader on its emissive materials, carouselChase).
+- Lived-in: scripts/lived-in-textures.mjs + scripts/blender/lived-in.py -> poster_column, ticket_litter, balloons
+  (convert-env table), placed by livedIn() in shared/map.js (columns are solid). DECOR entries can carry y now.
+  OWN_SHADOW in models.js: props newer than the shadow stand-in keep their own shadows. neonSign(text, colour, w,
+  flicker): most signs sputter (updateNeon), TICKETS signs on the kiosks.
+- Wet ground: groundRain.soak (rises with time x rain) moves the puddle edge (puddleEdge) and adds mud rims;
+  puddleField(renderer) reads the puddle noise back from the GPU so footsteps splash (fx.puddleSplash) where water
+  is drawn.
+- Going live needs deploy-pages AND Render (shared/game.js, shared/map.js changed).
