@@ -75,6 +75,13 @@ export const ENV = {
   // the perimeter fence's panels, as breakable props (scripts/fence-panels.mjs)
   fence_panel_a: ['blender/fence_panel_a.glb', 3000, 256],
   fence_panel_b: ['blender/fence_panel_b.glb', 3000, 256],
+  // the themed buildings' painted fronts and inside dressing (scripts/blender/themed.py, our own art)
+  front_tunnel: ['blender/front_tunnel.glb', 5000, 2048],
+  front_funhouse: ['blender/front_funhouse.glb', 600, 2048],
+  front_arcade: ['blender/front_arcade.glb', 3200, 2048],
+  inside_tunnel: ['blender/inside_tunnel.glb', 1600, 2048],
+  inside_funhouse: ['blender/inside_funhouse.glb', 1000, 2048],
+  inside_arcade: ['blender/inside_arcade.glb', 2600, 2048],
 };
 
 /**

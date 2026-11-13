@@ -70,7 +70,10 @@ let after = 0;
 
 async function model(file) {
   const keep = path.join(ORIG, file);
-  if (!existsSync(keep)) {
+  // a model freshly rebuilt (convert-env.mjs writes WebP textures) replaces the kept original; otherwise a rebuild
+  // would be thrown away and the old one compressed again
+  const fresh = (await io.read(file)).getRoot().listTextures().some((t) => t.getImage() && t.getMimeType() !== 'image/ktx2');
+  if (!existsSync(keep) || fresh) {
     mkdirSync(path.dirname(keep), { recursive: true });
     copyFileSync(file, keep);
   }

@@ -5,3 +5,4 @@ assets-src
 *.log
 .claude
 __pycache__/
+review/

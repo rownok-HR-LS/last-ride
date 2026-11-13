@@ -408,3 +408,22 @@ sounds; lightning that lights the park, rides that light up, lived-in details (B
 - Spikes in the ground by the bus stop: a 19 m roadside oak at (-12.9, 122.8) reached a branch across the gate and
   into the ground. world.js skips roadside trees within 26 m of the gate (others keep their places). The road
   cut-away (bus.js busClip) now only runs during the intro.
+
+## Blender round: themed buildings (2026-11-14)
+
+- The user asked to finish all the Blender work first (fronts and interiors, neon tubes, coaster/arena/free fall,
+  small props, animations, distance versions), shown group by group; nothing live until they say so.
+- Group 1, the themed buildings (user chose painted carnival fronts, themed and full interiors):
+  scripts/themed-textures.mjs paints the art (themed_*.png in assets-src/blender/tex), scripts/blender/themed.py
+  builds front_{tunnel,funhouse,arcade} and inside_{tunnel,funhouse,arcade} in each building's own coordinates and
+  writes shared/themed-layout.js (centre, foot, size, colliders); shared/map.js themed() places them as DECOR.
+  Tunnel: monster mouths (lips, fangs, tusks, glowing eyes, brows) round both doors, graveyard mural, warning
+  posters; inside: scenery cut-outs, tombstones (solid), cobwebs, bats, glowing eyes. Funhouse: sunburst on the
+  arch, spiral discs, stretched clowns, boards; inside: 11 dizzy panels, giant dice (solid), bunting, a table and
+  chairs on the ceiling. Arcade: marquee canopy with bulbs, posters, coin signs; inside: cosmic carpet, posters,
+  high-score board, prize shelf. About +2.8 MB.
+- Rebuild: node scripts/themed-textures.mjs; node scripts/export-kit-layout.mjs layout.json; blender ... themed.py
+  -- <repo> layout.json; node scripts/convert-env.mjs front_* inside_*; node scripts/ktx-compress.mjs models front_
+  (and inside_). ktx-compress now takes a freshly converted model (WebP textures) as its new original; before, it
+  silently re-compressed the first version it had kept.
+- Colliders changed (dice, tombstones): going live needs deploy-pages AND Render.

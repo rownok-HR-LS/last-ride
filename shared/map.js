@@ -4,6 +4,7 @@
 //            { k: 'cyl', x, z, r, y0, y1 }
 import { rng } from './rng.js';
 import { MAP_HALF } from './constants.js';
+import { THEMED } from './themed-layout.js';
 
 export const PARK_EDGE = MAP_HALF - 4; // the iron fence
 
@@ -792,6 +793,21 @@ for (const p of PATHS.slice(1)) {
   }
   storyProps();
   livedIn();
+  themed();
+}
+
+/**
+ * The themed buildings' painted fronts and the dressing inside them (scripts/blender/themed.py, placed by
+ * shared/themed-layout.js in each building's own coordinates): monster mouths and a graveyard mural on the Tunnel of
+ * Terror, the Funhouse's sunburst and spirals, the Arcade's marquee; scenery flats, dice, carpet and posters inside.
+ */
+function themed() {
+  for (const t of THEMED) {
+    const b = BUILDINGS.find((q) => q.style === t.style);
+    if (!b) continue;
+    DECOR.push({ model: t.model, x: b.cx + t.x, z: b.cz + t.z, y: t.y, rot: 0, w: t.w, d: t.d, h: t.h });
+    for (const [x, z, w, d, h, rot] of t.solids) addBox(b.cx + x, b.cz + z, w, d, 0, h, rot);
+  }
 }
 
 /**
