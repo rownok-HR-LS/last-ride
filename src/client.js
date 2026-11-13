@@ -11,7 +11,7 @@ import { FERRIS, FREEFALL, REGIONS, trackAt, pathDistance, PARK_EDGE, BREAKABLES
 import { shatter, stepDebris, debrisCount } from './debris.js';
 import { updateScares } from './scares.js';
 import { buildClouds } from './clouds.js';
-import { buildWorld, buildSky, groundRain, SKY_SCALE } from './world.js';
+import { buildWorld, buildSky, groundRain, SKY_SCALE, updateNeon, puddleField } from './world.js';
 import { Rain, sheltered } from './rain.js';
 import { Rides } from './rides.js';
 import { Character, Corpse, nameTag, setCharacterRim } from './characters.js';
@@ -234,6 +234,12 @@ export class Client {
     scene.add(this.driver.root);
     this.projectiles = new Projectiles(scene, this.fx);
     this.post = createPost(renderer, scene, this.camera);
+    // where the puddles are, for the footsteps (the ground shader's own pattern, read back from the GPU)
+    try {
+      this.puddles = puddleField(renderer);
+    } catch (e) {
+      console.warn('puddles', e);
+    }
 
     this.hudRoot = document.createElement('div');
     this.hudRoot.className = 'hud';
@@ -558,8 +564,10 @@ export class Client {
     windTime.value = t % 1000;
     blowWind(dt, NIGHT_WIND.storm);
     groundRain.amount.value = 0.85;
+    groundRain.soak.value = 0.6;
     sceneWet.value = 0.85;
     this.lamps.update([], t, cam.position.x, cam.position.z, 1);
+    updateNeon(t);
     updateLampLight([], 1);
     if (this.showChar) {
       const x = 2.5;
@@ -1622,6 +1630,9 @@ export class Client {
     windTime.value = this.time % 1000;
     blowWind(dt, NIGHT_WIND[snap.night] ?? NIGHT_WIND.storm);
     groundRain.amount.value = rainAmount;
+    // the park soaks up the night's rain: the puddles spread over the match (dry nights stay where they are)
+    const soakTo = snap.phase === 'live' || snap.phase === 'end' ? Math.min(1, 0.25 + (snap.time || 0) * rainAmount / 360) : 0.25;
+    groundRain.soak.value += (soakTo - groundRain.soak.value) * Math.min(1, dt * 0.5);
     // (on a dry night the park is still wet from the rain before)
     sceneWet.value = Math.max(rainAmount, 0.35);
     this.rainAmount = rainAmount;
@@ -1631,6 +1642,7 @@ export class Client {
     const out = Math.max(Math.abs(this.camera.position.x), Math.abs(this.camera.position.z)) - PARK_EDGE;
     this.scene.fog.density = (0.0068 + Math.min(1, Math.max(0, out / 120)) * 0.003) * (this.night?.fog ?? 1);
     this.lamps.update(snap.blackouts, this.time, this.camera.position.x, this.camera.position.z, this.intro.power(snap));
+    updateNeon(this.time);
     updateLampLight(snap.blackouts, this.intro.power(snap));
     this.bus.update(snap.bus, true, dt, { cabin: this.cine ? this.cine.cabin : 0 });
     // the tour's driver never leaves his seat
@@ -1812,7 +1824,10 @@ export class Client {
       if (ch.step && cd < 28) {
         const surface = pathDistance(p.x, p.z) < 0 ? 'stone' : 'dirt';
         const wet = sheltered(p.x, p.y + 1.6, p.z, snap.bus) ? 0 : this.rainAmount || 0;
-        audio.play('step', p.id === this.myId ? null : [p.x, p.y, p.z], { surface, run: Math.hypot(p.vx, p.vz) > 4, self: p.id === this.myId, wet });
+        // a foot coming down in a puddle: a real splash, and you hear the water
+        const puddle = p.state !== 'ghost' && p.y < 0.3 && this.puddles?.wet(p.x, p.z);
+        audio.play('step', p.id === this.myId ? null : [p.x, p.y, p.z], { surface, run: Math.hypot(p.vx, p.vz) > 4, self: p.id === this.myId, wet, puddle });
+        if (puddle && cd < 22) this.fx.puddleSplash(p.x, p.y, p.z, p.vx, p.vz, Math.hypot(p.vx, p.vz) > 4);
         // and you can see it: water kicked up from the foot coming down (left, right, left...)
         if (wet > 0.1 && cd < 18 && p.state !== 'ghost') {
           c.foot = -(c.foot || 1);

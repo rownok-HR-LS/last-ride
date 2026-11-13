@@ -234,6 +234,9 @@ async function tieTape(src) {
  * Many placements of the same model as instanced meshes: [{ x, z, rot, w, d, ... }].
  * name may pick one piece of a model: 'light_poles#LightPole_01_2'.
  */
+/** Props added since the shadow stand-in was baked (src/shadowproxy.js): they cast their own moonlight shadow. */
+const OWN_SHADOW = new Set(['poster_column', 'balloons']);
+
 export async function placeModels(parent, name, list) {
   if (!list.length) return;
   const [file, part] = name.split('#');
@@ -256,8 +259,9 @@ export async function placeModels(parent, name, list) {
   const lod = !part && FAR_MODELS[file];
   const near = instance(parent, src, mats, keep);
   for (const [mesh, max] of near) {
-    // (they keep their own shadow, which goes when they break: src/shadowproxy.js leaves them out)
-    if (ids) mesh.userData.moves = true;
+    // (they keep their own shadow, which goes when they break: src/shadowproxy.js leaves them out; so do props
+    // newer than the baked shadow stand-in, or they would lose theirs)
+    if (ids || OWN_SHADOW.has(file)) mesh.userData.moves = true;
     cullable(mesh, max, 25, 0, ids);
     if (lod) lodLimit(mesh, lod);
   }

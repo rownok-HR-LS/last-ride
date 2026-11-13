@@ -334,7 +334,9 @@ export function play(name, pos = null, opt = {}) {
       if (sample(d, opt.surface === 'stone' ? 'step_stone' : 'step_dirt', t, { vol: opt.surface === 'stone' ? 0.9 : 0.5, rate: opt.run ? 1.05 : 0.95, vary: 0.08 })) {
         // the rain has soaked everything: water slaps on the cobbles, mud sucks at the shoes
         const wet = opt.wet ?? 0;
-        if (wet > 0.05) {
+        // a foot in a puddle (rain or not): the slap of water
+        if (opt.puddle) sample(d, 'step_water', t + 0.005, { vol: opt.run ? 1 : 0.75, rate: 0.9 + Math.random() * 0.15 });
+        else if (wet > 0.05) {
           if (opt.surface === 'stone') sample(d, 'step_water', t + 0.01, { vol: 0.5 * wet * (opt.run ? 1.3 : 1), rate: 1.05 });
           else sample(d, 'squelch', t + 0.02, { vol: 0.28 * wet, rate: 0.75 + Math.random() * 0.15 });
           if (opt.run && Math.random() < 0.18 * wet) sample(d, 'splash', t + 0.02, { vol: 0.35, rate: 1.3 });

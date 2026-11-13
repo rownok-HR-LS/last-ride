@@ -68,6 +68,10 @@ export const ENV = {
   evidence: ['blender/evidence.glb', 1200, 512],
   pram: ['blender/pram.glb', 2500, 256],
   tour_board: ['blender/tour_board.glb', 200, 1024],
+  // lived-in dressing (scripts/blender/lived-in.py, our own)
+  poster_column: ['blender/poster_column.glb', 900, 1024],
+  ticket_litter: ['blender/ticket_litter.glb', 400, 512],
+  balloons: ['blender/balloons.glb', 1800, 256],
 };
 
 /**

@@ -405,6 +405,18 @@ export class FX {
     r.m.visible = true;
   }
 
+  /** A foot coming down in a puddle: a crown of water thrown up and out, and a ring spreading on the pool. */
+  puddleSplash(x, y, z, vx, vz, run) {
+    const n = run ? 16 : 9;
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = 0.8 + Math.random() * (run ? 2.2 : 1.3);
+      this.norm.spawn(x + Math.cos(a) * 0.1, y + 0.04, z + Math.sin(a) * 0.1, Math.cos(a) * sp + vx * 0.15, 1.6 + Math.random() * (run ? 2.4 : 1.4), Math.sin(a) * sp + vz * 0.15,
+        C(Math.random() < 0.5 ? '#c9d4e0' : '#a6b2c0'), 0.07 + Math.random() * 0.06, 0.3 + Math.random() * 0.2, 9, 0.5);
+    }
+    this.footSplash(x, y, z, vx, vz, 1, true, true);
+  }
+
   impact(x, y, z, kind) {
     if (kind === 'player') {
       for (let i = 0; i < 10; i++) this.norm.spawn(x, y, z, rnd(2.5), rnd(2) + 1, rnd(2.5), C('#5a0606'), 0.28, 0.45, 9, 2);

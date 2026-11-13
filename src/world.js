@@ -7,7 +7,7 @@ import { addLampLight, loadLampLight, lampGlow } from './lamplight.js';
 import { ssr, SSR_GLSL } from './ssr.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
-import { PROPS, LAMPS, LAMP_HEAD, PARK_EDGE, PRIZE_BOOTHS, DECOR, LANDMARKS_OUT, rotXZ } from '../shared/map.js';
+import { PROPS, LAMPS, LAMP_HEAD, PARK_EDGE, PRIZE_BOOTHS, DECOR, LANDMARKS_OUT, rotXZ, pathDistance } from '../shared/map.js';
 import { rng } from '../shared/rng.js';
 import { glow, signTex, pbr, grimyStripes, pathMask } from './textures.js';
 import { plantTrees } from './trees.js';
@@ -247,13 +247,33 @@ function roadEdgeTex() {
 
 // ------------------------------------------------------------------ signs
 
-export function neonSign(text, color, w) {
+export function neonSign(text, color, w, flicker = null) {
   const { texture, glow: lit } = signTex(text, { color });
   const m = new THREE.MeshStandardMaterial({ map: texture, emissiveMap: lit, emissive: '#ffffff', emissiveIntensity: 1.4, roughness: 0.8, side: THREE.DoubleSide });
   const sign = new THREE.Mesh(new THREE.PlaneGeometry(w, w / 4), m);
   // the light bake (src/tools/export-glows.js) finds the signs by this
   sign.userData.neon = color;
+  // forty years on, most of them sputter: now and then (a tired tube), or all the time (a dying one)
+  const h = Math.abs(Math.sin(text.length * 12.9898 + w * 78.233) * 43758.5453) % 1;
+  const kind = flicker ?? (h < 0.45 ? 'tired' : h < 0.6 ? 'dying' : null);
+  if (kind) FLICKER.push({ m, kind, seed: h * 100 });
   return sign;
+}
+
+/** The neon signs that sputter (neonSign), and their state. */
+const FLICKER = [];
+
+/** Sputter the tired and dying neon (call every frame with the time in seconds). */
+export function updateNeon(t) {
+  for (const f of FLICKER) {
+    const s = t * (f.kind === 'dying' ? 1 : 0.35) + f.seed;
+    // a tired tube: steady, then a burst of stutters every so often; a dying one stutters most of the time
+    const burst = Math.sin(s * 0.9) * Math.sin(s * 0.37 + 1.7);
+    const stut = Math.sin(t * 41 + f.seed) * Math.sin(t * 17.3 + f.seed * 2.1);
+    let k = 1;
+    if (burst > (f.kind === 'dying' ? -0.2 : 0.55)) k = stut > 0.1 ? 1 : stut > -0.4 ? 0.35 : 0.05;
+    f.m.emissiveIntensity = 1.4 * k;
+  }
 }
 
 // ------------------------------------------------------------------ props
@@ -595,8 +615,10 @@ export function buildWorld(scene) {
     add(neonSign('PRIZE COUNTER', '#ffb05a', 3.3), b.x + ox, 3.9, b.z + oz, b.rot);
   }
   // old carnival signs
-  add(neonSign('LAST RIDE', '#c8392b', 12), 0, 8.6, 110.75);
-  add(neonSign('LAST RIDE', '#c8392b', 12), 0, 8.6, 109.25, Math.PI);
+  add(neonSign('LAST RIDE', '#c8392b', 12, false), 0, 8.6, 110.75);
+  add(neonSign('LAST RIDE', '#c8392b', 12, false), 0, 8.6, 109.25, Math.PI);
+  // the ticket kiosks: a small TICKETS sign over each, all of them on their last legs
+  for (const k of PROPS.filter((q) => q.type === 'ticket')) add(neonSign('TICKETS', '#ff6a3a', 2.2, 'dying'), k.x, 3.3, k.z, k.rot || 0);
   add(neonSign('BUMPER CARS', '#d9b45a', 10), 48, 7.6, 62 + 9.6);
   add(neonSign('THE LAST RIDE', '#d9b45a', 7), 51.3, 5.6, 17, Math.PI / 2);
   add(neonSign('FREE FALL', '#c8392b', 6), -95, 9, 4.3);
@@ -624,7 +646,7 @@ export function buildWorld(scene) {
   buildBackdrop(scene);
   buildScatter(scene);
   buildMist(scene);
-  for (const d of DECOR) modelSpots.push([d.model, { x: d.x, z: d.z, rot: d.rot, w: d.w, d: d.d, brk: d.brk }]);
+  for (const d of DECOR) modelSpots.push([d.model, { x: d.x, z: d.z, y: d.y, rot: d.rot, w: d.w, d: d.d, brk: d.brk }]);
   // the memorial's candles throw a warm, unsteady glow on the ground round it
   for (const d of DECOR.filter((o) => o.model === 'memorial')) {
     const mat = new THREE.MeshBasicMaterial({
@@ -703,8 +725,60 @@ function scaledPlane(size, tiles) {
   return g;
 }
 
-/** Rain falling into the puddles (driven by the client): time in seconds and how much of the rain is falling. */
-export const groundRain = { time: { value: 0 }, amount: { value: 0 } };
+/**
+ * Rain falling into the puddles (driven by the client): time in seconds, how much of the rain is falling, and how
+ * soaked the park is by now (0..1: the puddles spread and mud gathers round them as it rises).
+ */
+export const groundRain = { time: { value: 0 }, amount: { value: 0 }, soak: { value: 0.5 } };
+
+/** The puddles' noise (the ground shader's, word for word): the GPU's own rounding decides where they are. */
+const PUDDLE_GLSL = `
+  float gh(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+  float gn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(gh(i), gh(i + vec2(1, 0)), f.x), mix(gh(i + vec2(0, 1)), gh(i + vec2(1, 1)), f.x), f.y); }
+  float fbm(vec2 p){ return gn(p) * 0.55 + gn(p * 2.3) * 0.3 + gn(p * 5.1) * 0.15; }
+  float puddleNoise(vec2 uv){ return fbm(uv * 0.33 + 31.0) + fbm(uv * 1.9 + 5.0) * 0.12; }`;
+/** Where the puddles begin, for a soak (the shader's smoothstep edge; puddleField.wet uses the same). */
+export const puddleEdge = (soak) => 0.675 - soak * 0.05;
+
+/**
+ * The puddles as the game needs them (footsteps splash in them): the ground shader's puddle noise drawn by the GPU
+ * into a 512 x 512 grid over the ground once, and read back. at(x, z) -> the noise there; wet(x, z) -> standing in a
+ * puddle now (by tonight's soak).
+ */
+export function puddleField(renderer) {
+  const N = 512;
+  const rt = new THREE.WebGLRenderTarget(N, N, { type: THREE.UnsignedByteType, depthBuffer: false });
+  const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({
+    vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+    // the ground's texture coordinates: 60 across its 240 m
+    fragmentShader: `varying vec2 vUv; ${PUDDLE_GLSL}
+      void main(){ gl_FragColor = vec4(clamp(puddleNoise(vUv * 60.0) / 1.5, 0.0, 1.0), 0.0, 0.0, 1.0); }`,
+    depthTest: false,
+    depthWrite: false,
+  }));
+  const scene = new THREE.Scene();
+  scene.add(quad);
+  const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  const prev = renderer.getRenderTarget();
+  renderer.setRenderTarget(rt);
+  renderer.render(scene, cam);
+  const px = new Uint8Array(N * N * 4);
+  renderer.readRenderTargetPixels(rt, 0, 0, N, N, px);
+  renderer.setRenderTarget(prev);
+  rt.dispose();
+  quad.geometry.dispose();
+  quad.material.dispose();
+  const at = (x, z) => {
+    // world -> the ground's (u, v): u along x, v along -z, each 0..1 across the 240 m
+    const u = (x + 120) / 240;
+    const v = (-z + 120) / 240;
+    if (u < 0 || u >= 1 || v < 0 || v >= 1) return 0;
+    const i = Math.floor(v * N) * N + Math.floor(u * N);
+    return (px[i * 4] / 255) * 1.5;
+  };
+  return { at, wet: (x, z) => at(x, z) + (pathDistance(x, z) < 0 ? 0.04 : 0) > puddleEdge(groundRain.soak.value) + 0.01 };
+}
 
 function groundMaterial() {
   // dead grass, mud and leaf litter blended by large-scale noise; cobbles on the walkways
@@ -721,6 +795,7 @@ function groundMaterial() {
     sh.uniforms.maskMap = { value: pathMask() };
     sh.uniforms.rainT = groundRain.time;
     sh.uniforms.rainAmt = groundRain.amount;
+    sh.uniforms.soak = groundRain.soak;
     // reflections in the wet ground (ssr.js)
     sh.uniforms.ssrTex = ssr.tex;
     sh.uniforms.ssrView = ssr.view;
@@ -728,13 +803,13 @@ function groundMaterial() {
     sh.uniforms.ssrOn = ssr.on;
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
-        uniform sampler2D mapMud; uniform sampler2D mapLeaves; uniform sampler2D mapStone; uniform sampler2D norStone; uniform sampler2D maskMap; uniform float rainT; uniform float rainAmt;
+        uniform sampler2D mapMud; uniform sampler2D mapLeaves; uniform sampler2D mapStone; uniform sampler2D norStone; uniform sampler2D maskMap; uniform float rainT; uniform float rainAmt; uniform float soak;
         uniform sampler2D ssrTex; uniform mat4 ssrView; uniform mat4 ssrProj; uniform float ssrOn;
         float gh(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
         float gn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
           return mix(mix(gh(i), gh(i + vec2(1, 0)), f.x), mix(gh(i + vec2(0, 1)), gh(i + vec2(1, 1)), f.x), f.y); }
         float fbm(vec2 p){ return gn(p) * 0.55 + gn(p * 2.3) * 0.3 + gn(p * 5.1) * 0.15; }
-        float pathK; float puddle; float wetG;`)
+        float pathK; float puddle; float wetG; float mudK;`)
       .replace('#include <map_fragment>', `
         vec2 big = vMapUv * 0.22;
         float wet = smoothstep(0.42, 0.7, fbm(big));
@@ -749,12 +824,17 @@ function groundMaterial() {
         col.rgb *= vec3(0.74, 0.68, 0.58);
         pathK = smoothstep(0.25, 0.75, texture2D(maskMap, vMapUv / 60.0).r);
         vec4 stoneCol = texture2D(mapStone, vMapUv * 1.6) * vec4(0.86, 0.84, 0.8, 1.0);
-        // rain water left standing in the dips: sharp-edged pools, more of them on the worn cobbles
+        // rain water left standing in the dips: sharp-edged pools, more of them on the worn cobbles, spreading as the
+        // night's rain soaks the park (puddleEdge in world.js, the footsteps' splashes, agrees)
         float pn = fbm(vMapUv * 0.33 + 31.0) + fbm(vMapUv * 1.9 + 5.0) * 0.12;
-        puddle = smoothstep(0.655, 0.695, pn + pathK * 0.04) * (0.55 + 0.45 * wet);
+        float edge = 0.675 - soak * 0.05;
+        puddle = smoothstep(edge - 0.02, edge + 0.02, pn + pathK * 0.04) * (0.55 + 0.45 * wet);
+        // and churned mud gathers round them on the dirt: dark, wet and shiny
+        mudK = smoothstep(edge - 0.09 - soak * 0.03, edge - 0.015, pn) * (1.0 - pathK) * (1.0 - puddle);
+        col.rgb = mix(col.rgb, texture2D(mapMud, vMapUv * 1.3).rgb * vec3(0.42, 0.36, 0.3), mudK * 0.85);
         vec4 ground = mix(col, stoneCol, pathK);
         // a dark rim where the water soaks into the edges
-        ground.rgb *= 1.0 - smoothstep(0.6, 0.67, pn + pathK * 0.04) * 0.35;
+        ground.rgb *= 1.0 - smoothstep(edge - 0.075, edge - 0.005, pn + pathK * 0.04) * 0.35;
         ground.rgb = mix(ground.rgb, ground.rgb * 0.22, puddle);
         diffuseColor *= ground;`)
       .replace('#include <normal_fragment_maps>', `
@@ -788,7 +868,7 @@ function groundMaterial() {
           reflectedLight.directSpecular *= ambientOcclusion;
         #endif`)
       .replace('#include <roughnessmap_fragment>', `// the rain falling now leaves everything with a film of water
-        float roughnessFactor = mix(roughness - wetG * 0.3 - pathK * 0.2 - rainAmt * 0.18, 0.1, puddle);`)
+        float roughnessFactor = mix(roughness - wetG * 0.3 - pathK * 0.2 - rainAmt * 0.18 - mudK * 0.45, 0.1, puddle);`)
       .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
         // the pools mirror the sky, but the town glow on the horizon is a saturated purple: keep its light, drop most of its colour
         reflectedLight.indirectSpecular = mix(reflectedLight.indirectSpecular, vec3(dot(reflectedLight.indirectSpecular, vec3(0.3, 0.5, 0.2))) * vec3(0.92, 0.96, 1.05), puddle * 0.7);

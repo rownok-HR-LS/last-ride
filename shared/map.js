@@ -780,6 +780,7 @@ for (const p of PATHS.slice(1)) {
     LANDMARKS_OUT.push({ x, z, r: Math.hypot(w, d) / 2 + 3 });
   }
   storyProps();
+  livedIn();
 }
 
 /**
@@ -787,6 +788,58 @@ for (const p of PATHS.slice(1)) {
  * the memorial just inside the gate, MISSING notice boards along the walkways, the county's CLOSED barricades and
  * prize teddy bears dropped where people stood. A random stream of its own, so the rest of the park stays put.
  */
+/**
+ * Lived-in dressing (scripts/blender/lived-in.py): poster columns papered with torn circus posters beside the
+ * walkways (solid: cover), ride tickets dropped by the prize booths and along the paths, and half-deflated balloons
+ * caught up in the trees. From its own rng(2024), so the rest of the park doesn't move.
+ */
+function livedIn() {
+  const lr = rng(2024);
+  const free = (x, z, r) => clearance(x, z, r) > 0.3 && !inKeepout(x, z) && !nearTrack(x, z, r + 1)
+    && !CHEST_SPOTS.some((c) => Math.hypot(c.x - x, c.z - z) < r + 2);
+  const cols = [];
+  for (let i = 0; i < 4000 && cols.length < 6; i++) {
+    const x = (lr() * 2 - 1) * (PARK_EDGE - 10);
+    const z = (lr() * 2 - 1) * (PARK_EDGE - 10);
+    const pd = pathDistance(x, z);
+    if (pd < 1.2 || pd > 3.2 || !free(x, z, 1.1) || cols.some((c) => Math.hypot(c[0] - x, c[1] - z) < 30)) continue;
+    cols.push([x, z]);
+    DECOR.push({ model: 'poster_column', x, z, rot: lr() * Math.PI * 2, w: 1.04, d: 1.04, h: 3.17 });
+    addCyl(x, z, 0.48, 0, 3.1);
+  }
+  // tickets: by each prize booth, and here and there on the paths
+  const litter = (x, z) => DECOR.push({ model: 'ticket_litter', x, z, rot: lr() * Math.PI * 2, w: 1.5, d: 1.5, h: 0.03 });
+  for (const b of PRIZE_BOOTHS) {
+    for (let k = 0; k < 20; k++) {
+      const a = lr() * Math.PI * 2;
+      const x = b.x + Math.cos(a) * (3 + lr() * 2);
+      const z = b.z + Math.sin(a) * (3 + lr() * 2);
+      if (clearance(x, z, 0.6) > 0.1) {
+        litter(x, z);
+        break;
+      }
+    }
+  }
+  for (let i = 0, n = 0; i < 3000 && n < 16; i++) {
+    const x = (lr() * 2 - 1) * (PARK_EDGE - 6);
+    const z = (lr() * 2 - 1) * (PARK_EDGE - 6);
+    if (pathDistance(x, z) > 1 || clearance(x, z, 0.6) < 0.1 || nearTrack(x, z, 1)) continue;
+    litter(x, z);
+    n++;
+  }
+  // balloons caught in the trees, two-thirds of the way up, strings hanging
+  const trees = PROPS.filter((q) => q.type === 'tree');
+  for (let i = 0, n = 0; i < 400 && n < 10 && trees.length; i++) {
+    const t = trees[Math.floor(lr() * trees.length)];
+    const h = 5.8 * (t.s || 1);
+    if (h < 4.5) continue;
+    const a = lr() * Math.PI * 2;
+    const off = 0.5 + lr() * 0.6;
+    DECOR.push({ model: 'balloons', x: t.x + Math.cos(a) * off, z: t.z + Math.sin(a) * off, y: h * 0.62 - 1.35, rot: lr() * Math.PI * 2, w: 0.62, d: 0.42, h: 1.75 });
+    n++;
+  }
+}
+
 function storyProps() {
   const sr = rng(1031);
   // visual footprint (w across, d deep, as modelled), and the solid part: [local x, local z, w, d, height]
