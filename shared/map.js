@@ -31,6 +31,9 @@ export const BREAKABLE_MODELS = {
   tour_board: { hp: 30, loot: 0, chunks: 6, inside: '#a88a5c' },
   // the shipping crates (a stack has this much for each crate in it): sturdy, the park's main cover
   crate: { hp: 80, loot: 0.3, chunks: 14, inside: '#b89466' },
+  // the perimeter fence's 12 m iron panels: tough, and nothing behind them but woods you can't reach
+  fence_panel_a: { hp: 140, loot: 0, chunks: 18, inside: '#4a4640' },
+  fence_panel_b: { hp: 140, loot: 0, chunks: 18, inside: '#4a4640' },
 };
 /** Every breakable prop: { id, model, x, z, rot, w, d, h, col } (col: its collider, switched off once broken). */
 export const BREAKABLES = [];
@@ -269,8 +272,16 @@ function lamp(x, z) {
     for (const [x, z, rot] of [[m, -e, 0], [m, e, 0], [-e, m, Math.PI / 2], [e, m, Math.PI / 2]]) {
       // the tour bus drives in through a gap in the south fence
       if (z === e && rot === 0 && Math.abs(x) < 6) continue;
-      prop({ type: 'fence', x, z, len: seg, rot });
+      // each panel breaks on its own (a scenery prop now, not part of the kit)...
+      prop({ type: 'fence', x, z, len: seg, rot, decor: true });
+      const entry = { model: (x + z) % (2 * seg) < seg ? 'fence_panel_a' : 'fence_panel_b', x, z, rot, w: 12.42, d: 0.42, h: 3.69 };
+      DECOR.push(entry);
       addBox(x, z, seg, 0.3, 0, 3.4, rot);
+      breakable(entry);
+      // ...but the park's edge holds: an unseen wall just outside it (the woods beyond are only scenery)
+      const out = 0.5;
+      const [ox, oz] = rot === 0 ? [0, Math.sign(z) * out] : [Math.sign(x) * out, 0];
+      addBox(x + ox, z + oz, seg, 0.2, 0, 3.4, rot);
     }
   }
   // brick gate posts either side of the gap

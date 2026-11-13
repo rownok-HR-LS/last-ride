@@ -72,6 +72,9 @@ export const ENV = {
   poster_column: ['blender/poster_column.glb', 900, 1024],
   ticket_litter: ['blender/ticket_litter.glb', 400, 512],
   balloons: ['blender/balloons.glb', 1800, 256],
+  // the perimeter fence's panels, as breakable props (scripts/fence-panels.mjs)
+  fence_panel_a: ['blender/fence_panel_a.glb', 3000, 256],
+  fence_panel_b: ['blender/fence_panel_b.glb', 3000, 256],
 };
 
 /**

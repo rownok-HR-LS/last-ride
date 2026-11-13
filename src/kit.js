@@ -58,7 +58,8 @@ export async function buildKit(Builder, hasMaterial) {
   const tents = PROPS.filter((p) => p.type === 'gametent');
   if (tents.length) jobs.push(load('tentdress').then((g) => tents.forEach((p) => place(g, { x: p.x, z: p.z, rot: (p.x + p.z) % 6.28 }))));
   // the perimeter fence in two panel patterns, the food carts, the ticket kiosks, the backlot water tower
-  const fences = PROPS.filter((p) => p.type === 'fence');
+  // (the fence's panels break, so they are scenery props now: world.js draws them from DECOR)
+  const fences = PROPS.filter((p) => p.type === 'fence' && !p.decor);
   for (const [k, v] of [[0, 'a'], [1, 'b']]) {
     const mine = fences.filter((p, i) => i % 2 === k);
     if (mine.length) jobs.push(load(`fence_${v}`).then((g) => mine.forEach((p) => place(g, { x: p.x, z: p.z, rot: p.rot || 0 }))));
