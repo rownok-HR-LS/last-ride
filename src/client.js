@@ -115,6 +115,11 @@ function blowWind(dt, target) {
   motionTime.value = (motionTime.value + dt * (0.55 + 0.45 * windAmp.value)) % 10000;
 }
 
+/** Where the park's generators hum: by the backlot trailers, and at the Ferris wheel's control booth. */
+const GENERATORS = [[-92, 0.8, -61], [-76, 0.8, -98], [FERRIS.x + 11, 0.8, FERRIS.z + 10]];
+/** Broken loudspeakers on poles, still playing the park's tune: by the big top and the carousel. */
+const SPEAKERS = [[17, 6, 15], [-52, 6, 29], [30, 6, -40]];
+
 /** Weapons made of wood (they splinter): the mallet's mallet head, the cotton-candy spike's stick. */
 const WOOD = new Set(['mallet', 'spike']);
 
@@ -1464,6 +1469,52 @@ export class Client {
     return best ? { x: best.x, y: best.y + 1.6, z: best.z } : null;
   }
 
+  /**
+   * The park's own sounds, each heard from its spot: generators by the trailers and the Ferris wheel's control booth,
+   * the buzz of the nearest neon sign, broken loudspeakers still playing a calliope tune, and the Ferris wheel's old
+   * steel groaning while it turns.
+   */
+  parkSounds(snap) {
+    const L = this.camera.position;
+    const nearest = (list) => {
+      let best = null;
+      let bd = Infinity;
+      for (const q of list) {
+        const d = Math.hypot(q[0] - L.x, q[2] - L.z);
+        if (d < bd) {
+          bd = d;
+          best = q;
+        }
+      }
+      return best;
+    };
+    if (!this.neonSpots) {
+      this.neonSpots = [];
+      const v = new THREE.Vector3();
+      this.scene.traverse((o) => {
+        if (o.userData?.neon) {
+          o.getWorldPosition(v);
+          this.neonSpots.push([v.x, v.y, v.z]);
+        }
+      });
+    }
+    const quiet = snap.phase === 'end' ? 0.4 : 1;
+    audio.spot('generator', 'generator', nearest(GENERATORS), 0.55 * quiet, 22);
+    audio.spot('neon', 'neon', nearest(this.neonSpots), 0.35 * quiet, 12);
+    audio.spot('speaker', 'speaker', nearest(SPEAKERS), 0.45 * quiet, 38);
+    // the Ferris wheel groans while someone turns it
+    const a = snap.ferris?.angle ?? 0;
+    const turning = this.lastFerrisAngle != null && Math.abs(a - this.lastFerrisAngle) > 1e-4;
+    this.lastFerrisAngle = a;
+    if (turning) {
+      this.creakT = (this.creakT ?? 1) - 1 / 60;
+      if (this.creakT <= 0) {
+        this.creakT = 1.6 + Math.random() * 2.5;
+        audio.play('creak', [FERRIS.x, FERRIS.hubY, FERRIS.z], { vol: 0.8 });
+      }
+    }
+  }
+
   /** The flash, sparks and blood of a melee blow on p, struck from 'from' (anything with x and z) with weapon w. */
   strikeFx(p, from, heavy, blocked, w = null) {
     if (!p) return;
@@ -2048,6 +2099,7 @@ export class Client {
     audio.loop('bus', snap.bus.v > 0.5 || snap.phase === 'launch' ? 0.9 : 0, [snap.bus.x, 1, snap.bus.z]);
     const outside = p && p.state === 'alive' && snap.zone.state !== 'idle' && Math.hypot(p.x - snap.zone.cx, p.z - snap.zone.cz) > snap.zone.r;
     audio.loop('stormDrone', outside ? 0.6 : 0);
+    this.parkSounds(snap);
     // the score: tension when someone's near (or you're dead), combat while you fight, danger when you're hurt,
     // finale for the last ride
     let nearest = Infinity;
@@ -2059,6 +2111,7 @@ export class Client {
     }
     const aliveMe = p?.state === 'alive';
     const live = snap.phase === 'live';
+    const alive = snap.players.reduce((n, q) => n + (q.state === 'alive' ? 1 : 0), 0);
     const hpNow = (snap.me?.hp ?? 100) + (snap.me?.shield ?? 0);
     const combat = Math.max(0, 1 - (this.time - (this.lastCombat ?? -99)) / 4);
     audio.setScore({
@@ -2066,6 +2119,9 @@ export class Client {
       combat: aliveMe ? combat : 0,
       danger: aliveMe && live ? Math.max(Math.min(1, (45 - hpNow) / 35), nearest < 4 ? 0.5 : 0) : 0,
       finale: snap.finalT > 0 ? 1 : live && snap.zone.idx >= 4 ? 0.5 : 0,
+      // the night building: the storm's stage (and it closing in now), and how many have fallen
+      build: !live ? 0 : Math.min(1, (snap.zone?.idx ?? 0) / 5 * 0.6 + (snap.zone?.state === 'shrink' ? 0.12 : 0) + Math.max(0, 20 - alive) / 16 * 0.4),
+      few: live && alive <= 5 ? 1 : 0,
     });
     // out of breath, or badly hurt: you can hear yourself
     audio.loop('breath', aliveMe && ((snap.me?.stam ?? 100) < 22 || hpNow < 30) ? 0.5 : 0);

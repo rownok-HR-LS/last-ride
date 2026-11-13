@@ -384,6 +384,15 @@ export function play(name, pos = null, opt = {}) {
       noise(d, t, blade ? 0.16 : 0.1, { freq: blade ? 3200 : 900, sweepTo: 300, vol: blade ? 0.9 : 1.1 });
       break;
     }
+    case 'creak': {
+      // a big ride's old steel complaining as it turns: a slow, low groan of metal
+      const d = out(pos, opt.vol ?? 0.6, 60, true);
+      if (!d) return;
+      if (!sample(d, 'creak', t, { vol: 0.9, rate: 0.55 + Math.random() * 0.2, vary: 0.05 })) {
+        tone(d, t, 0.9, { type: 'sawtooth', freq: 140 + Math.random() * 40, to: 90, vol: 0.12 });
+      }
+      break;
+    }
     case 'bodyfall': {
       // a body hitting the ground: a dull, heavy thud and a soft slap (louder the harder it fell)
       const d = out(pos, 0.5 + (opt.hard || 0) * 0.5, 30);
@@ -1005,6 +1014,163 @@ export function loop(name, vol, pos = null) {
   l.g.gain.setTargetAtTime(muted ? 0 : v, ctx.currentTime, 0.15);
 }
 
+// ------------------------------------------------------------------ the park's own sounds, in place
+
+/**
+ * Sounds that sit at one spot in the park and are heard from where you stand, turning as you turn (a panner, like
+ * the one-shot sounds): kind 'generator' (a diesel generator's hum and chug), 'neon' (a sign's buzz, with the odd
+ * crackle), 'speaker' (a broken loudspeaker on a pole, still playing a calliope tune, cutting out now and then).
+ * Call every frame with the nearest of each; vol 0 fades it out. range: how far it carries (metres).
+ */
+const spots = {};
+export function spot(name, kind, pos, vol, range = 30) {
+  if (!ctx) return;
+  let s = spots[name];
+  if (!s) {
+    if (vol <= 0.001 || !pos) return;
+    const g = ctx.createGain();
+    g.gain.value = 0;
+    const p = ctx.createPanner();
+    p.panningModel = 'HRTF';
+    p.distanceModel = 'inverse';
+    p.rolloffFactor = 0;
+    g.connect(p);
+    p.connect(amb);
+    p.connect(verbSend);
+    s = spots[name] = { g, p, kind };
+    makeSpot(s, kind);
+  }
+  let v = vol;
+  if (pos) {
+    if (s.p.positionX) {
+      s.p.positionX.setTargetAtTime(pos[0], ctx.currentTime, 0.05);
+      s.p.positionY.setTargetAtTime(pos[1], ctx.currentTime, 0.05);
+      s.p.positionZ.setTargetAtTime(pos[2], ctx.currentTime, 0.05);
+    } else s.p.setPosition(pos[0], pos[1], pos[2]);
+    const d = Math.hypot(pos[0] - listener.x, pos[1] - listener.y, pos[2] - listener.z);
+    v *= 1 / (1 + (d / range) * (d / range) * 4);
+    // muffled through a wall
+    if (occluded && d > 3 && occluded(pos[0], pos[1], pos[2])) v *= 0.5;
+  } else v = 0;
+  s.g.gain.setTargetAtTime(muted ? 0 : v, ctx.currentTime, 0.25);
+}
+
+function makeSpot(s, kind) {
+  const t = ctx.currentTime;
+  if (kind === 'generator') {
+    // a small diesel: a rough 25 Hz fundamental and its harmonics, chugging, under a filtered rattle
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 420;
+    const chug = ctx.createGain();
+    chug.gain.value = 0.7;
+    const lfo = ctx.createOscillator();
+    lfo.frequency.value = 12.5;
+    const ld = ctx.createGain();
+    ld.gain.value = 0.3;
+    lfo.connect(ld);
+    ld.connect(chug.gain);
+    for (const [f, v] of [[25, 0.5], [50, 0.45], [75, 0.2], [100, 0.12]]) {
+      const o = ctx.createOscillator();
+      o.type = 'sawtooth';
+      o.frequency.value = f + (Math.random() - 0.5) * 0.4;
+      const og = ctx.createGain();
+      og.gain.value = v;
+      o.connect(og);
+      og.connect(lp);
+      o.start(t);
+    }
+    const n = ctx.createBufferSource();
+    n.buffer = noiseBuf;
+    n.loop = true;
+    const nb = ctx.createBiquadFilter();
+    nb.type = 'bandpass';
+    nb.frequency.value = 900;
+    nb.Q.value = 1.2;
+    const ng = ctx.createGain();
+    ng.gain.value = 0.08;
+    n.connect(nb);
+    nb.connect(ng);
+    ng.connect(lp);
+    n.start(t);
+    lp.connect(chug);
+    chug.connect(s.g);
+    lfo.start(t);
+  } else if (kind === 'neon') {
+    // mains hum through a tired transformer: 120 Hz and its odd harmonics, a little gritty, with the odd crackle
+    const hp = ctx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = 90;
+    for (const [f, v] of [[120, 0.3], [240, 0.12], [360, 0.1], [600, 0.04]]) {
+      const o = ctx.createOscillator();
+      o.type = 'square';
+      o.frequency.value = f;
+      const og = ctx.createGain();
+      og.gain.value = v * 0.25;
+      o.connect(og);
+      og.connect(hp);
+      o.start(t);
+    }
+    hp.connect(s.g);
+    s.crackle = setInterval(() => {
+      if (!ctx || s.g.gain.value < 0.003 || Math.random() > 0.35) return;
+      noise(s.g, ctx.currentTime, 0.02 + Math.random() * 0.05, { type: 'highpass', freq: 2500, vol: 0.5 });
+    }, 700);
+  } else if (kind === 'speaker') {
+    // a calliope tune (a fairground organ: bright, reedy, slightly sharp), through a blown loudspeaker: thin, gritty,
+    // and cutting out now and then
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = 1300;
+    bp.Q.value = 0.9;
+    const shaper = ctx.createWaveShaper();
+    const curve = new Float32Array(256);
+    for (let i = 0; i < 256; i++) {
+      const x = (i / 255) * 2 - 1;
+      curve[i] = Math.tanh(x * 3.2);
+    }
+    shaper.curve = curve;
+    const cut = ctx.createGain();
+    cut.gain.value = 1;
+    bp.connect(shaper);
+    shaper.connect(cut);
+    cut.connect(s.g);
+    s.input = bp;
+    // a cheerful 6/8 tune in C, on a loop
+    const tune = [[72, 1], [76, 1], [79, 1], [84, 2], [79, 1], [77, 1], [76, 1], [74, 1], [72, 3], [74, 1], [77, 1], [81, 1], [79, 2], [77, 1],
+      [76, 1], [74, 1], [72, 1], [71, 3], [72, 1], [76, 1], [79, 1], [84, 2], [83, 1], [81, 1], [79, 1], [77, 1], [76, 2], [74, 1], [72, 3]];
+    const midi = (m) => 440 * Math.pow(2, (m - 69) / 12) * 1.008;
+    let step = 0;
+    let next = ctx.currentTime + 0.2;
+    const beat = 0.19;
+    s.timer = setInterval(() => {
+      if (!ctx) return;
+      // nobody near enough to hear it: let it run silent
+      if (s.g.gain.value < 0.002) {
+        next = ctx.currentTime + 0.1;
+        return;
+      }
+      while (next < ctx.currentTime + 0.5) {
+        const [m, len] = tune[step % tune.length];
+        tone(bp, next, beat * len * 0.9, { type: 'square', freq: midi(m), vol: 0.16 });
+        tone(bp, next, beat * len * 0.9, { type: 'sawtooth', freq: midi(m + 12), vol: 0.05, detune: 9 });
+        // oom-pah under it on the first of each three
+        if (step % 3 === 0) tone(bp, next, beat * 0.6, { type: 'triangle', freq: midi(m - 24), vol: 0.14 });
+        next += beat * len;
+        step++;
+      }
+      // the speaker cuts out for a moment now and then
+      if (Math.random() < 0.06) {
+        const at = ctx.currentTime;
+        cut.gain.setValueAtTime(1, at);
+        cut.gain.linearRampToValueAtTime(0.05, at + 0.03);
+        cut.gain.setValueAtTime(0.05, at + 0.2 + Math.random() * 0.6);
+        cut.gain.linearRampToValueAtTime(1, at + 0.9);
+      }
+    }, 150);
+  }
+}
+
 // ------------------------------------------------------------------ music box waltz
 
 let musicIntensity = 0;
@@ -1014,10 +1180,12 @@ export function setMusicIntensity(v) {
 
 /**
  * The score under the music box, 0..1 each: tension (someone's near, or you're a ghost), combat (you're fighting),
- * danger (you're badly hurt or about to be), finale (the last ride). The client sets it every frame; it's smoothed here.
+ * danger (you're badly hurt or about to be), finale (the last ride), build (how far the night has gone: the storm's
+ * stage and how few are left; it climbs all match), few (five or fewer left: the tense theme). The client sets it
+ * every frame; it's smoothed here.
  */
-const score = { tension: 0, combat: 0, danger: 0, finale: 0 };
-const scoreTarget = { tension: 0, combat: 0, danger: 0, finale: 0 };
+const score = { tension: 0, combat: 0, danger: 0, finale: 0, build: 0, few: 0 };
+const scoreTarget = { tension: 0, combat: 0, danger: 0, finale: 0, build: 0, few: 0 };
 let choir = null;
 export function setScore(s) {
   Object.assign(scoreTarget, s);
@@ -1025,9 +1193,9 @@ export function setScore(s) {
 
 /** Ease the score toward its targets and drive the layers that aren't on the beat (beds, heart, choir). */
 function stepScore(dt) {
-  for (const k in score) score[k] += (scoreTarget[k] - score[k]) * Math.min(1, dt * (k === 'combat' ? 3 : 0.8));
+  for (const k in score) score[k] += (scoreTarget[k] - score[k]) * Math.min(1, dt * (k === 'combat' ? 3 : k === 'build' ? 0.15 : 0.8));
   loop('scoreDrone', 0.55 * (1 - score.combat * 0.4) * (1 - score.finale * 0.4));
-  loop('scoreDread', Math.min(0.75, score.tension * 0.55 + score.finale * 0.35 + score.danger * 0.2));
+  loop('scoreDread', Math.min(0.8, score.tension * 0.5 + score.finale * 0.35 + score.danger * 0.2 + score.build * 0.25 + score.few * 0.15));
   loop('heart', score.danger * 0.28);
   loopRate('heart', 0.85 + score.danger * 0.5 + score.combat * 0.15);
   // a wordless choir for the last ride: an A-minor chord sung through two vowel formants, slowly swelling
@@ -1082,6 +1250,14 @@ function startMusic() {
     [72, 2], [71, 1], [69, 2], [68, 1], [69, 3], [0, 3],
   ];
   const bass = [45, 52, 52, 40, 47, 47, 45, 52, 52, 44, 52, 52];
+  // the last few riders: the same waltz turned darker (down a step, a flattened second and a tritone in it) and
+  // played slower and higher, like the box is running down
+  const fewMelody = [
+    [69, 2], [70, 1], [75, 2], [74, 1], [70, 2], [69, 1], [63, 3],
+    [64, 2], [70, 1], [72, 2], [70, 1], [68, 2], [63, 1], [64, 3],
+    [75, 2], [76, 1], [75, 2], [74, 1], [70, 2], [69, 1], [63, 3],
+    [64, 2], [63, 1], [64, 2], [70, 1], [69, 3], [0, 3],
+  ];
   let step = 0;
   let bassStep = 0;
   let next = ctx.currentTime + 0.5;
@@ -1092,11 +1268,12 @@ function startMusic() {
     if (!ctx) return;
     stepScore(Math.max(0.01, ctx.currentTime - lastTick));
     lastTick = ctx.currentTime;
-    const beat = 0.42 - musicIntensity * 0.12;
+    const beat = (0.42 - musicIntensity * 0.12) * (1 - score.build * 0.12) * (1 + score.few * 0.1);
     // the box winds down as the danger rises, and the drums take over in a fight
     const boxVol = 1 - score.combat * 0.45 - score.danger * 0.35;
     while (next < ctx.currentTime + 0.6) {
-      const [n, len] = melody[step % melody.length];
+      const theme = score.few > 0.5 ? fewMelody : melody;
+      const [n, len] = theme[step % theme.length];
       if (n) {
         const detune = Math.sin(next * 0.7) * 25;
         tone(musicBus, next, beat * len * 1.4, { type: 'sine', freq: midi(n + 12), vol: 0.22 * boxVol, detune: detune * (1 + score.danger * 2) });
@@ -1108,6 +1285,14 @@ function startMusic() {
         if (score.combat > 0.08) drum(next + b * beat, (b === 0 ? 0.5 : 0.22) * score.combat, b === 0);
         else if (score.finale > 0.3 && b === 0) drum(next, 0.25 * score.finale, true);
         if (musicIntensity > 0.5) noise(musicBus, next + b * beat, 0.08, { type: 'highpass', freq: 6000, vol: 0.12 });
+        // the night building: a low pulsing note under every beat, two an a beat by the end, growing all match
+        if (score.build > 0.12) {
+          const pv = 0.11 * score.build * (1 - score.combat * 0.5);
+          tone(musicBus, next + b * beat, beat * 0.45, { type: 'sawtooth', freq: midi(bn - 12), vol: pv, attack: 0.01 });
+          if (score.build > 0.6) tone(musicBus, next + (b + 0.5) * beat, beat * 0.3, { type: 'sawtooth', freq: midi(bn - 12), vol: pv * 0.6, attack: 0.01 });
+        }
+        // the last few: a dry clock ticking every beat
+        if (score.few > 0.3) noise(musicBus, next + b * beat, 0.025, { type: 'bandpass', freq: b % 2 ? 2600 : 3400, q: 8, vol: 0.35 * score.few });
         bassStep++;
       }
       next += beat * len;
