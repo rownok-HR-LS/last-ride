@@ -5,24 +5,30 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { ktx2 } from './ktx.js';
 import { glow } from './textures.js';
+import { PARK_EDGE } from '../shared/map.js';
 
 const LENGTH = 10.8; // metres
 
 /**
- * The bus as a box the trees are not drawn inside (src/trees.js gives their materials these planes, kept where the
- * bus is by Bus.update): the roadside crowns reach over the road, and a branch through the cabin showed in the
- * intro's shot up the aisle. A point is cut only when it is inside all six (clipIntersection). Until the bus is
- * placed every plane keeps everything.
+ * A box the trees are not drawn inside (src/trees.js gives their materials these planes, kept up to date by
+ * Bus.update): the roadside crowns reach over the road, and in the intro branches showed through the cabin and
+ * across the bus from the drone and crane shots. While the bus is out on the straight road through the woods the box
+ * is the air over that road (the bus is in it); inside the park it is the bus itself. A point is cut only when it is
+ * inside all six (clipIntersection). Until the bus is placed every plane keeps everything.
  */
 export const busClip = Array.from({ length: 6 }, () => new THREE.Plane(new THREE.Vector3(0, 1, 0), 1e6));
 /** The box in the body's own frame: [normal pointing out, distance out from the middle]. */
 const CLIP_BOX = [[1, 0, 0, 1.4], [-1, 0, 0, 1.4], [0, 1, 0, 3.5], [0, -1, 0, 0.1], [0, 0, 1, LENGTH / 2 + 0.15], [0, 0, -1, LENGTH / 2 + 0.15]];
+/** The road through the woods in world space (x = 0 from the gate out): [normal pointing out, distance from the origin]. */
+const ROAD_BOX = [[1, 0, 0, 5], [-1, 0, 0, 5], [0, 1, 0, 40], [0, -1, 0, 1], [0, 0, 1, 520], [0, 0, -1, -(PARK_EDGE + 2)]];
 function placeClip(body, on) {
+  // (on the straight from the woods to the park's main avenue, so the cut does not jump back as the bus passes the gate)
+  const road = on && Math.abs(body.matrixWorld.elements[12]) < 1 && body.matrixWorld.elements[14] > 40;
   for (let i = 0; i < 6; i++) {
-    const [x, y, z, d] = CLIP_BOX[i];
     const p = busClip[i];
     if (!on) p.set(p.normal.set(0, 1, 0), 1e6);
-    else p.set(p.normal.set(x, y, z), -d).applyMatrix4(body.matrixWorld);
+    else if (road) p.set(p.normal.fromArray(ROAD_BOX[i]), -ROAD_BOX[i][3]);
+    else p.set(p.normal.fromArray(CLIP_BOX[i]), -CLIP_BOX[i][3]).applyMatrix4(body.matrixWorld);
   }
 }
 // the model's nose points along +z; the game's yaw 0 faces -z

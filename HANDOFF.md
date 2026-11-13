@@ -380,3 +380,8 @@ sounds; lightning that lights the park, rides that light up, lived-in details (B
   dropped to 15% about 6% of the time (riders went black). Aisle shot now sharp (aperture 0); the tube sags to 60%,
   rarer. Cabin light is set by Bus.cabinLight after the camera picks its shot (with Bus.update now before the
   riders it was a frame late and the shot's first frame was dark).
+- Intro camera sweep (all 8 shots, frame by frame): the drone shot (16 s) and the crane behind the bus (25.5 s) flew
+  through the crowns over the road. bus.js busClip now clears the air over the road (|x| < 5, up to 40 m, z beyond
+  the fence) while the bus is on the straight (x = 0, z > 40), and the bus box elsewhere. Shots can also fade trees
+  near the camera: intro.js shot.cut [gone, whole] -> trees.js treeCut (dithered discard on vViewPosition), set in
+  updateCamera; the drone uses [7, 13], the crane [8, 16]. The first shot lost its overhead framing branches.

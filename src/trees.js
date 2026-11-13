@@ -8,6 +8,32 @@ import { cullable, lodLimit } from './cull.js';
 import { ktx2 } from './ktx.js';
 import { busClip } from './bus.js';
 
+/**
+ * Trees near the camera fade out (dithered) while this is set: [gone within, whole beyond] in metres; 0, 0 = off.
+ * The intro's drone and crane shots set it (intro.js treeCut), as their cameras pass through the crowns over the road.
+ */
+export const treeCut = { value: new THREE.Vector2(0, 0) };
+
+/** Give a tree material the camera cut-away (treeCut). */
+function nearCut(mat) {
+  const prev = mat.onBeforeCompile;
+  mat.onBeforeCompile = (sh, renderer) => {
+    prev?.call(mat, sh, renderer);
+    sh.uniforms.treeCut = treeCut;
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform vec2 treeCut;')
+      .replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
+        if (treeCut.y > 0.0) {
+          // a fine, stable dither (interleaved gradient noise) so the cut-away fades rather than ends at a line
+          float dither = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
+          if (smoothstep(treeCut.x, treeCut.y, length(vViewPosition)) < dither) discard;
+        }`);
+  };
+  const key = mat.customProgramCacheKey?.bind(mat);
+  mat.customProgramCacheKey = () => `${key ? key() : ''}|treeCut`;
+  return mat;
+}
+
 /** [preset, seed, tweak]. Every variant is normalised to 1 m tall and scaled per instance. */
 export const DEAD = [
   ['Oak Large', 11, (o) => { o.branch.angle[1] = 62; o.branch.gnarliness[1] = 0.3; }],
@@ -53,7 +79,7 @@ export async function preloadTrees() {
       // never drawn inside the tour bus (branches over the road reached through its cabin)
       mat.clippingPlanes = busClip;
       mat.clipIntersection = true;
-      swayed.set(mat, sway(mat, mat.name === 'needles' ? 0.011 : 0.008));
+      swayed.set(mat, nearCut(sway(mat, mat.name === 'needles' ? 0.011 : 0.008)));
     }
     const v = (out[lod][kind][+i] ??= { parts: [], tris: 0 });
     v.parts[+j] = { geo: m.geometry, mat: swayed.get(mat) };

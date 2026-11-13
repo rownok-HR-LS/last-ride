@@ -53,6 +53,7 @@ const ease = (u) => 0.5 - 0.5 * Math.cos(Math.PI * Math.min(1, Math.max(0, u)));
 
 /**
  * Shots. at: start (s). fov: lens (smaller = longer lens). shake: handheld amount. aperture: depth of field.
+ * cut: [gone within, whole beyond] metres: trees that near the camera fade out (trees.js treeCut).
  * cam(u, b, A): u = eased progress through the shot, b = bus now, A = bus at the start of the shot. Positions are
  * given in a bus frame [forward, right, up] via b.at / A.at, or in world space.
  */
@@ -79,7 +80,7 @@ const SHOTS = [
   },
   {
     // a drone high over the road, sinking as the treeline opens toward the park
-    at: 16, fov: 38, shake: 0.12, aperture: 0.25,
+    at: 16, fov: 38, shake: 0.12, aperture: 0.25, cut: [7, 13],
     cam: (u, b) => ({ pos: b.at(-24 + u * 7, 3 - u * 1.5, 19 - u * 6), look: b.at(20, 0, 0) }),
   },
   {
@@ -95,7 +96,7 @@ const SHOTS = [
   },
   {
     // behind the bus as it passes under the arch, craning up to the sign
-    at: 25.5, fov: 48, shake: 0.3, aperture: 0.3,
+    at: 25.5, fov: 48, shake: 0.3, aperture: 0.3, cut: [8, 16],
     cam: (u, b) => ({ pos: b.at(-12 - u * 3, 1.1, 3.2 + u * 4.5), look: b.at(16, 0, 2.4 + u * 3) }),
   },
 ];
@@ -212,6 +213,7 @@ export class Intro {
     r.focus = focus ?? Math.hypot(snap.bus.x - pos[0], 1.5 - pos[1], snap.bus.z - pos[2]);
     r.cabin = s.cabin || 0;
     r.interior = s.interior || 0;
+    r.cut = s.cut || null;
     return r;
   }
 

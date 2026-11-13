@@ -26,6 +26,7 @@ import { createPost, SSR } from './post.js';
 import { ringTex } from './textures.js';
 import { Guide } from './guide.js';
 import { Intro } from './intro.js';
+import { treeCut } from './trees.js';
 import { cullInstances, setCullScale, mergeBatches, setPropHidden } from './cull.js';
 import { freed } from './ktx.js';
 import { setStage, whenCompiled, needsCompile, watchAdds } from './stage.js';
@@ -1890,6 +1891,9 @@ export class Client {
 
     this.cine = this.intro.update(snap, cam);
     this.bus.cabinLight(this.cine ? this.cine.cabin : 0);
+    // shots that fly through the crowns over the road clear the trees right round the camera
+    if (this.cine?.cut) treeCut.value.set(this.cine.cut[0], this.cine.cut[1]);
+    else treeCut.value.set(0, 0);
     // indoors (the shot up the bus aisle) there is no open sky: the cabin light does the lighting
     const inside = this.cine?.interior ? 1 : 0;
     // lightning floods the sky (only a glimmer of it reaches inside)
