@@ -212,7 +212,7 @@ export class Client {
 
     const scene = new THREE.Scene();
     this.scene = scene;
-    this.camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 2500);
+    this.camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight || 1, 0.1, 2500);
     const sky = buildSky(scene, renderer);
     // storm clouds drifting over the sky photo (src/clouds.js)
     this.clouds = buildClouds(scene);
@@ -683,7 +683,9 @@ export class Client {
     const w = window.innerWidth;
     const h = window.innerHeight;
     this.renderer.setSize(w, h);
-    this.camera.aspect = w / h;
+    // a window with no size yet (a hidden frame) has no shape: 0/0 made the camera NaN, and the trees' bus
+    // clipping planes (bus.js busClip) threw on it
+    if (w > 0 && h > 0) this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.post.setSize(w, h);
   }
