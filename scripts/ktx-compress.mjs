@@ -6,7 +6,9 @@
 // assets-src/webp-originals so a re-run starts from them, not from a compressed copy.
 // tex-half: a half-size copy of each photo material in public/tex/<name>/half/, for phones and the Low setting
 // (src/textures.js picks it).
-// Usage: node scripts/ktx-compress.mjs [models|tex|tex-half|all] [file filter]
+// shrink: re-encode the textures of the models in TEX_SCALE at their scale, from the kept originals, leaving each
+// model's current geometry alone (several were edited after their textures were compressed).
+// Usage: node scripts/ktx-compress.mjs [models|tex|tex-half|all|shrink] [file filter]
 import { execFileSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -21,6 +23,15 @@ const KTX = 'C:/Program Files/KTX-Software/bin/ktx.exe';
 const ORIG = 'assets-src/webp-originals';
 const TMP = path.join(tmpdir(), 'lr-ktx');
 const RIDERS = new Set(['balthazar', 'businessman', 'carla', 'claudia', 'eric', 'manuel', 'nathan', 'oldlady', 'sophia', 'spice', 'bgpeople_0', 'bgpeople_1', 'bgpeople_2', 'bgpeople_3']);
+/**
+ * Models whose textures are stored smaller than drawn (a faster first load): props nobody sees from close enough to
+ * tell 1024 from 512, the woods outside the fence nobody can walk to, and the Ferris wheel's 20 maps (its bolts had
+ * their own). Model name -> scale.
+ */
+const TEX_SCALE = {
+  crates_barrels: 0.5, boxes: 0.5, trash_bags: 0.5, street_fences: 0.5, bench: 0.5,
+  dead_tree_trunk: 0.5, dead_tree_trunk_02: 0.5, rock_moss_set_01: 0.5, rock_moss_set_02: 0.5, ferris: 0.5,
+};
 const [what = 'all', filter = ''] = process.argv.slice(2);
 mkdirSync(TMP, { recursive: true });
 await MeshoptEncoder.ready;
@@ -73,7 +84,7 @@ async function model(file) {
     const normal = slots.some((s) => /normal/i.test(s));
     const colour = slots.some((s) => /baseColor|emissive|diffuse/i.test(s));
     // the riders' faces are looked at from close up: a finer quality for them
-    const data = await encode(t.getImage(), { srgb: colour && !normal, normal, quality: rider || normal ? 220 : 128 });
+    const data = await encode(t.getImage(), { srgb: colour && !normal, normal, quality: rider || normal ? 220 : 128, scale: TEX_SCALE[path.basename(file, '.glb')] || 1 });
     t.setImage(data).setMimeType('image/ktx2');
     if (t.getURI()) t.setURI(t.getURI().replace(/\.\w+$/, '.ktx2'));
     done++;
@@ -118,6 +129,34 @@ if (what === 'models' || what === 'all') {
     ...readdirSync('public/models/env').filter((f) => f.endsWith('.glb')).map((f) => `public/models/env/${f}`),
   ].filter((f) => f.includes(filter) && !/anims|weapons/.test(f));
   for (const f of files) await model(f);
+}
+if (what === 'shrink') {
+  for (const [name, scale] of Object.entries(TEX_SCALE)) {
+    if (!name.includes(filter)) continue;
+    const file = existsSync(`public/models/env/${name}.glb`) ? `public/models/env/${name}.glb` : `public/models/${name}.glb`;
+    const doc = await io.read(file);
+    const orig = await io.read(path.join(ORIG, file));
+    const now = doc.getRoot().listTextures();
+    const was = orig.getRoot().listTextures();
+    if (now.length !== was.length) throw new Error(`${file}: ${now.length} textures now, ${was.length} in the original`);
+    const a = statSync(file).size;
+    for (let i = 0; i < now.length; i++) {
+      const t = now[i];
+      const src = was[i].getImage();
+      const [w] = t.getSize() || [0];
+      const w0 = (await sharp(src).metadata()).width || 0;
+      // only shrink from the full-size original (never twice)
+      if (!w0 || Math.abs(w0 * scale - w) < 4) continue;
+      const slots = listTextureSlots(t);
+      const normal = slots.some((x) => /normal/i.test(x));
+      const colour = slots.some((x) => /baseColor|emissive|diffuse/i.test(x));
+      t.setImage(await encode(src, { srgb: colour && !normal, normal, quality: normal ? 220 : 128, scale }));
+    }
+    await io.write(file, doc);
+    before += a;
+    after += statSync(file).size;
+    console.log(`${file}: textures x${scale}, ${kb(a)} -> ${kb(statSync(file).size)}`);
+  }
 }
 if (what === 'tex' || what === 'all') await photoTextures();
 if (what === 'tex-half' || what === 'all') await photoTextures(true);

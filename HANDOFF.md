@@ -385,3 +385,14 @@ sounds; lightning that lights the park, rides that light up, lived-in details (B
   the fence) while the bus is on the straight (x = 0, z > 40), and the bus box elsewhere. Shots can also fade trees
   near the camera: intro.js shot.cut [gone, whole] -> trees.js treeCut (dithered discard on vViewPosition), set in
   updateCamera; the drone uses [7, 13], the crane [8, 16]. The first shot lost its overhead framing branches.
+
+## Faster loading (2026-11-14)
+
+- Measured: ~42 MB over the wire before the first ride (GitHub Pages gzips; KTX2 textures don't shrink further).
+  Everything was already KTX2 + meshopt, so "Phase 5 KTX2" is done.
+- scripts/ktx-compress.mjs TEX_SCALE + `shrink` mode: re-encodes a model's textures at a scale from the kept
+  originals (assets-src/webp-originals), leaving its current geometry. Halved: crates_barrels, boxes, trash_bags,
+  street_fences, bench, the woods' dead trunks and mossy rocks, and the Ferris wheel (20 maps). 9.3 MB -> 4.1 MB.
+  Checked before/after from 3.5 m with src/tools/props.js (props(['bench', ...], tag)): no visible change.
+- Left alone: Spice and the old lady are big from hair and clothing geometry (already partly quantized); thinning it
+  would show on riders seen up close. Bus, big top and the riders' 2048 atlases are looked at closely.
