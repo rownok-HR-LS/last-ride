@@ -1869,8 +1869,11 @@ export class Client {
       const rl = Math.hypot(fx, fy - 0.12, fz);
       const hit = rayWorld(b.x, 2.6, b.z, -fx / rl, (-fy + 0.12) / rl, -fz / rl, bd * rl + 0.5);
       if (hit) bd = Math.max(3, (hit.t - 0.5) / rl);
-      cam.position.set(b.x - fx * bd, 2.6 - fy * bd + bd * 0.12, b.z - fz * bd);
-      cam.lookAt(b.x, 2.2, b.z);
+      // pulled in close, the camera would be inside the bus (it is 11 m long): rise over the roof instead, and look
+      // down on it
+      const lift = Math.min(1, Math.max(0, (8.5 - bd) / 5.5)) * 3.4;
+      cam.position.set(b.x - fx * bd, 2.6 - fy * bd + bd * 0.12 + lift, b.z - fz * bd);
+      cam.lookAt(b.x, 2.2 + lift * 0.25, b.z);
       this.camDistNow = 4;
     } else if (snap.phase === 'end' && snap.winner) {
       const w = snap.players.find((q) => q.id === snap.winner) || p;
@@ -1928,6 +1931,18 @@ export class Client {
         let k = 1;
         if (t < Infinity) k = Math.max(0.12, (t - 0.35) / len);
         // ease back out after a wall, snap in when blocked
+        const ck = this.camK ?? 1;
+        this.camK = ck + (k - ck) * Math.min(1, dt * (k < ck ? 30 : 5));
+        dist *= this.camK;
+        side *= this.camK;
+      } else if (ghost && snap.bus) {
+        // a ghost's camera goes through walls like the ghost does, but not into the bus (its dark cabin filled the view)
+        const dx = -fx * dist + rx * side;
+        const dy = -fy * dist + up;
+        const dz = -fz * dist + rz * side;
+        const len = Math.hypot(dx, dy, dz);
+        const busT = rayBus(snap.bus, pivot.x, pivot.y, pivot.z, dx / len, dy / len, dz / len, len + 0.35);
+        const k = busT < Infinity ? Math.max(0.12, (busT - 0.35) / len) : 1;
         const ck = this.camK ?? 1;
         this.camK = ck + (k - ck) * Math.min(1, dt * (k < ck ? 30 : 5));
         dist *= this.camK;

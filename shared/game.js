@@ -1278,6 +1278,13 @@ export class Game {
     this.bus.z = b.z;
     this.bus.dx = ahead.x - b.x;
     this.bus.dz = ahead.z - b.z;
+    // at the end of the route there is nothing ahead: take the heading from the road behind (with none, the bus
+    // turned round as it stopped, and everyone still aboard was put off inside it)
+    if (Math.hypot(this.bus.dx, this.bus.dz) < 1e-4) {
+      const behind = busAt(this.bus.s - 4);
+      this.bus.dx = b.x - behind.x;
+      this.bus.dz = b.z - behind.z;
+    }
     const l = Math.hypot(this.bus.dx, this.bus.dz) || 1;
     this.bus.dx /= l;
     this.bus.dz /= l;
