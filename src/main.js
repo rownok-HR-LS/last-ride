@@ -9,6 +9,7 @@ import { loadSettings } from './settings.js';
 import { settingsBoard } from './menu.js';
 import { loadProgress, saveProgress, levelOf, dailies, looksFor } from './progress.js';
 import { loading } from './loading.js';
+import { fadeOut, fadeIn } from './fade.js';
 
 const app = document.getElementById('app');
 let parkInfo = Promise.resolve(null);
@@ -323,12 +324,17 @@ async function title() {
       });
       await ready;
       off();
+      await fadeOut(300);
       el.remove();
-      return client.start(profile);
+      client.start(profile);
+      fadeIn(800);
+      return;
     }
     // straight to the bus stop; until the live park is in, the photo of it stays behind the sign
-    if (client?.compiled) el.remove();
-    else {
+    if (client?.compiled) {
+      el.classList.add('leaving');
+      setTimeout(() => el.remove(), 450);
+    } else {
       el.classList.add('boarding');
       ready.then(() => setTimeout(() => el.remove(), 1500));
     }

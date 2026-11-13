@@ -2,6 +2,7 @@
 // watching a ride already under way, and back to the stop afterwards.
 import { NetGame, connect, wakeServer } from './net.js';
 import { loading } from './loading.js';
+import { fadeOut, fadeIn, fadeReload } from './fade.js';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 /** How long a sleeping server gets to wake before we give up, and how long a dropped rider keeps trying. */
@@ -70,7 +71,7 @@ export class Online {
   /** Leave, then back to the title. */
   toMenu() {
     this.leave();
-    setTimeout(() => location.reload(), 150);
+    fadeReload();
   }
 
   /**
@@ -217,9 +218,14 @@ export class Online {
       }
       off?.();
       if (!game.ready) return setTimeout(go, 30);
-      this.sign.classList.remove('show');
-      this.client.hudRoot.style.visibility = '';
-      this.client.start(this.profile, game);
+      // through black: the stop's sign goes, the ride comes up
+      fadeOut(260).then(() => {
+        if (this.net !== game) return fadeIn(300);
+        this.sign.classList.remove('show');
+        this.client.hudRoot.style.visibility = '';
+        this.client.start(this.profile, game);
+        fadeIn(750);
+      });
     };
     go();
   }
@@ -227,8 +233,12 @@ export class Online {
   /** "Ride again" on the results sign. */
   again() {
     this.conn.send({ t: 'again' });
-    this.client.hud.hideEnd = true;
-    this.toLobby();
+    // the results go dark, and the bus stop comes up
+    fadeOut(260).then(() => {
+      this.client.hud.hideEnd = true;
+      this.toLobby();
+      fadeIn(500);
+    });
   }
 
   toLobby() {

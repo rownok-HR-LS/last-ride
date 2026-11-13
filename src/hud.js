@@ -113,6 +113,39 @@ function renderMapImage(size) {
 }
 
 /** The progression part of the results: experience by source, the level bar, level-ups, unlocks, dailies, records. */
+/** Count each [data-count] number in el up from data-from (or 0) to its value, over a second, easing out. */
+function countUp(el) {
+  const items = [...el.querySelectorAll('[data-count]')];
+  const xp = el.querySelector('.xp-head b');
+  if (xp) {
+    const n = parseInt(xp.textContent.replace(/[^0-9]/g, ''), 10) || 0;
+    xp.dataset.count = n;
+    xp.dataset.plus = '1';
+    items.push(xp);
+  }
+  const clock = (v) => `${Math.floor(v / 60)}:${String(v % 60).padStart(2, '0')}`;
+  const t0 = performance.now();
+  const step = () => {
+    const u = Math.min(1, (performance.now() - t0 - 350) / 1100);
+    const k = u <= 0 ? 0 : 1 - (1 - u) ** 3;
+    for (const b of items) {
+      const to = +b.dataset.count;
+      const from = +(b.dataset.from || 0);
+      const v = Math.round(from + (to - from) * k);
+      b.textContent = b.dataset.clock ? clock(v) : b.dataset.plus ? `+${v} XP` : String(v);
+    }
+    if (u < 1 && el.isConnected) requestAnimationFrame(step);
+  };
+  // (a timer as well: a tab in the background holds animation frames back)
+  requestAnimationFrame(step);
+  setTimeout(() => {
+    for (const b of items) {
+      const to = +b.dataset.count;
+      b.textContent = b.dataset.clock ? clock(to) : b.dataset.plus ? `+${to} XP` : String(to);
+    }
+  }, 1700);
+}
+
 function xpPanel(e) {
   const pct = (l) => (l.need ? Math.round((l.into / l.need) * 100) : 100);
   const up = e.after.level > e.before.level;
@@ -652,14 +685,24 @@ export class Hud {
     const winPol = winOutfit ? `<img class="end-pol" src="./riders/${winOutfit}.webp" alt="" />` : '';
     const clock = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
     const rows = st.slice(0, 10)
-      .map((s) => `<tr class="${s.id === mine?.id ? 'me' : ''}"><td>${s.place}</td><td>${esc(s.name)}</td><td>${s.kills}</td><td>${s.ghostKills}</td><td>${s.revives}</td><td>${clock(s.alive)}</td></tr>`)
+      .map((s, i) => `<tr class="${s.id === mine?.id ? 'me' : ''}" style="--i:${i}"><td>${s.place}</td><td>${esc(s.name)}</td><td>${s.kills}</td><td>${s.ghostKills}</td><td>${s.revives}</td><td>${clock(s.alive)}</td></tr>`)
+      .join('');
+    // the night's awards: one rider each, if anyone earned it (yours picked out in gold)
+    const best = (f) => st.reduce((a, b) => (f(b) > f(a) ? b : a), st[0]);
+    const awards = [
+      ['Most kills', best((x) => x.kills), (x) => x.kills, (x) => `${x.kills} kill${x.kills === 1 ? '' : 's'}`],
+      ['Longest survivor', best((x) => x.alive), (x) => x.alive, (x) => clock(x.alive)],
+      ['Best ghost', best((x) => x.ghostKills * 2 + x.revives), (x) => x.ghostKills * 2 + x.revives, (x) => `${x.ghostKills} ghost kill${x.ghostKills === 1 ? '' : 's'}, ${x.revives} stolen`],
+      ['Heaviest hitter', best((x) => x.dmg), (x) => x.dmg, (x) => `${x.dmg} damage`],
+    ].filter(([, who, score]) => who && score(who) > 0)
+      .map(([title, who, , what], i) => `<li class="${who.id === mine?.id ? 'mine' : ''}" style="--i:${i}"><small>${title}</small><b>${esc(who.name)}</b><span>${what(who)}</span></li>`)
       .join('');
     const stub = mine
       ? `<div class="end-stub">
-          <div class="stub-place"><small>you placed</small><b>${mine.place}</b><small>of ${st.length}</small></div>
+          <div class="stub-place"><small>you placed</small><b data-count="${mine.place}" data-from="${st.length}">${st.length}</b><small>of ${st.length}</small></div>
           <div class="stub-stats">
-            <span><b>${mine.kills}</b> kills</span><span><b>${mine.ghostKills}</b> as a ghost</span>
-            <span><b>${mine.revives}</b> bodies stolen</span><span><b>${mine.dmg}</b> damage</span><span><b>${clock(mine.alive)}</b> survived</span>
+            <span><b data-count="${mine.kills}">0</b> kills</span><span><b data-count="${mine.ghostKills}">0</b> as a ghost</span>
+            <span><b data-count="${mine.revives}">0</b> bodies stolen</span><span><b data-count="${mine.dmg}">0</b> damage</span><span><b data-count="${mine.alive}" data-clock="1">0:00</b> survived</span>
           </div>
         </div>`
       : '';
@@ -670,6 +713,7 @@ export class Hud {
       <h2>${meWon ? 'You rode the last bus out' : `${esc(win ? win.name : 'Nobody')} rode it out`}</h2>
       ${stub}
       ${earned ? xpPanel(earned) : ''}
+      ${awards ? `<ul class="end-awards">${awards}</ul>` : ''}
       <table class="end-board"><tr><th>#</th><th>Rider</th><th>Kills</th><th>Ghost</th><th>Stolen</th><th>Survived</th></tr>${rows}</table>
       <div class="board-buttons"><button class="ticket again">Ride again</button><button class="ticket dark menu">Main menu</button></div>
     </div>`;
@@ -682,6 +726,8 @@ export class Hud {
       // then the level bar fills
       const bar = $('.xp-bar i', el);
       if (bar) setTimeout(() => bar.style.setProperty('width', bar.dataset.to), 400);
+      // and the numbers on your stub count up (your place counts down to it)
+      countUp(el);
     }, 2500);
   }
 

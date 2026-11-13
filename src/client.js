@@ -45,6 +45,7 @@ import { CHAT_LINES, NIGHTS } from '../shared/constants.js';
 import { loadProgress, award } from './progress.js';
 import { setBinds } from './prompts.js';
 import { updateLampLight } from './lamplight.js';
+import { fadeReload } from './fade.js';
 
 const FEMALE = new Set(OUTFITS.filter((o) => o.voice === 'f').map((o) => o.id));
 
@@ -588,8 +589,8 @@ export class Client {
    */
   toMenu() {
     this.onLeave?.();
-    // a moment for the goodbye to reach the server
-    setTimeout(() => location.reload(), this.onLeave ? 150 : 0);
+    // through black (which also gives the goodbye a moment to reach the server)
+    fadeReload();
   }
 
   resume() {
