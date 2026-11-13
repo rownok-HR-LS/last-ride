@@ -7,7 +7,7 @@ import { MAX_PLAYERS, OUTFITS } from '../shared/constants.js';
 import {
   WEAPONS, WEAPON_IDS, FISTS, POWERS, RIDES, HEAVY, RARITIES, PRIZES,
 } from '../shared/items.js';
-import { FERRIS, REGIONS, trackAt, pathDistance, PARK_EDGE, BREAKABLES } from '../shared/map.js';
+import { FERRIS, FREEFALL, REGIONS, trackAt, pathDistance, PARK_EDGE, BREAKABLES } from '../shared/map.js';
 import { shatter, stepDebris, debrisCount } from './debris.js';
 import { updateScares } from './scares.js';
 import { buildClouds } from './clouds.js';
@@ -215,6 +215,9 @@ export class Client {
     this.clouds = buildClouds(scene);
     this.moonLight = sky.moonLight;
     this.moonDir = sky.moonDir;
+    // (lightning swings the light round for a moment: updateWeather)
+    this.moonDirBase = this.moonDir.clone();
+    this.flashDir = new THREE.Vector3(0, 1, 0);
     this.hemi = sky.hemi;
     const world = buildWorld(scene);
     this.lamps = world.lamps;
@@ -2171,7 +2174,17 @@ export class Client {
       const km = 0.4 + Math.random() * 3.6;
       const k = Math.min(1, Math.max(0.25, 1.2 / km));
       w.bolt = { t: 0, k, pulses: [[0, 1, 0.07], [0.12 + Math.random() * 0.08, 0.55, 0.05], [0.3 + Math.random() * 0.15, 0.85, 0.14]] };
-      setTimeout(() => audio.play(km < 1.3 ? 'thunderNear' : 'thunder', null, { km }), (km / 0.343) * 1000);
+      // the flash comes from where the bolt is: somewhere up in the sky, a different side each time
+      const az = Math.random() * Math.PI * 2;
+      const el = 0.6 + Math.random() * 0.6;
+      this.flashDir.set(Math.cos(el) * Math.sin(az), Math.sin(el), Math.cos(el) * Math.cos(az));
+      // a close one sometimes comes down on something tall nearby: the bolt seen, a blast of light, sparks
+      const target = km < 1.3 && Math.random() < 0.5 ? this.strikeTarget() : null;
+      if (target) {
+        w.bolt.k = 1;
+        this.strike(target);
+        audio.play('thunderNear', null, { km: 0.2 });
+      } else setTimeout(() => audio.play(km < 1.3 ? 'thunderNear' : 'thunder', null, { km }), (km / 0.343) * 1000);
     }
     w.flash = 0;
     if (w.bolt) {
@@ -2180,6 +2193,104 @@ export class Client {
       for (const [t0, a, decay] of b.pulses) if (b.t >= t0) w.flash += a * Math.exp(-(b.t - t0) / decay);
       w.flash *= b.k;
       if (b.t > 1.5) w.bolt = null;
+    }
+    // while it flashes the light falls from the bolt's side of the sky, shadows and all (the shadow map is redrawn
+    // every frame of it), then swings back to the moon
+    const bend = Math.min(1, w.flash * 1.4);
+    if (bend > 0.01 || this.lightBent) {
+      this.moonDir.copy(this.moonDirBase).lerp(this.flashDir, bend).normalize();
+      this.shRight = this.shUp = null;
+      this.lightBent = bend > 0.01;
+      this.renderer.shadowMap.needsUpdate = true;
+    }
+    this.updateStrike(dt, w.flash);
+  }
+
+  /** Something tall within reach for a bolt to hit: the Ferris wheel, the Free Fall tower, the big top, the tower. */
+  strikeTarget() {
+    const L = this.camera.position;
+    const tall = [
+      [FERRIS.x, FERRIS.hubY + FERRIS.r + 0.5, FERRIS.z],
+      [FREEFALL.x, 48.5, FREEFALL.z],
+      [0, 19, 0],
+      [-96, 15, -102],
+    ].filter((q) => Math.hypot(q[0] - L.x, q[2] - L.z) < 170);
+    return tall.length ? tall[Math.floor(Math.random() * tall.length)] : null;
+  }
+
+  /** A bolt comes down on target: a jagged, branching streak of light, a burst of white light there, and sparks. */
+  strike(target) {
+    const [tx, ty, tz] = target;
+    // the bolt: a crooked path down from the clouds, each step knocked sideways a little less the lower it gets
+    const pts = [];
+    const top = new THREE.Vector3(tx + (Math.random() - 0.5) * 50, 150, tz + (Math.random() - 0.5) * 50);
+    const n = 16;
+    for (let i = 0; i <= n; i++) {
+      const u = i / n;
+      const q = new THREE.Vector3().lerpVectors(top, new THREE.Vector3(tx, ty, tz), u);
+      if (i > 0 && i < n) {
+        const j = (1 - u) * 9 + 1.5;
+        q.x += (Math.random() - 0.5) * j;
+        q.z += (Math.random() - 0.5) * j;
+        q.y += (Math.random() - 0.5) * 3;
+      }
+      pts.push(q);
+    }
+    const path = new THREE.CurvePath();
+    for (let i = 0; i < pts.length - 1; i++) path.add(new THREE.LineCurve3(pts[i], pts[i + 1]));
+    const geos = [new THREE.TubeGeometry(path, n * 2, 0.6, 5, false)];
+    // a couple of forks off the main bolt
+    for (let f = 0; f < 2; f++) {
+      const from = pts[3 + Math.floor(Math.random() * 7)];
+      const fork = new THREE.CurvePath();
+      let a = from;
+      for (let i = 0; i < 4; i++) {
+        const b = a.clone().add(new THREE.Vector3((Math.random() - 0.5) * 12, -6 - Math.random() * 6, (Math.random() - 0.5) * 12));
+        fork.add(new THREE.LineCurve3(a, b));
+        a = b;
+      }
+      geos.push(new THREE.TubeGeometry(fork, 8, 0.3, 4, false));
+    }
+    // (far brighter than white, so it burns through the bloom even against a sky lit up by the flash)
+    if (!this.boltMat) this.boltMat = new THREE.MeshBasicMaterial({ color: new THREE.Color('#e4ecff').multiplyScalar(5), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, fog: false });
+    const group = new THREE.Group();
+    for (const g of geos) group.add(new THREE.Mesh(g, this.boltMat));
+    group.renderOrder = 8;
+    this.scene.add(group);
+    if (this.boltFx) this.scene.remove(this.boltFx.group);
+    this.boltFx = { group, t: 0, at: new THREE.Vector3(tx, ty, tz) };
+    // sparks raining down off the struck steel, and a few glowing bits
+    for (let i = 0; i < 70; i++) {
+      const sp = 4 + Math.random() * 10;
+      const a = Math.random() * Math.PI * 2;
+      this.fx.add.spawn(tx, ty, tz, Math.cos(a) * sp * 0.6, Math.random() * 6 - 1, Math.sin(a) * sp * 0.6, new THREE.Color(Math.random() < 0.3 ? '#ffffff' : '#ffc070'), 0.12, 0.6 + Math.random() * 0.9, 9, 0.6);
+    }
+    this.fx.sparkle(tx, ty, tz, '#cfe0ff', 30);
+  }
+
+  /** The bolt and its light, fading with the flash; gone after a second. */
+  updateStrike(dt, flash) {
+    const S = this.boltFx;
+    if (!S) return;
+    S.t += dt;
+    // the bolt holds for half a second, flickering, then fades (on its own time: the sky's flash would hide it)
+    this.boltMat.opacity = (S.t < 0.45 ? 1 : Math.max(0, 1 - (S.t - 0.45) * 3)) * (0.55 + 0.45 * Math.abs(Math.sin(S.t * 47)));
+    // a white-blue blast of light where it hit (the muzzle-flash light, borrowed: a new light would make every
+    // material in the park rebuild its shader)
+    const L = this.muzzleLight;
+    L.position.copy(S.at);
+    L.color.set('#cfdcff');
+    L.distance = 140;
+    L.decay = 1.6;
+    L.intensity = 2600 * Math.min(1, flash * 1.2 + Math.max(0, 0.15 - S.t) * 4);
+    if (S.t > 1.1) {
+      this.scene.remove(S.group);
+      for (const m of S.group.children) m.geometry.dispose();
+      this.boltFx = null;
+      L.intensity = 0;
+      L.color.set('#ffb060');
+      L.distance = 9;
+      L.decay = 2;
     }
   }
 

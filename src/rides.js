@@ -101,6 +101,8 @@ function horseMesh(color) {
 export class Rides {
   constructor(scene) {
     this.scene = scene;
+    // where the carousel's bulb chase has got to (its shader: upgradeCarousel)
+    this.carouselChase = { value: 0 };
     this.buildFerris();
     this.buildCoaster();
     this.buildCars();
@@ -154,6 +156,27 @@ export class Rides {
     const g = this.carousel;
     for (const ch of [...g.children]) g.remove(ch);
     g.add(model);
+    // its own bulbs (the glowing parts, aged nearly dead above) run a slow chase round the ride: lit by their
+    // angle about its axis, a few bright bands travelling round (carouselChase.value: Rides.updateBulbs)
+    this.carouselBulbs = null;
+    for (const m of aged.values()) {
+      if (!m.emissive || m.emissive.getHex() === 0) continue;
+      m.onBeforeCompile = (sh) => {
+        sh.uniforms.chaseT = this.carouselChase;
+        sh.vertexShader = sh.vertexShader
+          .replace('#include <common>', `#include <common>
+varying vec2 vChase;`)
+          .replace('#include <begin_vertex>', `#include <begin_vertex>
+  vChase = position.xz;`);
+        sh.fragmentShader = sh.fragmentShader
+          .replace('#include <common>', `#include <common>
+varying vec2 vChase;
+uniform float chaseT;`)
+          .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+  { float a = atan(vChase.y, vChase.x) / 6.2832; float band = pow(max(0.0, cos((a * 4.0 - chaseT) * 6.2832)), 6.0); totalEmissiveRadiance *= 1.0 + band * 14.0; }`);
+      };
+      m.customProgramCacheKey = () => 'lr-carousel-chase';
+    }
     // dozens of parts into a few draw calls: the frame as one piece per material, each horse as its own
     const horses = [];
     model.traverse((o) => {
@@ -347,7 +370,7 @@ export class Rides {
       }
     }
     // bulbs on the rim
-    const bulbs = new THREE.InstancedMesh(new THREE.SphereGeometry(0.16, 6, 4), new THREE.MeshBasicMaterial({ toneMapped: false }), 96);
+    const bulbs = new THREE.InstancedMesh(new THREE.SphereGeometry(0.26, 6, 4), new THREE.MeshBasicMaterial({ toneMapped: false }), 96);
     const mm = new THREE.Matrix4();
     // most bulbs died years ago
     const cols = [new THREE.Color('#1a1412'), new THREE.Color('#ffa850').multiplyScalar(1.6), new THREE.Color('#1a1412'), new THREE.Color('#2a1a14')];
@@ -358,6 +381,9 @@ export class Rides {
       bulbs.setColorAt(i, cols[(i * 7) % 4]);
     }
     wheel.add(bulbs);
+    this.wheelBulbs = bulbs;
+    // which bulbs still work (the rest come on only for a ghost: Rides.updateBulbs)
+    this.wheelAlive = Array.from({ length: 96 }, (_, i) => (i * 7) % 4 === 1);
     this.scene.add(wheel);
     this.wheel = wheel;
     this.gondolas = [];
@@ -484,6 +510,7 @@ export class Rides {
       bulbs.setColorAt(i, new THREE.Color(i % 5 === 0 ? '#ffa850' : '#1a1412').multiplyScalar(i % 5 === 0 ? 1.6 : 1));
     }
     g.add(bulbs);
+    this.carouselBulbs = bulbs;
     this.horses = [];
     const colors = ['#efe4d2', '#2b1838', '#8e44d6', '#e2384f'];
     for (let i = 0; i < 12; i++) {
@@ -553,6 +580,48 @@ export class Rides {
     this.domeMat = new THREE.MeshBasicMaterial({ color: '#05020a', transparent: true, opacity: 0.6, depthWrite: false, side: THREE.DoubleSide });
   }
 
+  /**
+   * The rides' bulbs. The Ferris wheel's few working bulbs flicker; when a ghost takes it over, every bulb on the rim
+   * stutters on and a chase runs round it, warm with a sickly green in it, and dies back down when the ghost lets go.
+   * The carousel's working bulbs run a slow chase as it turns.
+   */
+  updateBulbs(snap, dt, time) {
+    const on = snap.ferris?.driver != null ? 1 : 0;
+    // coming on: a few stutters first; going off: fading
+    this.ferrisLit = (this.ferrisLit ?? 0) + (on - (this.ferrisLit ?? 0)) * Math.min(1, dt * (on ? 1.4 : 0.8));
+    const lit = this.ferrisLit;
+    const stutter = lit > 0.05 && lit < 0.6 ? (Math.sin(time * 37) > 0.2 ? 1 : 0.15) : 1;
+    const c = (this.bulbCol ??= new THREE.Color());
+    const warm = (this.bulbWarm ??= new THREE.Color('#ffa850'));
+    const sick = (this.bulbSick ??= new THREE.Color('#b8ff7a'));
+    const dead = (this.bulbDead ??= new THREE.Color('#1a1412'));
+    const B = this.wheelBulbs;
+    for (let i = 0; i < 96; i++) {
+      const k = i % 48;
+      // the chase: a bright band running round the rim, three of them
+      const chase = Math.max(0, Math.cos(((k / 48) * 3 - time * 0.9) * Math.PI * 2)) ** 6;
+      let v = this.wheelAlive[i] ? 0.55 + 0.45 * Math.max(0, Math.sin(time * 13 + i * 2.7) * 0.5 + 0.5) * (Math.sin(time * 3.1 + i) > -0.9 ? 1 : 0) : 0;
+      v = Math.max(v, lit * stutter * (0.45 + chase * 1.4));
+      c.copy(dead).lerp(warm, Math.min(1, v));
+      if (lit > 0.05) c.lerp(sick, lit * 0.35 * (1 - chase));
+      // (well over white, so the lit ones bloom into a glow you can see across the park)
+      c.multiplyScalar(1 + v * 2.6);
+      B.setColorAt(i, c);
+    }
+    B.instanceColor.needsUpdate = true;
+    this.carouselChase.value = time * 0.5;
+    const C = this.carouselBulbs;
+    if (!C) return;
+    for (let i = 0; i < 40; i++) {
+      const works = i % 5 === 0 || i % 7 === 3;
+      const chase = Math.max(0, Math.cos((i / 40 - time * 0.12) * Math.PI * 2 * 4)) ** 4;
+      const v = works ? 0.5 + chase * 1.1 : 0;
+      c.copy(dead).lerp(warm, Math.min(1, v)).multiplyScalar(1 + v * 1.8);
+      C.setColorAt(i, c);
+    }
+    C.instanceColor.needsUpdate = true;
+  }
+
   update(snap, dt, time) {
     // Ferris wheel
     const F = FERRIS;
@@ -580,6 +649,8 @@ export class Rides {
       mesh.rotation.y = c.yaw;
       mesh.userData.eyes.material = c.driver ? m('bulbGreen') : m('bulb');
     });
+
+    this.updateBulbs(snap, dt, time);
 
     // carousel spins slowly; horses bob
     this.carousel.rotation.y = time * 0.18;
