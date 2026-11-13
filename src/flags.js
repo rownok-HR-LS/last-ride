@@ -165,3 +165,82 @@ export async function buildDoorFlaps() {
   place(flap, '#a99d88', [[15.5, 19.7, 8.4, 1.1, 1.3], [39.5, 19.7, 8.4, 1.1, 1.3]]);
   return group;
 }
+
+/**
+ * The little game tents' doorways: a pair of canvas flaps over each (the same storm-blown cloth as the big top's),
+ * hinged at their outer edges, that swing aside when someone comes up to the door and fall back after. The scan's
+ * doorway faces its own +z, about 3.4 m out, 2 m wide and 2.3 m high (found by casting rays at it, then by eye).
+ */
+const TENT_DOOR = { r: 3.42, top: 2.3, half: 0.03, sx: 0.84, sy: 0.57 };
+let tentFlaps = null;
+
+export async function buildTentFlaps() {
+  const tents = PROPS.filter((p) => p.type === 'gametent');
+  if (!tents.length) return null;
+  const m = await loadMotion('flap');
+  // the tents' own dark red stripe, so the curtains read against the pale canvas inside
+  const mat = motionMaterial(wetten(new THREE.MeshStandardMaterial({ color: '#7a2226', side: THREE.DoubleSide, roughness: 0.92 })), m, undefined, { ampFloor: 0.35 });
+  const mesh = new THREE.InstancedMesh(motionGeometry(m), mat, tents.length * 2);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  mesh.userData.moves = true;
+  mesh.frustumCulled = false;
+  const doors = tents.map((p) => {
+    // the same turn world.js gives the scanned tent
+    const rot = (p.x + p.z) % 6.28;
+    const ox = Math.sin(rot);
+    const oz = Math.cos(rot);
+    return { x: p.x + ox * TENT_DOOR.r, z: p.z + oz * TENT_DOOR.r, rot, tx: oz, tz: -ox, open: 0 };
+  });
+  tentFlaps = { mesh, doors };
+  placeTentFlaps();
+  return mesh;
+}
+
+const _fm = new THREE.Matrix4();
+const _fr = new THREE.Matrix4();
+const _ft = new THREE.Matrix4();
+const _fs = new THREE.Matrix4();
+
+function placeTentFlaps() {
+  const { mesh, doors } = tentFlaps;
+  const D = TENT_DOOR;
+  const w = 0.6 * D.sx;
+  doors.forEach((d, i) => {
+    for (const [k, side] of [[0, -1], [1, 1]]) {
+      // hinge at the flap's outer edge; it swings out and away from the doorway as it opens
+      const hx = d.x + d.tx * side * (D.half + w);
+      const hz = d.z + d.tz * side * (D.half + w);
+      _fm.makeTranslation(hx, D.top, hz);
+      _fr.makeRotationY(d.rot + side * d.open * 1.25);
+      _ft.makeTranslation(-side * w, 0, 0);
+      _fs.makeScale(D.sx, D.sy, 1);
+      _fm.multiply(_fr).multiply(_ft).multiply(_fs);
+      mesh.setMatrixAt(i * 2 + k, _fm);
+    }
+  });
+  mesh.instanceMatrix.needsUpdate = true;
+}
+
+/** Each frame: riders (anything with x, z, and state 'alive') near a doorway push its flaps aside. */
+export function updateTentFlaps(riders, dt) {
+  if (!tentFlaps) return;
+  let moved = false;
+  for (const d of tentFlaps.doors) {
+    let near = 0;
+    for (const p of riders || []) {
+      if (p.state !== 'alive') continue;
+      const dist = Math.hypot(p.x - d.x, p.z - d.z);
+      near = Math.max(near, 1 - Math.min(1, Math.max(0, (dist - 0.9) / 1.2)));
+    }
+    // quick to open, slow to fall back
+    const to = near;
+    const k = Math.min(1, dt * (to > d.open ? 6 : 1.4));
+    const v = d.open + (to - d.open) * k;
+    if (Math.abs(v - d.open) > 1e-4) {
+      d.open = v;
+      moved = true;
+    }
+  }
+  if (moved) placeTentFlaps();
+}

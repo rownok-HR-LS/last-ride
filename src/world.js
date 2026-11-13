@@ -18,7 +18,7 @@ import { buildKit, kitDraws, boothVariant, BOOTH_GAMES } from './kit.js';
 import { buildDecals } from './decals.js';
 import { whenCompiled } from './stage.js';
 import { bunting, lightStrings } from './motion.js';
-import { buildFlags, buildDoorFlaps } from './flags.js';
+import { buildFlags, buildDoorFlaps, buildTentFlaps } from './flags.js';
 import { buildSigns } from './signs.js';
 import { buildScares } from './scares.js';
 import { compressed } from './ktx.js';
@@ -540,6 +540,8 @@ export function buildWorld(scene) {
   // flags streaming in the storm (src/flags.js)
   buildFlags().then((f) => f && scene.add(f)).catch((e) => console.warn('flags', e));
   buildDoorFlaps().then((f) => f && scene.add(f)).catch((e) => console.warn('door flaps', e));
+  // and on the little game tents' doorways, pushed aside by whoever comes up to them (updateTentFlaps)
+  buildTentFlaps().then((f) => f && scene.add(f)).catch((e) => console.warn('tent flaps', e));
   // the rides' names on boards swinging from chains (src/signs.js)
   buildSigns(Builder).then((g) => scene.add(g)).catch((e) => console.warn('signs', e));
   // the buildings' moving scares: dropping skeletons, coffin lids, a lurching ride car (src/scares.js)
