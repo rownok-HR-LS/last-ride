@@ -369,15 +369,28 @@ export function play(name, pos = null, opt = {}) {
       const d = out(pos, opt.heavy ? 1 : 0.75, 30);
       if (!d) return;
       const blade = ['machete', 'axe', 'spike', 'chainsaw'].includes(opt.w);
+      // weight you feel more than hear: a short low thump under every blow, deeper on a heavy one
+      tone(d, t, opt.heavy ? 0.18 : 0.11, { freq: opt.heavy ? 62 : 85, to: 38, vol: opt.heavy ? 0.9 : 0.55 });
       if (has('punch')) {
         // blades bite and cut; clubs and fists land a heavy body blow; both get a wet flesh layer
         if (blade) sample(d, 'slice', t, { vol: 0.8, rate: opt.heavy ? 0.85 : 1 });
         sample(d, opt.heavy || (!blade && opt.w !== 'fists') ? 'punch' : 'punch_light', t, { vol: blade ? 0.6 : 1, rate: opt.heavy ? 0.82 : 0.95 });
         sample(d, 'flesh', t + 0.005, { vol: blade ? 0.8 : 0.5, rate: 0.9 });
+        // a heavy blow cracks bone: loud and low from a club or hammer, a sharper bite from a blade
+        if (opt.heavy) sample(d, 'crack', t + 0.012, { vol: blade ? 0.32 : 0.62, rate: blade ? 1.15 : 0.72, vary: 0.1 });
         break;
       }
       tone(d, t, 0.14, { freq: opt.heavy ? 95 : 140, to: 45, vol: 1 });
       noise(d, t, blade ? 0.16 : 0.1, { freq: blade ? 3200 : 900, sweepTo: 300, vol: blade ? 0.9 : 1.1 });
+      break;
+    }
+    case 'bodyfall': {
+      // a body hitting the ground: a dull, heavy thud and a soft slap (louder the harder it fell)
+      const d = out(pos, 0.5 + (opt.hard || 0) * 0.5, 30);
+      if (!d) return;
+      tone(d, t, 0.2, { freq: 70, to: 34, vol: 0.8 });
+      if (!sample(d, 'thud_wood', t, { vol: 0.45, rate: 0.55, vary: 0.1 })) noise(d, t, 0.14, { freq: 500, sweepTo: 120, vol: 0.9 });
+      sample(d, 'flesh', t + 0.01, { vol: 0.3, rate: 0.7 });
       break;
     }
     case 'block': {

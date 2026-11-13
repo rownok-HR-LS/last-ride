@@ -1252,8 +1252,8 @@ export class Character {
   /** Something the sim told us about this character (a swing, a block, a dodge, a throw). */
   event(e, time) {
     if (e.e === 'swing') this.combo = e.heavy ? 0 : e.combo || 0;
-    // a hit freezes both fighters for a few frames
-    if (e.e === 'hit' || e.e === 'block') this.hitstop = e.heavy ? 0.09 : 0.06;
+    // a hit freezes both fighters for a few frames (a heavy one, long enough to feel the weight)
+    if (e.e === 'hit' || e.e === 'block') this.hitstop = e.heavy ? 0.13 : e.e === 'block' ? 0.05 : 0.07;
     if (e.e === 'hit' && e.victim) {
       const r = REACTS[Math.floor(Math.random() * REACTS.length)];
       this.hitClip = this.clips[r] ? (e.heavy ? 'react_gut' : r) : e.heavy ? (this.clips.hit_body ? 'hit_body' : 'm_stagger') : this.clips.hit_head ? 'hit_head' : 'm_stagger';
@@ -1810,6 +1810,8 @@ const OUTFIT_TINT = {
   denise: '#4f5156', ruth: '#536165',
 };
 
+const _cpHip = new THREE.Vector3();
+
 export class Corpse {
   /**
    * look: { seed, wet, blood, wear } of the rider who fell, so the body keeps their clothes, dye, dirt and blood.
@@ -1853,6 +1855,20 @@ export class Corpse {
   /** near: { riders, cars } that can shove a loose body about. */
   update(dt, near = null) {
     this.t += dt;
+    // the moment the body hits the ground: falling fast, then stopped (onLand: client.js, dust and a thud)
+    if (this.onLand && !this.landed && this.t < 6) {
+      const hips = this.char.bones.Hips;
+      if (hips) {
+        const y = hips.getWorldPosition(_cpHip).y;
+        const vy = this.lastHipY == null ? 0 : (y - this.lastHipY) / Math.max(dt, 1e-3);
+        if (vy < -1.6) this.falling = Math.max(this.falling || 0, -vy);
+        else if (this.falling && vy > -0.4) {
+          this.landed = true;
+          this.onLand(_cpHip.x, Math.max(0, y - 0.9), _cpHip.z, Math.min(1, this.falling / 6));
+        }
+        this.lastHipY = y;
+      }
+    }
     if (this.rag) {
       if (this.t < 9) {
         if (near) this.rag.kick(near.riders, near.cars);

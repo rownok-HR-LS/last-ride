@@ -114,6 +114,9 @@ function blowWind(dt, target) {
   motionTime.value = (motionTime.value + dt * (0.55 + 0.45 * windAmp.value)) % 10000;
 }
 
+/** Weapons made of wood (they splinter): the mallet's mallet head, the cotton-candy spike's stick. */
+const WOOD = new Set(['mallet', 'spike']);
+
 export class Client {
   /**
    * How a dying rider falls (Corpse/ragdoll): from the pose their character is in, carrying on how they moved,
@@ -1048,7 +1051,7 @@ export class Client {
           ch?.char.event(e, this.time);
           audio.play('block', pos, { broke: e.broke });
           if (pl) this.fx.sparkle(pl.x, pl.y + 1.3, pl.z, '#fff2c0', e.broke ? 20 : 8);
-          this.strikeFx(pl, this.game.players.get(e.by), !!e.broke, true);
+          this.strikeFx(pl, this.game.players.get(e.by), !!e.broke, true, this.game.players.get(e.by)?.wpn);
           if (e.by === me) {
             this.hud.hitMarker(false);
             this.combatWord(pl, e.broke ? 'GUARD BROKEN' : 'BLOCKED', e.broke ? 'broke' : 'blocked');
@@ -1075,6 +1078,11 @@ export class Client {
         }
         case 'break':
           audio.play('break', pos);
+          // the weapon gives out in their hands: splinters from wood, sparks from metal
+          if (pl) {
+            if (WOOD.has(e.w)) this.fx.splinters(pl.x, pl.y + 1.2, pl.z, Math.sin(pl.yaw), Math.cos(pl.yaw), 14);
+            else this.fx.sparkle(pl.x, pl.y + 1.2, pl.z, '#ffc070', 14);
+          }
           if (e.id === me) this.hud.toast(`Your ${WEAPONS[e.w].name} broke!`);
           break;
         case 'dodge':
@@ -1150,13 +1158,15 @@ export class Client {
             const heavy = e.amt > 40;
             this.chars.get(e.id)?.char.event({ e: 'hit', heavy, victim: true }, this.time);
             this.chars.get(e.by)?.char.event({ e: 'hit', heavy }, this.time);
-            if (e.by === me || e.id === me) {
-              this.shake = Math.max(this.shake, heavy ? 0.45 : 0.22);
-              this.impact(heavy, e.id === me);
-            }
             // a white-hot flash where it lands, blood thrown on along the line of the blow
             const by = this.game.players.get(e.by);
-            this.strikeFx(pl, e.fx != null ? { x: e.fx, z: e.fz } : by, heavy, false);
+            const from = e.fx != null ? { x: e.fx, z: e.fz } : by;
+            if (e.by === me || e.id === me) {
+              this.shake = Math.max(this.shake, heavy ? 0.5 : 0.22);
+              const dl = pl && from ? Math.hypot(pl.x - from.x, pl.z - from.z) || 1 : 1;
+              this.impact(heavy, e.id === me, pl && from ? { x: (pl.x - from.x) / dl, z: (pl.z - from.z) / dl } : null);
+            }
+            this.strikeFx(pl, from, heavy, false, e.how);
             // it lands on the ground around them, flung away from the blow
             if (pl && pl.onGround) {
               const a = e.fx != null ? Math.atan2(pl.x - e.fx, pl.z - e.fz) : Math.random() * 6.28;
@@ -1193,7 +1203,14 @@ export class Client {
           if (v) this.fx.ecto(v.x, v.y - 1.2, v.z, 24);
           if (v && !e.steal) {
             const fx = this.bodyFx.get(v.id) || { wet: 0, blood: 0 };
-            this.corpses.push(new Corpse(v.outfit, v.x, v.y - 1.2, v.z, v.yaw, this.scene, { seed: v.id, ...fx, wear: v.look }, this.deathFall(e, v)));
+            const body = new Corpse(v.outfit, v.x, v.y - 1.2, v.z, v.yaw, this.scene, { seed: v.id, ...fx, wear: v.look }, this.deathFall(e, v));
+            // it hits the ground: a puff of wet dirt and a thud
+            body.onLand = (x, y, z, hard) => {
+              if (hard < 0.15) return;
+              if (pathDistance(x, z) >= 0) this.fx.dust(x, y, z);
+              audio.play('bodyfall', [x, y, z], { hard });
+            };
+            this.corpses.push(body);
             // a pool spreads out under the body
             this.fx.blood(v.x, v.y - 1.2, v.z, 1.9 + Math.random() * 0.6, 0.35);
           }
@@ -1446,8 +1463,8 @@ export class Client {
     return best ? { x: best.x, y: best.y + 1.6, z: best.z } : null;
   }
 
-  /** The flash, sparks and blood of a melee blow on p, struck from 'from' (anything with x and z). */
-  strikeFx(p, from, heavy, blocked) {
+  /** The flash, sparks and blood of a melee blow on p, struck from 'from' (anything with x and z) with weapon w. */
+  strikeFx(p, from, heavy, blocked, w = null) {
     if (!p) return;
     let dx = from ? p.x - from.x : Math.random() - 0.5;
     let dz = from ? p.z - from.z : Math.random() - 0.5;
@@ -1455,15 +1472,23 @@ export class Client {
     dx /= l;
     dz /= l;
     // contact is on the near side of the body, chest high
-    this.fx.strike(p.x - dx * 0.3, p.y + (heavy ? 1.35 : 1.2), p.z - dz * 0.3, dx, dz, heavy, blocked);
+    this.fx.strike(p.x - dx * 0.3, p.y + (heavy ? 1.35 : 1.2), p.z - dz * 0.3, dx, dz, heavy, blocked, WOOD.has(w) ? 'wood' : !w || w === 'fists' ? 'flesh' : 'metal');
   }
 
-  /** The camera jolts toward a blow you land and away from one you take. heavy: a bigger jolt. */
-  impact(heavy, taken = false) {
+  /**
+   * The camera jolts toward a blow you land and away from one you take. heavy: a bigger jolt. dir: the way the blow
+   * travelled (unit x, z), so the camera is knocked sideways with it rather than at random.
+   */
+  impact(heavy, taken = false, dir = null) {
     this.pads?.rumble(heavy || taken);
+    const k = this.settings.shake ?? 1;
     this.punch = Math.max(this.punch || 0, heavy ? 1 : 0.6);
-    this.kick += (taken ? -1 : 1) * (heavy ? 0.035 : 0.02) * (this.settings.shake ?? 1);
-    this.kickYaw += (Math.random() - 0.5) * (heavy ? 0.05 : 0.025);
+    this.kick += (taken ? -1 : 1) * (heavy ? 0.045 : 0.02) * k;
+    if (dir) {
+      // how far across the view the blow travelled: + to the right of the camera
+      const across = dir.x * Math.cos(this.camYaw) - dir.z * Math.sin(this.camYaw);
+      this.kickYaw += -across * (heavy ? 0.075 : 0.035) * k;
+    } else this.kickYaw += (Math.random() - 0.5) * (heavy ? 0.05 : 0.025);
   }
 
   // ---------------------------------------------------------------- per-frame

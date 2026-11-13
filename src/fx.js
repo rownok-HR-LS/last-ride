@@ -310,8 +310,9 @@ export class FX {
   /**
    * The instant a melee blow lands: a white-hot flash that swells and is gone in a tenth of a second, sparks and
    * blood thrown on through the target along the line of the blow (dx, dz: unit direction attacker -> target).
+   * mat: what the weapon is made of: 'metal' throws sparks off a block, 'wood' splinters, 'flesh' (fists) neither.
    */
-  strike(x, y, z, dx, dz, heavy = false, blocked = false) {
+  strike(x, y, z, dx, dz, heavy = false, blocked = false, mat = 'metal') {
     let f = this.strikes.find((q) => q.life <= 0);
     if (!f) {
       const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: hitStar(), blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
@@ -327,6 +328,17 @@ export class FX {
     f.size = heavy ? 0.85 : 0.55;
     f.s.scale.setScalar(f.size * 0.4);
     f.s.visible = true;
+    // a guard catching a metal weapon: a burst of sparks off the point of contact, a few long streaks among them,
+    // thrown back the way the blow came (it bounced); wood splinters instead
+    if (blocked && mat === 'metal') {
+      for (let i = 0; i < (heavy ? 26 : 16); i++) {
+        const sp = 4 + Math.random() * (heavy ? 10 : 7);
+        const side = rnd(1.3);
+        const streak = Math.random() < 0.3;
+        this.add.spawn(x, y, z, (-dx - dz * side) * sp, rnd(1.6) * sp * 0.5 + 1.5, (-dz + dx * side) * sp, C(streak ? '#fff7d8' : '#ffb347'), streak ? 0.05 : 0.08, streak ? 0.35 + Math.random() * 0.2 : 0.15 + Math.random() * 0.15, 12, 2);
+      }
+    }
+    if (mat === 'wood') this.splinters(x, y, z, -dx * (blocked ? 1 : -0.4), -dz * (blocked ? 1 : -0.4), blocked || heavy ? 9 : 4);
     // hot sparks fan out along the blow
     const n = heavy ? 14 : 8;
     for (let i = 0; i < n; i++) {
@@ -336,10 +348,28 @@ export class FX {
     }
     if (blocked) return;
     // blood carried through: a cone behind the target, not a puff in every direction
-    for (let i = 0; i < (heavy ? 22 : 12); i++) {
-      const sp = 1.6 + Math.random() * (heavy ? 4 : 2.6);
+    for (let i = 0; i < (heavy ? 30 : 12); i++) {
+      const sp = 1.6 + Math.random() * (heavy ? 4.5 : 2.6);
       const side = rnd(0.8);
       this.norm.spawn(x + dx * 0.15, y + rnd(0.15), z + dz * 0.15, (dx - dz * side) * sp, Math.random() * 2 + 0.6, (dz + dx * side) * sp, C(Math.random() < 0.5 ? '#6a0808' : '#4a0404'), 0.16 + Math.random() * 0.16, 0.45 + Math.random() * 0.25, 9, 1.5);
+    }
+    // a heavy blow throws a few big drops that arc out and fall, and a fine red mist hangs where it landed
+    if (heavy) {
+      for (let i = 0; i < 6; i++) {
+        const sp = 2.5 + Math.random() * 3;
+        const side = rnd(0.5);
+        this.norm.spawn(x + dx * 0.2, y, z + dz * 0.2, (dx - dz * side) * sp, 1.5 + Math.random() * 2, (dz + dx * side) * sp, C('#3e0303'), 0.24 + Math.random() * 0.1, 0.7 + Math.random() * 0.3, 11, 0.4);
+      }
+      for (let i = 0; i < 3; i++) this.norm.spawn(x + dx * 0.3 + rnd(0.1), y + rnd(0.1), z + dz * 0.3 + rnd(0.1), dx * 0.6 + rnd(0.3), 0.2, dz * 0.6 + rnd(0.3), C('#5a0a0a'), 0.22, 0.45, -0.1, 2.5, 0.9);
+    }
+  }
+
+  /** Wood splinters off a club or mallet (dx, dz: the way they fly), n of them. */
+  splinters(x, y, z, dx, dz, n = 6) {
+    for (let i = 0; i < n; i++) {
+      const sp = 2 + Math.random() * 4;
+      const side = rnd(1.2);
+      this.norm.spawn(x, y, z, (dx - dz * side) * sp, 1.5 + Math.random() * 2.5, (dz + dx * side) * sp, C(Math.random() < 0.5 ? '#8a6238' : '#5e4022'), 0.07 + Math.random() * 0.06, 0.6 + Math.random() * 0.4, 12, 0.6);
     }
   }
 
