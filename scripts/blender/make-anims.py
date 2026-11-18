@@ -1,6 +1,8 @@
 # New animations for the riders, keyed in Blender on the Mixamo skeleton the game's clips use: a spike stab, an
 # overhead mallet whack, a chainsaw hold and revving thrust, a ghost's limp float, flailing on a long fall (off the
-# bus), and two deaths (to the knees and forward; a twisting fall sideways).
+# bus), two deaths (to the knees and forward; a twisting fall sideways), and the gestures: wrapping a bandage,
+# patching up from a medkit, pouring a salt circle, holding up a relic, picking something up, heaving a chest open,
+# a ghost's casting thrust and the winner's arms-up.
 #
 #   blender --background --factory-startup --python scripts/blender/make-anims.py -- <mixamo anims folder> <out folder> [clip ...]
 #
@@ -339,7 +341,152 @@ def possess_wheel():
     rig.bake('possess_wheel', dur, pose, loop=True)
 
 
+# ------------------------------------------------------------------ gestures (src/characters.js gesture / heal clips)
+
+def stand(r):
+    """Keep both feet where they stand (after the hips have moved)."""
+    leg_to(r, 'Right', (0.0, 0.11, 0.08), (1.2, 0.15, 0.5))
+    leg_to(r, 'Left', (0.0, -0.11, 0.08), (1.2, -0.15, 0.5))
+
+
+def heal_wrap():
+    """Winding a bandage round the left forearm: the arm held out, the right hand looping round it twice."""
+    rig = Rig('breath_idle.fbx')
+    dur = 1.6
+
+    def pose(r, t):
+        w = 2 * math.pi * 2 * t / dur
+        spine(r, 0.18, -0.12)
+        headturn(r, 0.45, -0.15)
+        arm_to(r, 'Left', (0.36, 0.02, 1.08), (-0.3, -0.7, 0.8))
+        arm_to(r, 'Right', (0.27 + 0.05 * math.sin(w), -0.04 + 0.04 * math.sin(w), 1.08 + 0.08 * math.cos(w)), (-0.3, 0.7, 0.9))
+    rig.bake('heal_wrap', dur, pose, loop=True)
+
+
+def heal_medkit():
+    """Crouched over a wound: the kit held in the left hand, the right dabbing and pressing at the side."""
+    rig = Rig('breath_idle.fbx')
+    dur = 1.8
+
+    def pose(r, t):
+        w = 2 * math.pi * t / dur
+        r.move('Hips', r.up * -0.16 + r.fwd * -0.04)
+        stand(r)
+        spine(r, 0.32, -0.2, -0.08)
+        headturn(r, 0.5, -0.25)
+        arm_to(r, 'Left', (0.34, -0.08, 0.86), (-0.2, -0.7, 0.7))
+        press = 0.5 - 0.5 * math.cos(w * 2)
+        arm_to(r, 'Right', (0.12 + 0.06 * press, -0.18, 0.92 + 0.04 * math.sin(w)), (-0.2, 0.8, 0.8))
+    rig.bake('heal_medkit', dur, pose, loop=True)
+
+
+def salt_pour():
+    """Bending to pour a circle of salt: the right hand low and out, sweeping round from right to left."""
+    rig = Rig('breath_idle.fbx')
+    R = [(0.0, (0.1, 0.3, 0.85)), (0.25, (0.5, 0.42, 0.62)), (1.0, (0.48, -0.25, 0.58)), (1.3, (0.1, 0.3, 0.85))]
+    yaw = [(0.0, 0.0), (0.25, -0.35), (1.0, 0.45), (1.3, 0.0)]
+    pitch = [(0.0, 0.0), (0.25, 0.4), (1.0, 0.45), (1.3, 0.0)]
+    down = [(0.0, 0.0), (0.25, -0.12), (1.0, -0.12), (1.3, 0.0)]
+
+    def pose(r, t):
+        r.move('Hips', r.up * track(down, t))
+        stand(r)
+        spine(r, track(pitch, t), track(yaw, t))
+        headturn(r, 0.35, track(yaw, t) * 0.5)
+        arm_to(r, 'Right', track(R, t), (-0.3, 0.8, 0.6))
+        # the hand turned over to let the salt run
+        r.rotate('RightHand', r.euler(0.0, 0.0, 0.9 * smooth(t / 0.25) * smooth((1.3 - t) / 0.3)))
+    rig.bake('salt_pour', 1.3, pose)
+
+
+def relic_raise():
+    """Holding the relic up and out at whatever comes, the other arm across the face."""
+    rig = Rig('breath_idle.fbx')
+    R = [(0.0, (0.1, 0.3, 0.85)), (0.35, (0.5, 0.18, 1.78)), (1.05, (0.52, 0.16, 1.82)), (1.4, (0.1, 0.3, 0.85))]
+    L = [(0.0, (0.1, -0.3, 0.85)), (0.35, (0.24, -0.02, 1.52)), (1.05, (0.25, -0.02, 1.54)), (1.4, (0.1, -0.3, 0.85))]
+    pitch = [(0.0, 0.0), (0.35, -0.18), (1.05, -0.2), (1.4, 0.0)]
+
+    def pose(r, t):
+        spine(r, track(pitch, t), 0.0, 0.05)
+        headturn(r, -0.1 * smooth(t / 0.35), -0.35 * smooth(t / 0.35) * smooth((1.4 - t) / 0.35))
+        arm_to(r, 'Right', track(R, t), (-0.3, 0.8, 1.2))
+        arm_to(r, 'Left', track(L, t), (-0.3, -0.7, 1.1))
+    rig.bake('relic_raise', 1.4, pose)
+
+
+def pickup():
+    """A quick dip to snatch something off the floor."""
+    rig = Rig('breath_idle.fbx')
+    down = [(0.0, 0.0), (0.4, -0.36), (0.55, -0.36), (0.9, 0.0)]
+    pitch = [(0.0, 0.0), (0.4, 0.7), (0.55, 0.7), (0.9, 0.0)]
+    R = [(0.0, (0.1, 0.3, 0.85)), (0.4, (0.5, 0.16, 0.14)), (0.55, (0.48, 0.16, 0.16)), (0.9, (0.1, 0.3, 0.85))]
+
+    def pose(r, t):
+        r.move('Hips', r.up * track(down, t) + r.fwd * (track(down, t) * 0.2))
+        stand(r)
+        spine(r, track(pitch, t))
+        headturn(r, 0.3)
+        arm_to(r, 'Right', track(R, t), (-0.3, 0.8, 0.5))
+        arm_to(r, 'Left', (0.15, -0.3, 0.75 + track(down, t) * 0.4), (-0.3, -0.8, 0.6))
+    rig.bake('pickup', 0.9, pose)
+
+
+def open_chest():
+    """Crouched at a chest, both hands under the lid, heaving it up."""
+    rig = Rig('breath_idle.fbx')
+    down = [(0.0, 0.0), (0.3, -0.3), (0.75, -0.18), (1.2, 0.0)]
+    pitch = [(0.0, 0.0), (0.3, 0.6), (0.75, 0.15), (1.2, 0.0)]
+    H = [(0.0, (0.1, 0.3, 0.85)), (0.3, (0.52, 0.24, 0.5)), (0.75, (0.56, 0.24, 1.1)), (1.2, (0.1, 0.3, 0.85))]
+
+    def pose(r, t):
+        r.move('Hips', r.up * track(down, t))
+        stand(r)
+        spine(r, track(pitch, t))
+        headturn(r, 0.25 - 0.4 * smooth((t - 0.3) / 0.45))
+        f, rr, u = track(H, t)
+        arm_to(r, 'Right', (f, rr, u), (-0.3, 0.8, 0.6))
+        arm_to(r, 'Left', (f, -rr, u), (-0.3, -0.8, 0.6))
+    rig.bake('open_chest', 1.2, pose)
+
+
+def ghost_cast():
+    """A ghost hurling a power: hunched back, then both arms thrust out, fingers spread; legs trail as it floats."""
+    rig = Rig('breath_idle.fbx')
+    dur = 0.9
+    H = [(0.0, (0.14, 0.32, 0.74)), (0.15, (-0.05, 0.3, 1.2)), (0.32, (0.7, 0.2, 1.38)), (0.6, (0.66, 0.22, 1.32)), (0.9, (0.14, 0.32, 0.74))]
+    pitch = [(0.0, 0.18), (0.15, -0.15), (0.32, 0.4), (0.6, 0.35), (0.9, 0.18)]
+
+    def pose(r, t):
+        spine(r, track(pitch, t))
+        headturn(r, 0.2 - track(pitch, t) * 0.3)
+        f, rr, u = track(H, t)
+        arm_to(r, 'Right', (f, rr, u), (-0.4, 0.6, 1.1))
+        arm_to(r, 'Left', (f, -rr, u), (-0.4, -0.6, 1.1))
+        leg_to(r, 'Right', (-0.12, 0.1, 0.2), (0.8, 0.12, 0.6))
+        leg_to(r, 'Left', (-0.06, -0.11, 0.16), (0.8, -0.12, 0.6))
+    rig.bake('ghost_cast', dur, pose)
+
+
+def victory():
+    """The one who rode it out: both arms up, fists pumping, leaning back and bouncing on the heels."""
+    rig = Rig('breath_idle.fbx')
+    dur = 2.4
+
+    def pose(r, t):
+        w = 2 * math.pi * t / dur
+        pump = 0.5 - 0.5 * math.cos(w * 2)
+        r.move('Hips', r.up * (0.035 * math.sin(w * 2)))
+        stand(r)
+        spine(r, -0.16, 0.08 * math.sin(w), 0.05 * math.sin(w))
+        headturn(r, -0.35, 0.1 * math.sin(w + 1))
+        arm_to(r, 'Right', (0.12, 0.42, 1.85 + 0.2 * pump), (-0.3, 0.9, 1.4))
+        arm_to(r, 'Left', (0.12, -0.42, 1.85 + 0.2 * (1 - pump)), (-0.3, -0.9, 1.4))
+    rig.bake('victory', dur, pose, loop=True)
+
+
 CLIPS = {
+    'heal_wrap': heal_wrap, 'heal_medkit': heal_medkit, 'salt_pour': salt_pour, 'relic_raise': relic_raise,
+    'pickup': pickup, 'open_chest': open_chest, 'ghost_cast': ghost_cast, 'victory': victory,
     'possess_ride': possess_ride, 'possess_wheel': possess_wheel,
     'spike_stab': spike_stab, 'mallet_whack': mallet_whack,
     'saw_idle': lambda: saw('saw_idle', 0.6, 0.0), 'saw_rev': lambda: saw('saw_rev', 0.8, 0.22),

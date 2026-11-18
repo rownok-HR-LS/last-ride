@@ -449,3 +449,11 @@ sounds; lightning that lights the park, rides that light up, lived-in details (B
   pins); kit.js places them (PROPS type 'table', and walls flagged gatepost in map.js), kitDraws covers both.
   Rebuild: blender ... build-weapons.py -- assets-src/blender/weapons/weapons.glb; blender ... build-kit.py --
   layout.json assets-src/blender/kit table gatepost; node scripts/pack-kit.mjs.
+- Group 5, animations (make-anims.py): heal_wrap (bandage round the forearm), heal_medkit (hunched, pressing a
+  wound), salt_pour, relic_raise, pickup, open_chest, ghost_cast, victory; add-anims.mjs merged them (93 clips).
+  characters.js: HEAL picks the heal clip from p.using (soda keeps drink); Character.gesture(name, dur) plays a
+  one-off clip as the override while standing or walking slowly (never over a dodge, stagger, slide, fall or
+  possession; ghost_ clips only for ghosts); ONCE clips play once and hold. client.js calls it on salt, relic,
+  chest, pickup, fling, trapSet, scare (by), steps and blackout (game.js now puts the ghost's id on those two), and
+  victory for the winner on 'end'. A repeated gesture restarts its action (clearing this.over orphaned it at full
+  weight). No shove clip: shoves are body contacts, not an action. Needs Render (game.js events).

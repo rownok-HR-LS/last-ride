@@ -1086,10 +1086,10 @@ export class Game {
     } else if (cmd.id === 'steps') {
       const a = this.rand() * Math.PI * 2;
       this.steps.push({ x, y, z, dx: Math.cos(a), dz: Math.sin(a), t: def.dur, owner: p.id, k: 0 });
-      this.events.push({ e: 'steps', x, y, z });
+      this.events.push({ e: 'steps', id: p.id, x, y, z });
     } else if (cmd.id === 'blackout') {
       this.blackouts.push({ x, z, r: def.radius, t: def.dur, dur: def.dur });
-      this.events.push({ e: 'blackout', x, z, r: def.radius });
+      this.events.push({ e: 'blackout', id: p.id, x, z, r: def.radius });
     } else if (cmd.id === 'storm') {
       this.pullStorm(x, z, def.shift);
       this.events.push({ e: 'storm', x, z, id: p.id });

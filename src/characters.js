@@ -985,6 +985,10 @@ const UPPER = ['m_idle', 'fight_idle', 'm_light', 'm_light2', 'm_heavy', 'm_bloc
  */
 const OWN_SWING = { spike: 'spike_stab', mallet: 'mallet_whack', chainsaw: 'saw_rev' };
 const OWN_GUARD = { chainsaw: 'saw_idle' };
+/** Healing has moves of its own (make-anims.py): a bandage is wound round the arm, a medkit dabbed at a wound. */
+const HEAL = { bandage: 'heal_wrap', medkit: 'heal_medkit' };
+/** One-off gestures (Character.gesture) that play once and hold their last pose until they end (the rest loop). */
+const ONCE = new Set(['salt_pour', 'relic_raise', 'pickup', 'open_chest', 'ghost_cast']);
 /** The big two-handed weapons fight with the great-sword set: both hands on the haft, the weight behind each swing. */
 const TWO_HANDED = new Set(['sledge', 'axe', 'lever']);
 /** Cuts that live inside a longer clip (the great-sword combo holds three slashes). */
@@ -1138,6 +1142,16 @@ export class Character {
     this.blinkT = -1;
     this.blinkTwice = false;
     this.squint = 0;
+  }
+
+/** Play a gesture clip (make-anims.py) for dur seconds (by default its own length); a repeat starts it again. */
+  gesture(name, dur) {
+    const clip = this.clips[name];
+    if (!clip) return;
+    this.gest = name;
+    this.gestT = dur ?? clip.duration;
+    // already playing (two pickups in a row): start it again (clearing this.over would leave the old one running)
+    if (this.over === name) this.action(name).reset().play();
   }
 
   action(name) {
@@ -1418,7 +1432,7 @@ export class Character {
         over = 'jump_down';
         overSpeed = 1.25;
       }
-      else if (speed < 0.6 && p.using) over = 'drink';
+      else if (speed < 0.6 && p.using) over = this.clips[HEAL[p.using]] ? HEAL[p.using] : 'drink';
       else if (speed < 0.6 && p.reloading) {
         over = 'reload';
         overSpeed = 1.4;
@@ -1428,6 +1442,15 @@ export class Character {
     if (!ghost && p.tumble && this.clips.fall_flail) {
       over = 'fall_flail';
       overSpeed = 1.3;
+    }
+    // a one-off gesture (pouring salt, the relic held up, a pickup, a chest heaved open, a ghost's cast, the winner's
+    // arms up): only standing or walking slowly, and never over a dodge, a stagger, a slide or a fall
+    if (this.gestT > 0) {
+      this.gestT -= dt;
+      const g = this.gest;
+      const spirit = g.startsWith('ghost_');
+      const ok = ghost ? spirit && !p.possess : !spirit && p.onGround && !p.stagger && !p.dodge && !p.slide && !p.tumble && (speed < 2.5 || g === 'victory');
+      if (ok && this.clips[g]) over = g;
     }
     if (over !== this.over) {
       if (this.over) this.fadingOver = this.over;
@@ -1441,6 +1464,10 @@ export class Character {
           a.setLoop(THREE.LoopOnce, 1);
           a.clampWhenFinished = true;
           a.time = CUTS.jump_down ? CUTS.jump_down[0] : 0;
+        }
+        if (ONCE.has(over)) {
+          a.setLoop(THREE.LoopOnce, 1);
+          a.clampWhenFinished = true;
         }
         if (over === 'slide') {
           a.setLoop(THREE.LoopOnce, 1);

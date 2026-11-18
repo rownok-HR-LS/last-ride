@@ -1137,9 +1137,11 @@ export class Client {
           break;
         case 'salt':
           audio.play('salt', [e.x, e.y, e.z]);
+          this.chars.get(e.id)?.char.gesture('salt_pour');
           break;
         case 'relic':
           audio.play('relic', pos);
+          this.chars.get(e.id)?.char.gesture('relic_raise');
           if (pl) this.fx.sparkle(pl.x, pl.y + 1.5, pl.z, '#ffd76a', 30);
           if (e.id === me) this.hud.banner('BLESSED RELIC', 'Ghost attacks can\'t hurt you, and ghosts that come close burn', 2.5, 'alive');
           break;
@@ -1272,9 +1274,11 @@ export class Client {
           break;
         case 'chest':
           this.fx.sparkle(e.x, e.y + 0.5, e.z);
+          this.chars.get(e.id)?.char.gesture('open_chest');
           audio.play('chest', [e.x, e.y, e.z]);
           break;
         case 'pickup':
+          this.chars.get(e.id)?.char.gesture('pickup');
           if (e.id === me) {
             audio.play('pickup');
             this.hud.toast(e.label);
@@ -1292,6 +1296,7 @@ export class Client {
           break;
         case 'fling':
           audio.play('fling', e.from);
+          this.chars.get(e.id)?.char.gesture('ghost_cast');
           break;
         case 'boom': {
           this.fx.explosion(e.x, e.y, e.z, e.r, e.kind);
@@ -1305,9 +1310,11 @@ export class Client {
           if (e.id === me) this.hud.banner('BEAR TRAP!', 'Stuck for a moment', 1.5, 'danger');
           break;
         case 'trapSet':
+          this.chars.get(e.id)?.char.gesture('ghost_cast');
           if (this.snap?.me?.state === 'ghost') audio.play('trapSet', [e.x, e.y, e.z]);
           break;
         case 'scare':
+          this.chars.get(e.by)?.char.gesture('ghost_cast');
           if (e.id === me) {
             this.hud.scare();
             audio.play('scream');
@@ -1316,9 +1323,11 @@ export class Client {
           break;
         case 'steps':
           audio.play('steps', [e.x, e.y, e.z]);
+          this.chars.get(e.id)?.char.gesture('ghost_cast');
           break;
         case 'blackout':
           audio.play('blackout', [e.x, 2, e.z]);
+          this.chars.get(e.id)?.char.gesture('ghost_cast');
           break;
         case 'storm':
           audio.play('storm');
@@ -1371,6 +1380,8 @@ export class Client {
           break;
         }
         case 'end':
+          // the one who rode it out throws their arms up for the end screen
+          if (e.winner != null) this.chars.get(e.winner)?.char.gesture('victory', 60);
           audio.setMusicIntensity(0);
           if (e.winner === me) audio.play('win');
           this.hud.banner(e.winner === me ? 'YOU SURVIVED' : 'RIDE OVER', `${this.name(e.winner)} survived the Last Ride`, 4);
