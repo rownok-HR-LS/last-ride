@@ -82,6 +82,10 @@ export const ENV = {
   inside_tunnel: ['blender/inside_tunnel.glb', 1600, 2048],
   inside_funhouse: ['blender/inside_funhouse.glb', 1000, 2048],
   inside_arcade: ['blender/inside_arcade.glb', 2600, 2048],
+  // the rides' dressing (scripts/blender/rides-dress.py, our own art)
+  dress_station: ['blender/dress_station.glb', 600, 1024],
+  dress_arena: ['blender/dress_arena.glb', 2400, 2048],
+  dress_freefall: ['blender/dress_freefall.glb', 900, 1024],
 };
 
 /**

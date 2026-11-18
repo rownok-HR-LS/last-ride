@@ -5,6 +5,7 @@
 import { rng } from './rng.js';
 import { MAP_HALF } from './constants.js';
 import { THEMED } from './themed-layout.js';
+import { RIDES_DRESS } from './rides-layout.js';
 
 export const PARK_EDGE = MAP_HALF - 4; // the iron fence
 
@@ -807,6 +808,12 @@ function themed() {
     if (!b) continue;
     DECOR.push({ model: t.model, x: b.cx + t.x, z: b.cz + t.z, y: t.y, rot: 0, w: t.w, d: t.d, h: t.h });
     for (const [x, z, w, d, h, rot] of t.solids) addBox(b.cx + x, b.cz + z, w, d, 0, h, rot);
+  }
+  // the rides' dressing (scripts/blender/rides-dress.py, shared/rides-layout.js; already in park coordinates): the
+  // coaster station's height clown and rails, the bumper cars' painted floor and grid, the Free Fall's control desk
+  for (const t of RIDES_DRESS) {
+    DECOR.push({ model: t.model, x: t.x, z: t.z, y: t.y, rot: 0, w: t.w, d: t.d, h: t.h });
+    for (const [x, z, w, d, h, rot] of t.solids) addBox(x, z, w, d, 0, h, rot);
   }
 }
 

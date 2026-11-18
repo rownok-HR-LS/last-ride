@@ -434,3 +434,10 @@ sounds; lightning that lights the park, rides that light up, lived-in details (B
   letters: false, the tubes are added in front, coloured per sign (emissive), and the FLICKER entry dims them too;
   if a model is missing the words are painted on as before. Rebuild: blender ... neon.py -- assets-src/blender/neon
   C:/Windows/Fonts/ARLRDBD.TTF slug=TEXT ...; node scripts/pack-neon.mjs.
+- Group 3, rides: scripts/blender/dresslib.py now holds the shared dressing helpers (themed.py and rides-dress.py
+  use it; themed output unchanged), scripts/paintkit.mjs the shared paint helpers. scripts/rides-textures.mjs paints
+  rides_{signs,arena_floor,hazard,panel}; scripts/blender/rides-dress.py builds dress_station (height clown, entry
+  rails, hung rules/EXIT), dress_arena (painted floor with one-way arrows, ceiling grid, rubber strip, column signs,
+  pay podium), dress_freefall (control desk, hazard-striped power cabinets, cable drum, height sign) and writes
+  shared/rides-layout.js (park coordinates + colliders); map.js themed() places them. The arena floor still looks
+  pale under the wet-ground sheen (the old floor did too). +0.65 MB.

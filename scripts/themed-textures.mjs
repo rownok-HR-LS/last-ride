@@ -4,39 +4,13 @@
 // dizzy wall panels for the funhouse, cosmic carpet and posters for the arcade). Everything is faded, chipped and
 // water-stained: the park closed in 1987.
 // Usage: node scripts/themed-textures.mjs  ->  assets-src/blender/tex/themed_*.png
-import sharp from 'sharp';
-import { mkdirSync } from 'node:fs';
-
-const OUT = 'assets-src/blender/tex';
-mkdirSync(OUT, { recursive: true });
+import { DEFS, age, svg, saver } from './paintkit.mjs';
 
 let seed = 31;
 const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
 const R = (a, b) => a + rand() * (b - a);
 
-/** Shared filters: paint grain, peeling (a mask with holes), water streaks, soft blur. */
-const DEFS = (id = 0) => `<defs>
-  <filter id="grain${id}" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="${7 + id}"/><feColorMatrix values="0 0 0 0 0.25  0 0 0 0 0.2  0 0 0 0 0.15  0 0 0 0.45 0"/></filter>
-  <filter id="peel${id}" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.012" numOctaves="4" seed="${3 + id}"/><feComponentTransfer><feFuncA type="discrete" tableValues="0 0 0 0 0 0 0 0 0 1"/></feComponentTransfer><feColorMatrix values="0 0 0 0 0.36  0 0 0 0 0.33  0 0 0 0 0.29  0 0 0 0.75 0"/></filter>
-  <filter id="streak${id}" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.06 0.003" numOctaves="3" seed="${11 + id}"/><feColorMatrix values="0 0 0 0 0.1  0 0 0 0 0.08  0 0 0 0 0.05  0 0 0 0.38 -0.1"/></filter>
-  <filter id="soft${id}"><feGaussianBlur stdDeviation="3"/></filter>
-  <filter id="glow${id}" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="10" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-  <radialGradient id="vig${id}"><stop offset="0.5" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.6"/></radialGradient>
-</defs>`;
-
-/** Age over a w x h painted area: grain, streaks, peeled patches showing primer, a dark vignette. */
-const age = (w, h, id = 0, peel = true) => `
-  <rect width="${w}" height="${h}" filter="url(#grain${id})"/>
-  <rect width="${w}" height="${h}" filter="url(#streak${id})"/>
-  ${peel ? `<rect width="${w}" height="${h}" filter="url(#peel${id})"/>` : ''}
-  <rect width="${w}" height="${h}" fill="url(#vig${id})"/>`;
-
-const svg = (w, h, body) => `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">${body}</svg>`;
-const save = async (name, w, h, body, alpha = false) => {
-  const img = sharp(Buffer.from(svg(w, h, body)));
-  await (alpha ? img.png() : img.flatten({ background: '#000' }).png()).toFile(`${OUT}/themed_${name}.png`);
-  console.log(`themed_${name}.png ${w}x${h}`);
-};
+const save = saver('themed_');
 
 /** A crooked tombstone outline at x (bottom y), w wide, h tall. */
 function tomb(x, y, w, h, fill, tilt = 0) {
