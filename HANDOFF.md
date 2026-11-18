@@ -427,3 +427,10 @@ sounds; lightning that lights the park, rides that light up, lived-in details (B
   (and inside_). ktx-compress now takes a freshly converted model (WebP textures) as its new original; before, it
   silently re-compressed the first version it had kept.
 - Colliders changed (dice, tombstones): going live needs deploy-pages AND Render.
+- Group 2, neon: scripts/blender/neon.py turns each sign's text (Arial Rounded MT Bold: its letters are single
+  outlines; Segoe Script's overlapping strokes showed as stray lines, and an inward offset shot spikes) into glass
+  tube along the letter outlines, with standoffs, for a 1 x 0.25 board; scripts/pack-neon.mjs ->
+  public/models/neon/neon_<slug>.glb (13 texts, ~43k tris, ~360 KB). world.js neonSign: the board is signTex with
+  letters: false, the tubes are added in front, coloured per sign (emissive), and the FLICKER entry dims them too;
+  if a model is missing the words are painted on as before. Rebuild: blender ... neon.py -- assets-src/blender/neon
+  C:/Windows/Fonts/ARLRDBD.TTF slug=TEXT ...; node scripts/pack-neon.mjs.

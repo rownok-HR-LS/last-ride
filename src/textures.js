@@ -224,8 +224,8 @@ export function ringTex() {
  * Old carnival sign: rusted board, chipped painted letters, a frame of mostly dead bulbs.
  * Returns { texture, glow } where glow is an emissive mask for the few bulbs still working.
  */
-export function signTex(text, { color = '#c8392b', font = 'Rye, Georgia, serif' } = {}) {
-  return cached(`sign:${text}:${color}`, () => {
+export function signTex(text, { color = '#c8392b', font = 'Rye, Georgia, serif', letters = true } = {}) {
+  return cached(`sign:${text}:${color}:${letters}`, () => {
     const r = rng(text.length * 97 + text.charCodeAt(0));
     const c = canvas(1024, 256);
     const ctx = c.getContext('2d');
@@ -251,7 +251,14 @@ export function signTex(text, { color = '#c8392b', font = 'Rye, Georgia, serif' 
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = color;
-    ctx.fillText(text, 512, 136);
+    // (a neon sign's words are its tubes, src/world.js neonSign; only a sign without them has them painted on)
+    if (letters) ctx.fillText(text, 512, 136);
+    // where the tubes are, their colour has stained the board a little
+    else {
+      ctx.globalAlpha = 0.12;
+      ctx.fillRect(60, 70, 904, 130);
+      ctx.globalAlpha = 1;
+    }
     // chipped paint and rust runs over the letters
     for (let i = 0; i < 700; i++) {
       ctx.fillStyle = r() < 0.7 ? 'rgba(20,14,10,0.85)' : 'rgba(110,60,30,0.6)';

@@ -1,6 +1,8 @@
 // Builds the static park: sky, ground, lighting and every prop from shared/map.js.
 // Static geometry is merged per material to keep draw calls low.
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { softShaft, nightAir } from './shafts.js';
 import { wetten, groundAO } from './wet.js';
 import { addLampLight, loadLampLight, lampGlow } from './lamplight.js';
@@ -247,16 +249,49 @@ function roadEdgeTex() {
 
 // ------------------------------------------------------------------ signs
 
+/**
+ * The glass tubes of each sign's words (scripts/blender/neon.py, packed by scripts/pack-neon.mjs), built for a board
+ * 1 m wide; text -> a promise of the model (null if it is missing: the words are painted on instead).
+ */
+const neonLoader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+const TUBES = new Map();
+const TUBE_ON = 3.2;
+function neonTubes(text) {
+  if (!TUBES.has(text)) {
+    const slug = text.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+    TUBES.set(text, neonLoader.loadAsync(`./models/neon/neon_${slug}.glb`).then((g) => g.scene, () => null));
+  }
+  return TUBES.get(text);
+}
+
 export function neonSign(text, color, w, flicker = null) {
-  const { texture, glow: lit } = signTex(text, { color });
+  const { texture, glow: lit } = signTex(text, { color, letters: false });
   const m = new THREE.MeshStandardMaterial({ map: texture, emissiveMap: lit, emissive: '#ffffff', emissiveIntensity: 1.4, roughness: 0.8, side: THREE.DoubleSide });
   const sign = new THREE.Mesh(new THREE.PlaneGeometry(w, w / 4), m);
   // the light bake (src/tools/export-glows.js) finds the signs by this
   sign.userData.neon = color;
+  // the words in glass tube, in the sign's colour (the glass a little tinted even when a tube is out)
+  const glass = new THREE.Color(color).multiplyScalar(0.35);
+  const tm = new THREE.MeshStandardMaterial({ color: glass, emissive: color, emissiveIntensity: TUBE_ON, roughness: 0.25, metalness: 0 });
+  neonTubes(text).then((src) => {
+    if (!src) {
+      m.map = signTex(text, { color }).texture;
+      m.needsUpdate = true;
+      return;
+    }
+    const g = src.clone(true);
+    g.traverse((o) => {
+      if (!o.isMesh) return;
+      if (o.material?.name === 'neon_tube') o.material = tm;
+      o.castShadow = false;
+    });
+    g.scale.setScalar(w);
+    sign.add(g);
+  });
   // forty years on, most of them sputter: now and then (a tired tube), or all the time (a dying one)
   const h = Math.abs(Math.sin(text.length * 12.9898 + w * 78.233) * 43758.5453) % 1;
   const kind = flicker ?? (h < 0.45 ? 'tired' : h < 0.6 ? 'dying' : null);
-  if (kind) FLICKER.push({ m, kind, seed: h * 100 });
+  if (kind) FLICKER.push({ m, tm, kind, seed: h * 100 });
   return sign;
 }
 
@@ -273,6 +308,7 @@ export function updateNeon(t) {
     let k = 1;
     if (burst > (f.kind === 'dying' ? -0.2 : 0.55)) k = stut > 0.1 ? 1 : stut > -0.4 ? 0.35 : 0.05;
     f.m.emissiveIntensity = 1.4 * k;
+    f.tm.emissiveIntensity = TUBE_ON * k;
   }
 }
 
