@@ -3,11 +3,12 @@
 #
 #   blender --background --factory-startup --python scripts/blender/build-weapons.py -- out.glb
 #
-# One GLB, one node per model: w_<weapon>, p_<projectile>, i_<occult item>, l_<loot>. Each sits exactly where the old
+# One GLB, one node per model: w_<weapon>, p_<projectile>, i_<occult item>, l_<loot>, h_<ghost hazard>. Each sits exactly where the old
 # code-built model sat (src/weapons.js GRIP: 'hand' = gripped at the origin, handle up +y; 'aim' = pointing along -z
 # from the grip; 'bow' = grip at the origin, limbs up and down, string toward +z). Materials are named for the game to
 # fill in (src/weapons.js): wood, wooddark, steel, chrome, rust, black, rubber, tape, cardboard, gold, string, rarity
-# (the weapon's rarity colour), band / soda / cross / chestwood (set per loot), or a '#rrggbb' paint.
+# (the weapon's rarity colour), band / soda / cross / chestwood (set per loot), holyglass / holywater / flaretip, or a
+# '#rrggbb' paint.
 import math
 import os
 import sys
@@ -440,6 +441,76 @@ def relic():
     return K
 
 
+def projectile_holy():
+    """A glass flask of holy water, centred, neck up: a corked bottle with a paper label and a red cross."""
+    K = Kit()
+    # the bottle's profile, bottom to lip: (radius, height)
+    prof = [(0.02, -0.078), (0.05, -0.074), (0.064, -0.05), (0.067, -0.02), (0.063, 0.015), (0.048, 0.042),
+            (0.024, 0.06), (0.019, 0.075), (0.019, 0.088), (0.023, 0.092)]
+    for (r0, y0), (r1, y1) in zip(prof, prof[1:]):
+        K.cyl('holyglass', (0, (y0 + y1) / 2, 0), r0, y1 - y0, segs=20, r2=r1)
+    # the water inside, a little smaller, filling it two thirds of the way
+    for (r0, y0), (r1, y1) in zip(prof[:5], prof[1:5]):
+        K.cyl('holywater', (0, (y0 + y1) / 2, 0), r0 * 0.9, y1 - y0, segs=16, r2=r1 * 0.9)
+    K.cyl('wood', (0, 0.1, 0), 0.017, 0.03, segs=10, r2=0.019)
+    obox(K, '#e8e0c8', (0, -0.018, 0.066), X, Y, Z, (0.06, 0.05, 0.002), bevel=0)
+    K.box('#a82020', (0, -0.018, 0.068), (0.008, 0.036, 0.002), bevel=0)
+    K.box('#a82020', (0, -0.01, 0.068), (0.026, 0.008, 0.002), bevel=0)
+    return K
+
+
+def projectile_flare():
+    """A road flare, pointing along -z: red paper tube, printed band, striker cap, the burning end."""
+    K = Kit()
+    K.cyl('#c4221a', (0, 0, 0.01), 0.018, 0.2, axis='z', segs=14)
+    K.cyl('#f2c53a', (0, 0, 0.03), 0.0185, 0.04, axis='z', segs=14)
+    K.cyl('black', (0, 0, 0.115), 0.02, 0.025, axis='z', segs=14)
+    K.cyl('#3a2a20', (0, 0, -0.095), 0.019, 0.012, axis='z', segs=14, r2=0.012)
+    K.ball('flaretip', (0, 0, -0.11), 0.016, segs=10)
+    return K
+
+
+def tickets():
+    """A roll of carnival tickets lying on its side, a strip of them run out across the floor."""
+    K = Kit()
+    K.cyl('#f08a2a', (0, 0.05, 0), 0.05, 0.058, axis='x', segs=20)
+    K.cyl('#d8c8a8', (0, 0.05, 0), 0.018, 0.06, axis='x', segs=12)
+    K.cyl('#c86a1a', (0, 0.05, 0), 0.0505, 0.004, axis='x', segs=20)
+    z = 0.06
+    for k in range(5):
+        a = 0.12 * math.sin(k * 1.3)
+        K.box('#f08a2a' if k % 2 == 0 else '#e87a20', (math.sin(a) * 0.02 * k, 0.002 + 0.0005 * k, z), (0.056, 0.003, 0.05), rot=(0, a, 0), bevel=0)
+        K.box('black', (math.sin(a) * 0.02 * k, 0.0035 + 0.0005 * k, z + 0.025), (0.056, 0.001, 0.002), rot=(0, a, 0), bevel=0)
+        z += 0.052
+    return K
+
+
+def bear_trap():
+    """A bear trap set open on the ground, centred: base bar, the trigger pan, two jaws laid flat with their teeth up,
+    a leaf spring at each end and a length of chain to a stake."""
+    K = Kit()
+    K.box('rust', (0, 0.015, 0), (0.08, 0.03, 0.96), bevel=0.006)
+    K.cyl('steel', (0, 0.04, 0), 0.1, 0.014, segs=18)
+    K.cyl('rust', (0, 0.03, 0), 0.03, 0.03, segs=10)
+    for side in (-1, 1):
+        pts = [(side * 0.38 * math.sin(a), 0.04, 0.38 * math.cos(a)) for a in [k * math.pi / 16 for k in range(17)]]
+        tube(K, 'steel', pts, 0.016, segs=8)
+        for k in range(1, 16, 2):
+            a = k * math.pi / 16
+            x, z = side * 0.38 * math.sin(a), 0.38 * math.cos(a)
+            K.cyl('steel', (x * 0.97, 0.085, z * 0.97), 0.018, 0.08, segs=4, r2=0.001)
+    for end in (-1, 1):
+        # a flat spring bowed up over the end of the bar
+        pts = [(0, 0.03, end * 0.42), (0, 0.09, end * 0.5), (0, 0.06, end * 0.58), (0, 0.03, end * 0.6)]
+        tube(K, 'rust', pts, 0.012, segs=6)
+        K.box('rust', (0, 0.03, end * 0.42), (0.11, 0.025, 0.03), bevel=0.004)
+    # the chain: links alternating flat and upright, off one end to a stake
+    for k in range(6):
+        ring(K, 'rust', (0.0, 0.02, -0.62 - k * 0.045), 0.022, 0.008, axis='x' if k % 2 else 'y', segs=10)
+    K.cyl('rust', (0.0, 0.05, -0.9), 0.012, 0.1, segs=8)
+    return K
+
+
 # ------------------------------------------------------------------ loot (centred on the origin)
 
 def ammo():
@@ -511,8 +582,8 @@ MODELS = {
     'w_machete': machete, 'w_axe': axe, 'w_chainsaw': chainsaw, 'w_darts': darts, 'w_bow': bow,
     'w_crossbow': crossbow, 'w_harpoon': harpoon, 'w_fireworks': fireworks,
     'p_bow': projectile_bow, 'p_crossbow': projectile_crossbow, 'p_darts': projectile_darts,
-    'p_harpoon': projectile_harpoon, 'p_fireworks': projectile_fireworks,
-    'i_salt': salt, 'i_relic': relic,
+    'p_harpoon': projectile_harpoon, 'p_fireworks': projectile_fireworks, 'p_holy': projectile_holy, 'p_flare': projectile_flare,
+    'i_salt': salt, 'i_relic': relic, 'i_tickets': tickets, 'h_trap': bear_trap,
     'l_ammo': ammo, 'l_bandage': bandage, 'l_medkit': medkit, 'l_soda': soda, 'l_chest': chest,
 }
 

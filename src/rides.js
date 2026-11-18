@@ -8,6 +8,7 @@ import { ringTex } from './textures.js';
 import { loadModel, mergeStatic } from './models.js';
 import { kitPart } from './kit.js';
 import { windAmp } from './motion.js';
+import { blenderModel } from './weapons.js';
 
 /** Copy a geometry with plain float attributes (compressed int16 ones clamp when transformed). */
 function floatGeo(src) {
@@ -696,7 +697,8 @@ uniform float chaseT;`)
       seen.add(t.id);
       let mesh = this.trapMeshes.get(t.id);
       if (!mesh) {
-        mesh = this.trapGeo.clone();
+        // the Blender trap (build-weapons.py h_trap) once the weapons model has loaded, else the simple one
+        mesh = blenderModel('h_trap') || this.trapGeo.clone();
         this.scene.add(mesh);
         this.trapMeshes.set(t.id, mesh);
       }

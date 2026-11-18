@@ -72,6 +72,11 @@ export async function buildKit(Builder, hasMaterial) {
   if (kiosks.length) jobs.push(load('kiosk').then((g) => kiosks.forEach((p) => place(g, { x: p.x, z: p.z, rot: p.rot || 0 }))));
   const towers = PROPS.filter((p) => p.type === 'watertower');
   if (towers.length) jobs.push(load('watertower').then((g) => towers.forEach((p) => place(g, { x: p.x, z: p.z, rot: 0 }))));
+  // the picnic tables by the big top, and the brick posts either side of the gate
+  const tables = PROPS.filter((p) => p.type === 'table');
+  if (tables.length) jobs.push(load('table').then((g) => tables.forEach((p) => place(g, { x: p.x, z: p.z, rot: p.rot || 0 }))));
+  const posts = PROPS.filter((p) => p.gatepost);
+  if (posts.length) jobs.push(load('gatepost').then((g) => posts.forEach((p) => place(g, { x: p.x, z: p.z, rot: 0 }))));
   // the rides' fixed parts (scripts/blender/build-rides.py): the Free Fall tower, the coaster's track and supports
   // (already in park coordinates), its station, the Ferris wheel's control booth, the bumper-car pavilion
   for (const type of ['freefall', 'station', 'control', 'arena']) {
@@ -116,7 +121,7 @@ export async function kitPart(Builder, name) {
 
 /** Is this map prop one the kit draws (the walk-in buildings' walls and roofs, the booths, trailers, the gate)? */
 export function kitDraws(p) {
-  if (['trailer', 'arch', 'booth', 'fence', 'cart', 'ticket', 'watertower', 'freefall', 'station', 'control', 'arena'].includes(p.type)) {
+  if (p.gatepost || ['trailer', 'arch', 'booth', 'fence', 'cart', 'ticket', 'watertower', 'freefall', 'station', 'control', 'arena', 'table'].includes(p.type)) {
     return true;
   }
   if (p.type !== 'wall' && p.type !== 'roof') return false;

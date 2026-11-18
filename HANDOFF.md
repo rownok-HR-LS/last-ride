@@ -441,3 +441,11 @@ sounds; lightning that lights the park, rides that light up, lived-in details (B
   pay podium), dress_freefall (control desk, hazard-striped power cabinets, cable drum, height sign) and writes
   shared/rides-layout.js (park coordinates + colliders); map.js themed() places them. The arena floor still looks
   pale under the wet-ground sheen (the old floor did too). +0.65 MB.
+- Group 4, small props: build-weapons.py gains p_holy (corked glass flask, label with a red cross, glowing water:
+  materials holyglass / holywater in weapons.js), p_flare (road flare, flaretip glows), i_tickets (a ticket roll
+  with a strip run out) and h_trap (bear trap: base bar, pan, jaws with teeth laid open, leaf springs, chain);
+  rides.js uses blenderModel('h_trap') when the weapons model has loaded. build-kit.py gains kit_table (planked
+  picnic table, A-frame legs, a slipped bench plank) and kit_gatepost (brick pier, stone bands, cap and ball, gate
+  pins); kit.js places them (PROPS type 'table', and walls flagged gatepost in map.js), kitDraws covers both.
+  Rebuild: blender ... build-weapons.py -- assets-src/blender/weapons/weapons.glb; blender ... build-kit.py --
+  layout.json assets-src/blender/kit table gatepost; node scripts/pack-kit.mjs.

@@ -214,6 +214,53 @@ def bulbs_along(K, outline, z, rr, red=False, step=0.55):
             K.ball(('bulbRed' if red else 'bulb') if on else 'bulbPink', (x0 + (x1 - x0) * t, y0 + (y1 - y0) * t - 0.18, z), 0.075)
 
 
+# ------------------------------------------------------------------ a picnic table (collider 2.2 x 1.0, 0.8 high)
+
+def picnic_table(seed=3):
+    rr = random.Random(seed)
+    K = Kit()
+    # the top: five weathered planks with gaps, one darker replacement
+    for k in range(5):
+        z = -0.36 + k * 0.18
+        K.box('woodDark' if k == 3 else 'wood', (rr.uniform(-0.01, 0.01), 0.76, z), (2.2, 0.05, 0.165), rot=(0, rr.uniform(-0.01, 0.01), 0), bevel=0.012)
+    # benches each side, two planks (one has come loose and slipped)
+    for side in (-1, 1):
+        for k in range(2):
+            z = side * (0.66 + k * 0.15)
+            slip = 0.06 if side > 0 and k == 1 else 0.0
+            K.box('wood', (slip, 0.45, z), (2.2, 0.045, 0.14), rot=(0, 0, 0.04 if slip else 0), bevel=0.01)
+    # A-frame legs at each end, a bench bearer across them, a brace under the top
+    for x in (-0.8, 0.8):
+        for side in (-1, 1):
+            K.box('woodDark', (x, 0.38, side * 0.3), (0.08, 0.84, 0.08), rot=(side * 0.62, 0, 0), bevel=0.008)
+        K.box('woodDark', (x, 0.405, 0), (0.08, 0.06, 1.95), bevel=0.008)
+        K.box('woodDark', (x, 0.715, 0), (0.08, 0.06, 0.8), bevel=0.008)
+        for side in (-1, 1):
+            K.ball('iron', (x + 0.045, 0.405, side * 0.32), 0.012, segs=6)
+    K.box('woodDark', (0, 0.62, 0), (1.5, 0.06, 0.08), rot=(0, 0, 0), bevel=0.008)
+    return K
+
+
+# ------------------------------------------------------------------ the gate's brick posts (collider 0.9 x 0.9, 4.2 high)
+
+def gatepost():
+    K = Kit()
+    K.box('plinth', (0, 0.18, 0), (1.0, 0.36, 1.0), bevel=0.03)
+    K.box('tunnel', (0, 0.36 + 1.72, 0), (0.84, 3.44, 0.84), bevel=0.02)
+    for y in (1.5, 2.9):
+        K.box('plinth', (0, y, 0), (0.9, 0.09, 0.9), bevel=0.015)
+    K.box('plinth', (0, 3.87, 0), (0.96, 0.1, 0.96), bevel=0.02)
+    K.box('plinth', (0, 4.0, 0), (1.04, 0.16, 1.04), bevel=0.03)
+    K.box('plinth', (0, 4.12, 0), (0.6, 0.1, 0.6), bevel=0.02)
+    K.ball('plinth', (0, 4.38, 0), 0.24, segs=14)
+    # the iron pins the gates once hung from, on both sides (whichever faces the gap)
+    for sx in (-1, 1):
+        for y in (0.8, 3.0):
+            K.box('iron', (sx * 0.46, y, 0), (0.1, 0.06, 0.06), bevel=0.005)
+            K.cyl('iron', (sx * 0.52, y + 0.06, 0), 0.025, 0.16, segs=8)
+    return K
+
+
 # ------------------------------------------------------------------ the backlot trailer (8 x 2.8, 3 m tall)
 
 def trailer():
@@ -840,6 +887,10 @@ if not ONLY or 'arch' in ONLY:
 for v in ('ringtoss', 'darts', 'milk', 'gallery', 'prize'):
     if not ONLY or f'booth_{v}' in ONLY:
         booth(v).export(f'{OUT}/kit_booth_{v}.glb')
+if not ONLY or 'table' in ONLY:
+    picnic_table().export(f'{OUT}/kit_table.glb')
+if not ONLY or 'gatepost' in ONLY:
+    gatepost().export(f'{OUT}/kit_gatepost.glb')
 if not ONLY or 'tentdress' in ONLY:
     tentdress().export(f'{OUT}/kit_tentdress.glb')
 if not ONLY or 'fence_a' in ONLY:

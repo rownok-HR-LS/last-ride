@@ -79,6 +79,10 @@ function blenderMat(key, rarity, extra) {
     case 'cardboard': return plain('#a07a50', 1, 0);
     case 'gold': return plain('#c9a14a', 0.35, 0.9, '#3a2a08');
     case 'string': return plain('#d8d0c0', 0.8, 0);
+    // holy water: clear blue glass and the faintly glowing water in it; a road flare's burning end
+    case 'holyglass': return mat('holyglass', () => new THREE.MeshStandardMaterial({ color: '#cfeaff', roughness: 0.08, metalness: 0, transparent: true, opacity: 0.35, depthWrite: false }));
+    case 'holywater': return mat('holywater', () => new THREE.MeshStandardMaterial({ color: '#9fd8ff', roughness: 0.1, emissive: '#2a6aa8', emissiveIntensity: 0.9 }));
+    case 'flaretip': return mat('flaretip', () => new THREE.MeshBasicMaterial({ color: '#ffd0b0', toneMapped: false }));
     case 'rarity': {
       const c = RARITIES[rarity ?? 0].color;
       return plain(c, 0.4, 0.3, c);

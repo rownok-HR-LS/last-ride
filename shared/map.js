@@ -288,7 +288,7 @@ function lamp(x, z) {
   }
   // brick gate posts either side of the gap
   for (const x of [-8.4, 4.4]) {
-    prop({ type: 'wall', x, z: e, w: 0.9, d: 0.9, h: 4.2, style: 'tunnel', rot: 0 });
+    prop({ type: 'wall', x, z: e, w: 0.9, d: 0.9, h: 4.2, style: 'tunnel', rot: 0, gatepost: true });
     addBox(x, e, 0.9, 0.9, 0, 4.2);
   }
 }
