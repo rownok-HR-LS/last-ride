@@ -1012,9 +1012,10 @@ const tiltAt = (keys, u) => {
 const HEAL = { bandage: 'heal_wrap', medkit: 'heal_medkit' };
 /** One-off gestures (Character.gesture) that play once and hold their last pose until they end (the rest loop). */
 const ONCE = new Set(['salt_pour', 'relic_raise', 'pickup', 'open_chest', 'ghost_cast',
-  'emote_wave', 'emote_taunt', 'emote_bow', 'ghost_wave', 'ghost_taunt', 'ghost_bow']);
+  'emote_wave', 'emote_taunt', 'emote_bow', 'ghost_wave', 'ghost_taunt', 'ghost_bow',
+  'emote_clap', 'emote_salute', 'emote_cower', 'emote_laugh', 'ghost_clap', 'ghost_salute', 'ghost_cower', 'ghost_laugh']);
 /** The emotes (the chat key held: src/client.js), living and ghost: they stop the moment their rider moves or fights. */
-const EMOTE_CLIP = /^(emote|ghost)_(wave|taunt|bow|dance)$/;
+const EMOTE_CLIP = /^(emote|ghost)_(wave|taunt|bow|dance|clap|salute|cower|laugh)$/;
 /** The big two-handed weapons fight with the great-sword set: both hands on the haft, the weight behind each swing. */
 const TWO_HANDED = new Set(['sledge', 'axe', 'lever']);
 /** Cuts that live inside a longer clip (the great-sword combo holds three slashes). */

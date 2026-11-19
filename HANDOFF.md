@@ -578,3 +578,16 @@ sounds; lightning that lights the park, rides that light up, lived-in details (B
   groan. HUD prompt/possessed text, guide marker + icon, death cause "the carousel".
 - Bots: planGhost takes it when 2+ riders are on it (or 1, 70%). 8 bot matches: 7 spins, 2 kills (Ferris 4, cars 3,
   coaster 1), match length 5.6 min. Needs Render (shared/).
+
+## Emotes earned with levels (2026-11-20)
+
+- The user picked Clap, Salute, Cower, Laugh at levels 5, 10, 15, 20, shown locked on the wheel.
+- make-anims.py: emote_clap / salute / cower / laugh and ghost_clap / salute / cower (curled up mid-air) / laugh
+  (head thrown back, arms wide); anims.glb 100 clips.
+- shared/constants.js EMOTES gets the four with `level` (numbers 4-7, new ones always go on the end: they travel over
+  the network); EMOTE_WHEEL = the wheel's slots clockwise from the top. The server accepts any number below
+  EMOTES.length; the lock is the client's (progress lives in the browser, no accounts): client.js openEmotes reads
+  the level, emote() refuses a locked one with "X unlocks at level N". The wheel has 8 slots (hud.js, style.css
+  .ew-s0..7), the mouse/stick picks by eighths, keys 1-8, the D-pad the first four. progress.js award lists emote
+  unlocks on the end screen. audio.js 'emote' n 4-7: clap, bugle, whimper, ha-ha. Bots now also laugh (brawlers,
+  opportunists) and salute (duelists) over a kill. Needs Render (shared/constants.js, bots.js).

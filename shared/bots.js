@@ -313,7 +313,9 @@ const WAVE = 0;
 const TAUNT = 1;
 const BOW = 2;
 const DANCE = 3;
-const SHOW_HOLD = [2.2, 2.2, 2.4, 3.6];
+const SALUTE = 5;
+const LAUGH = 7;
+const SHOW_HOLD = [2.2, 2.2, 2.4, 3.6, 2.4, 2.0, 2.6, 2.4];
 
 // ------------------------------------------------------------------ quick chat (shared/constants.js CHAT_LINES)
 
@@ -363,9 +365,9 @@ export function showOverKill(game, k, v) {
   if (!b || b.rand() > 0.5) return;
   const r = b.rand();
   b.show = k.state === 'ghost' ? (r < 0.6 ? TAUNT : r < 0.85 ? BOW : DANCE)
-    : b.persona === 'brawler' ? (r < 0.7 ? TAUNT : DANCE)
-    : b.persona === 'duelist' ? (r < 0.75 ? BOW : TAUNT)
-    : r < 0.5 ? DANCE : TAUNT;
+    : b.persona === 'brawler' ? (r < 0.45 ? TAUNT : r < 0.75 ? LAUGH : DANCE)
+    : b.persona === 'duelist' ? (r < 0.55 ? BOW : r < 0.8 ? SALUTE : TAUNT)
+    : r < 0.4 ? DANCE : r < 0.7 ? LAUGH : TAUNT;
   b.showAt = game.time + 0.7 + b.rand() * 0.6;
   b.showFace = { x: v.x, z: v.z };
 }

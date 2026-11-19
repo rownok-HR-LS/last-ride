@@ -2,6 +2,7 @@
 // picked, personal bests, and three daily challenges. A ride's results come in through award(); the end screen
 // shows what it earned.
 import { LOOK_KINDS, cleanLook } from '../shared/looks.js';
+import { EMOTES } from '../shared/constants.js';
 
 const KEY = 'last-ride-progress';
 export const MAX_LEVEL = 30;
@@ -131,6 +132,7 @@ export function award(p, stats) {
   // what the new levels unlocked
   const unlocks = [];
   for (const [kind, list] of Object.entries(LOOK_KINDS)) for (const x of list) if (x.level > before.level && x.level <= after.level) unlocks.push({ kind, ...x });
+  for (const e of EMOTES) if (e.level > before.level && e.level <= after.level) unlocks.push({ kind: 'emote', name: e.name, level: e.level });
   // personal bests
   const b = p.bests;
   const records = [];

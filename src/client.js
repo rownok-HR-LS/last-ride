@@ -43,8 +43,8 @@ import { loadSettings } from './settings.js';
 import { Touch, isTouch } from './touch.js';
 import { Pads } from './gamepad.js';
 import { lookItem } from '../shared/looks.js';
-import { CHAT_LINES, EMOTES, NIGHTS } from '../shared/constants.js';
-import { loadProgress, award } from './progress.js';
+import { CHAT_LINES, EMOTES, EMOTE_WHEEL, NIGHTS } from '../shared/constants.js';
+import { loadProgress, award, levelOf } from './progress.js';
 import { setBinds } from './prompts.js';
 import { updateLampLight } from './lamplight.js';
 import { fadeReload } from './fade.js';
@@ -840,7 +840,8 @@ export class Client {
           a.x *= 80 / r;
           a.y *= 80 / r;
         }
-        if (r > 16) this.emoteSel = (((Math.round(Math.atan2(a.x, -a.y) / (Math.PI / 2))) % 4) + 4) % 4;
+        // eight slices, clockwise from the top
+        if (r > 16) this.emoteSel = EMOTE_WHEEL[(((Math.round(Math.atan2(a.x, -a.y) / (Math.PI / 4))) % 8) + 8) % 8];
         inp.dx = inp.dy = 0;
       }
       if (inp.hit('Escape')) this.emoteOpen = false;
@@ -851,7 +852,7 @@ export class Client {
         }
       }
     }
-    this.hud.emoteWheel(this.emoteOpen, this.emoteSel, this.snap?.me?.state === 'ghost', (i) => (i < 0 ? (this.emoteOpen = false) : this.emote(i)));
+    this.hud.emoteWheel(this.emoteOpen, this.emoteSel, this.snap?.me?.state === 'ghost', (i) => (i < 0 ? (this.emoteOpen = false) : this.emote(i)), this.emoteLevel);
     if (this.chatOpen) {
       if (inp.hit('Escape')) this.chatOpen = false;
       for (let i = 0; i < CHAT_LINES.length; i++) {
@@ -993,6 +994,8 @@ export class Client {
 
   /** Open the emote wheel: 'hold' (the chat key held, the mouse points) or 'tap' (the phone's button; tap a slice). */
   openEmotes(how) {
+    // (the level decides which slices are earned: src/progress.js, kept in this browser)
+    this.emoteLevel = levelOf(loadProgress().xp).level;
     this.emoteOpen = how;
     this.emoteAim = { x: 0, y: 0 };
     this.emoteSel = -1;
@@ -1001,6 +1004,14 @@ export class Client {
 
   /** Play emote EMOTES[i] (everyone near sees it) and close the wheel. */
   emote(i) {
+    const m = EMOTES[i];
+    if (m?.level && m.level > (this.emoteLevel ?? 1)) {
+      audio.play('deny');
+      this.hud.toast(`${m.name} unlocks at level ${m.level}`);
+      this.emoteOpen = false;
+      this.emoteSel = -1;
+      return;
+    }
     this.game.command(this.myId, { c: 'emote', n: i });
     this.emoteOpen = false;
     this.emoteSel = -1;

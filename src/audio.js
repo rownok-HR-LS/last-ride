@@ -778,6 +778,22 @@ export function play(name, pos = null, opt = {}) {
         // ta-da
         for (const m of [72, 76, 79]) note(0, m, 0.12, { vol: 0.14 });
         for (const m of [72, 76, 79, 84]) note(0.16, m, 0.9, { vol: 0.13 });
+      } else if (opt.n === 4) {
+        // a slow, dry clap (a ghost's hollow and echoing)
+        for (let i = 0; i < 4; i++) {
+          const at = t + (0.3 + i * 0.5) * slow;
+          if (!sample(d, 'punch_light', at, { vol: 0.25, rate: ghost ? 1.4 : 2.2, vary: 0.05 })) noise(d, at, 0.05, { type: 'bandpass', freq: 1800, q: 0.8, vol: 0.6 });
+        }
+      } else if (opt.n === 5) {
+        // a bugle's call, short
+        [[0, 67, 0.12], [0.14, 72, 0.12], [0.28, 76, 0.36]].forEach(([a, m, l]) => note(a, m, l, { type: 'sawtooth', vol: 0.12 }));
+      } else if (opt.n === 6) {
+        // a quavering whimper sliding down
+        note(0, 79, 0.5, { type: 'sine', vol: 0.18, glide: -5, oct: false });
+        note(0.55, 76, 0.7, { type: 'sine', vol: 0.15, glide: -7, oct: false });
+      } else if (opt.n === 7) {
+        // ha-ha-ha-ha down the scale
+        [83, 81, 79, 76, 74].forEach((m, i) => note(i * 0.14, m, 0.1, { vol: 0.22 }));
       } else if (opt.n === 3) {
         // a calliope's oom-pah, two bars
         const tune = [76, 79, 84, 79, 81, 79, 76, 79, 77, 81, 86, 81, 79, 77, 74, 71];

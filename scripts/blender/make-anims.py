@@ -5,7 +5,7 @@
 # a ghost's casting thrust and the winner's arms-up; and the launchers' own handling: the harpoon gun braced at the
 # hip, the firework tube on the shoulder, and their reloads (cranking the crossbow, loading the harpoon from the
 # muzzle, dropping in a rocket and lighting its fuse with a match); and the emotes: a wave, a taunt, a bow and a
-# dance, each with a floating ghost version.
+# dance, each with a floating ghost version; and the emotes earned with levels: a clap, a salute, cowering, a laugh.
 #
 #   blender --background --factory-startup --python scripts/blender/make-anims.py -- <mixamo anims folder> <out folder> [clip ...]
 #
@@ -742,7 +742,151 @@ def ghost_dance():
     rig.bake('ghost_dance', dur, pose, loop=True)
 
 
+# ------------------------------------------------------------------ the emotes earned with levels (5, 10, 15, 20)
+
+def emote_clap():
+    """A slow, sarcastic clap: four claps in front of the chest, the head cocked."""
+    rig = Rig('breath_idle.fbx')
+    dur = 2.4
+
+    def pose(r, t):
+        k = smooth(t / 0.3) * smooth((dur - t) / 0.35)
+        o = 0.5 + 0.5 * math.cos(2 * math.pi * max(0.0, t - 0.3) / 0.5)
+        spine(r, -0.04 * k, 0.0, 0.0)
+        headturn(r, -0.08 * k, 0.12 * k, 0.15 * k)
+        for side, sg in (('Right', 1), ('Left', -1)):
+            rest = (0.1, 0.3 * sg, 0.85)
+            clap = (0.34, sg * (0.03 + 0.13 * o), 1.22)
+            arm_to(r, side, tuple(a + (b - a) * k for a, b in zip(rest, clap)), (-0.3, 0.8 * sg, 0.7))
+    rig.bake('emote_clap', dur, pose)
+
+
+def emote_salute():
+    """A sharp military salute: heels together, chest out, the right hand snapped to the brow and held."""
+    rig = Rig('breath_idle.fbx')
+    dur = 2.0
+
+    def pose(r, t):
+        k = smooth(t / 0.18) * smooth((dur - t) / 0.3)
+        spine(r, -0.08 * k, 0.0, 0.0)
+        headturn(r, -0.05 * k, 0.0, 0.0)
+        leg_to(r, 'Right', (0.0, 0.07, 0.08), (1.2, 0.1, 0.5))
+        leg_to(r, 'Left', (0.0, -0.07, 0.08), (1.2, -0.1, 0.5))
+        rest = (0.1, 0.3, 0.85)
+        brow = (0.13, 0.13, 1.66)
+        arm_to(r, 'Right', tuple(a + (b - a) * k for a, b in zip(rest, brow)), (0.0, 1.1, 1.45))
+        arm_to(r, 'Left', (0.02, -0.24, 0.82), (-0.3, -0.8, 0.8))
+    rig.bake('emote_salute', dur, pose)
+
+
+def emote_cower():
+    """Cowering: dropped into a crouch, bent over, both arms wrapped over the head, shaking."""
+    rig = Rig('breath_idle.fbx')
+    dur = 2.6
+
+    def pose(r, t):
+        k = smooth(t / 0.3) * smooth((dur - t) / 0.4)
+        j = (math.sin(t * 43.0) * 0.012, math.sin(t * 37.0 + 1.0) * 0.012)
+        r.move('Hips', r.up * (-0.34 * k) + r.fwd * (-0.06 * k))
+        stand(r)
+        spine(r, 0.55 * k + j[0] * 2, j[1] * 2, 0.0)
+        headturn(r, 0.5 * k, 0.0, 0.0)
+        for side, sg in (('Right', 1), ('Left', -1)):
+            rest = (0.1, 0.3 * sg, 0.85)
+            cover = (0.36 + j[0], sg * (0.08 + j[1]), 1.22 + j[1])
+            arm_to(r, side, tuple(a + (b - a) * k for a, b in zip(rest, cover)), (0.4, 0.7 * sg, 1.3))
+    rig.bake('emote_cower', dur, pose)
+
+
+def emote_laugh():
+    """Doubled over laughing: bent forward in heaves, one hand slapping the knee, the other on the belly."""
+    rig = Rig('breath_idle.fbx')
+    dur = 2.4
+
+    def pose(r, t):
+        k = smooth(t / 0.3) * smooth((dur - t) / 0.4)
+        heave = 0.5 + 0.5 * math.sin(2 * math.pi * 4.0 * t)
+        spine(r, (0.45 + 0.1 * heave) * k, 0.1 * k, 0.0)
+        headturn(r, (-0.2 + 0.1 * heave) * k, 0.0, 0.0)
+        rest_r, slap = (0.1, 0.3, 0.85), (0.36, 0.2, 0.55 + 0.08 * heave)
+        rest_l, belly = (0.1, -0.3, 0.85), (0.24, -0.06, 0.98)
+        arm_to(r, 'Right', tuple(a + (b - a) * k for a, b in zip(rest_r, slap)), (-0.3, 0.8, 0.6))
+        arm_to(r, 'Left', tuple(a + (b - a) * k for a, b in zip(rest_l, belly)), (-0.3, -0.8, 0.8))
+    rig.bake('emote_laugh', dur, pose)
+
+
+def ghost_clap():
+    """The dead clap slowly: three hollow claps with long pauses, the head lolled over."""
+    rig = Rig('breath_idle.fbx')
+    dur = 2.8
+
+    def pose(r, t):
+        k = smooth(t / 0.5) * smooth((dur - t) / 0.5)
+        o = 0.5 + 0.5 * math.cos(2 * math.pi * max(0.0, t - 0.5) / 0.75)
+        spine(r, 0.18 - 0.08 * k, 0.0, 0.08 * k)
+        headturn(r, 0.45 - 0.25 * k, 0.1 * k, 0.12 + 0.35 * k)
+        for side, sg, limp in (('Right', 1, LIMP_R), ('Left', -1, LIMP_L)):
+            clap = (0.38, sg * (0.03 + 0.16 * o), 1.25)
+            arm_to(r, side, tuple(a + (b - a) * k for a, b in zip(limp, clap)), (-0.3, 0.8 * sg, 0.8))
+        trail(r, 2 * math.pi * t / dur)
+    rig.bake('ghost_clap', dur, pose)
+
+
+def ghost_salute():
+    """The dead salute: stiff and slow, the hand at the brow, the head lolling back."""
+    rig = Rig('breath_idle.fbx')
+    dur = 2.6
+
+    def pose(r, t):
+        k = smooth(t / 0.5) * smooth((dur - t) / 0.5)
+        spine(r, 0.18 - 0.2 * k, 0.0, 0.0)
+        headturn(r, 0.45 - 0.6 * k, 0.0, 0.2 * k)
+        brow = (0.15, 0.13, 1.64)
+        arm_to(r, 'Right', tuple(a + (b - a) * k for a, b in zip(LIMP_R, brow)), (0.0, 1.1, 1.45))
+        arm_to(r, 'Left', LIMP_L, (-0.4, -0.5, 1.1))
+        trail(r, 2 * math.pi * t / dur, -0.05 * k)
+    rig.bake('ghost_salute', dur, pose)
+
+
+def ghost_cower():
+    """Curled up in mid-air: knees drawn up, arms over the head, trembling."""
+    rig = Rig('breath_idle.fbx')
+    dur = 2.8
+
+    def pose(r, t):
+        k = smooth(t / 0.4) * smooth((dur - t) / 0.5)
+        j = (math.sin(t * 43.0) * 0.015, math.sin(t * 37.0 + 1.0) * 0.015)
+        spine(r, 0.18 + 0.5 * k + j[0], j[1], 0.0)
+        headturn(r, 0.45 + 0.2 * k, 0.0, 0.0)
+        for side, sg, limp in (('Right', 1, LIMP_R), ('Left', -1, LIMP_L)):
+            cover = (0.4 + j[0], sg * (0.08 + j[1]), 1.3 + j[1])
+            arm_to(r, side, tuple(a + (b - a) * k for a, b in zip(limp, cover)), (0.4, 0.7 * sg, 1.3))
+            hang = (-0.12 if sg > 0 else -0.06, 0.1 * sg, 0.2)
+            knee = (0.28, 0.12 * sg, 0.62)
+            leg_to(r, side, tuple(a + (b - a) * k for a, b in zip(hang, knee)), (0.9, 0.12 * sg, 0.8))
+    rig.bake('ghost_cower', dur, pose)
+
+
+def ghost_laugh():
+    """A cackle: the head thrown back, arms flung wide, shaking with it, the legs swinging."""
+    rig = Rig('breath_idle.fbx')
+    dur = 2.6
+
+    def pose(r, t):
+        k = smooth(t / 0.4) * smooth((dur - t) / 0.5)
+        heave = 0.5 + 0.5 * math.sin(2 * math.pi * 5.0 * t)
+        spine(r, 0.18 - (0.35 + 0.08 * heave) * k, 0.0, 0.0)
+        headturn(r, 0.45 - (0.9 + 0.1 * heave) * k, 0.0, 0.0)
+        for side, sg, limp in (('Right', 1, LIMP_R), ('Left', -1, LIMP_L)):
+            wide = (0.05, sg * 0.62, 1.35 + 0.04 * heave)
+            arm_to(r, side, tuple(a + (b - a) * k for a, b in zip(limp, wide)), (-0.4, 0.6 * sg, 1.3))
+        trail(r, 4 * math.pi * t / dur, 0.0)
+    rig.bake('ghost_laugh', dur, pose)
+
+
 CLIPS = {
+    'emote_clap': emote_clap, 'emote_salute': emote_salute, 'emote_cower': emote_cower, 'emote_laugh': emote_laugh,
+    'ghost_clap': ghost_clap, 'ghost_salute': ghost_salute, 'ghost_cower': ghost_cower, 'ghost_laugh': ghost_laugh,
     'emote_wave': emote_wave, 'emote_taunt': emote_taunt, 'emote_bow': emote_bow, 'emote_dance': emote_dance,
     'ghost_wave': ghost_wave, 'ghost_taunt': ghost_taunt, 'ghost_bow': ghost_bow, 'ghost_dance': ghost_dance,
     'harpoon_aim': harpoon_aim, 'fireworks_aim': fireworks_aim, 'crossbow_reload': crossbow_reload,

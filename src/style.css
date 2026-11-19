@@ -1024,20 +1024,28 @@ body.pad .slot kbd, body.pad .item kbd:empty, body.pad .power kbd:empty { displa
 .tb-emote { right: 24px; bottom: 290px; width: 44px; height: 44px; font-size: 17px; }
 
 /* the emote wheel (the chat key held, or the phone's emote button): four slices round a hub */
-.emote-wheel { position: absolute; left: 50%; top: 50%; width: 300px; height: 300px; transform: translate(-50%, -50%); display: none; pointer-events: auto; z-index: 12; }
+.emote-wheel { position: absolute; left: 50%; top: 50%; width: 360px; height: 360px; transform: translate(-50%, -50%); display: none; pointer-events: auto; z-index: 12; }
 .emote-wheel.show { display: block; }
 .ew-ring { position: relative; width: 100%; height: 100%; border-radius: 50%; background: radial-gradient(circle, rgba(10,9,12,0.62) 0 30%, rgba(10,9,12,0.82) 31% 100%);
   border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(8px); box-shadow: 0 10px 40px rgba(0,0,0,0.45); }
-.ew-slice { position: absolute; width: 96px; height: 84px; margin: -42px 0 0 -48px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+.ew-slice { position: absolute; width: 84px; height: 72px; margin: -36px 0 0 -42px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
   border: 1px solid transparent; border-radius: 14px; background: none; color: #f1ece2; font: 700 14px/1 var(--hud); letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer;
   transition: background 0.12s, color 0.12s, transform 0.12s; }
-.ew-slice .ico { width: 30px; height: 30px; }
+.ew-slice .ico { width: 26px; height: 26px; }
 .ew-slice kbd { font-size: 10px; opacity: 0.7; }
 .ew-slice:hover, .ew-slice.on { background: rgba(255,225,79,0.16); border-color: rgba(255,225,79,0.5); color: #ffe14f; transform: scale(1.08); }
-.ew-0 { left: 50%; top: 18%; }
-.ew-1 { left: 82%; top: 50%; }
-.ew-2 { left: 50%; top: 82%; }
-.ew-3 { left: 18%; top: 50%; }
+/* eight slots clockwise from the top */
+.ew-s0 { left: 50.0%; top: 14.0%; }
+.ew-s1 { left: 75.5%; top: 24.5%; }
+.ew-s2 { left: 86.0%; top: 50.0%; }
+.ew-s3 { left: 75.5%; top: 75.5%; }
+.ew-s4 { left: 50.0%; top: 86.0%; }
+.ew-s5 { left: 24.5%; top: 75.5%; }
+.ew-s6 { left: 14.0%; top: 50.0%; }
+.ew-s7 { left: 24.5%; top: 24.5%; }
+.ew-slice.locked { opacity: 0.45; }
+.ew-slice.locked:hover, .ew-slice.locked.on { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.2); color: #f1ece2; transform: none; }
+.ew-slice small { font: 600 9px/1 var(--hud); letter-spacing: 0.08em; opacity: 0.8; }
 .ew-hub { position: absolute; left: 50%; top: 50%; width: 84px; height: 84px; margin: -42px 0 0 -42px; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
   color: #a9a092; text-align: center; cursor: pointer; }
 .ew-hub b { font: 700 13px/1 var(--hud); letter-spacing: 0.2em; text-transform: uppercase; color: #f1ece2; }

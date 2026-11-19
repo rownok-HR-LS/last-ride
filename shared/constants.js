@@ -76,13 +76,23 @@ export const BOT_NAMES = [
 export const CHAT_LINES = ['Over here!', 'Truce?', 'Behind you!', 'Run!', 'Thanks!', 'Ghost nearby!', 'Nice one.', 'Good game.'];
 /** Seconds between two lines from one rider. */
 export const CHAT_GAP = 2.5;
-/** The emote wheel (hold the chat key): up, right, down, left. A ghost does its own floating version of each. */
+/**
+ * The emote wheel (hold the chat key). A ghost does its own floating version of each. The first four everyone has;
+ * the rest are earned with levels (level: src/progress.js). Their numbers travel over the network, so new ones go on
+ * the end.
+ */
 export const EMOTES = [
   { id: 'wave', name: 'Wave' },
   { id: 'taunt', name: 'Taunt' },
   { id: 'bow', name: 'Bow' },
   { id: 'dance', name: 'Dance' },
+  { id: 'clap', name: 'Clap', level: 5 },
+  { id: 'salute', name: 'Salute', level: 10 },
+  { id: 'cower', name: 'Cower', level: 15 },
+  { id: 'laugh', name: 'Laugh', level: 20 },
 ];
+/** Where each emote sits on the wheel, clockwise from the top (EMOTES numbers): the first four up, right, down, left. */
+export const EMOTE_WHEEL = [0, 4, 1, 5, 2, 6, 3, 7];
 /** Seconds between two emotes from one rider. */
 export const EMOTE_GAP = 1.5;
 

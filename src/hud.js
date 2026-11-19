@@ -1,6 +1,6 @@
 // DOM heads-up display: vitals, weapons, ghost powers, minimap, landing map, kill feed, banners, end screen.
 import { kbd, usingPad } from './prompts.js';
-import { CHAT_LINES, EMOTES } from '../shared/constants.js';
+import { CHAT_LINES, EMOTES, EMOTE_WHEEL } from '../shared/constants.js';
 
 /** With a controller, items and ghost powers sit on the D-pad (and the bumpers): see gamepad.js. */
 const PAD_ITEM = { medkit: '↑', bandage: '↓', soda: '←', holy: '→' };
@@ -152,7 +152,7 @@ function xpPanel(e) {
   const from = up ? 0 : pct(e.before);
   const notes = [
     up ? `<li class="lvl">Level ${e.after.level}!</li>` : '',
-    ...e.unlocks.map((u) => `<li class="unlock">Unlocked: ${esc(u.name)} <span>${{ trail: 'swing trail', tag: 'name tag', dye: 'clothing dye' }[u.kind]}</span></li>`),
+    ...e.unlocks.map((u) => `<li class="unlock">Unlocked: ${esc(u.name)} <span>${{ trail: 'swing trail', tag: 'name tag', dye: 'clothing dye', emote: 'emote (hold T)' }[u.kind]}</span></li>`),
     ...e.finished.map((t) => `<li class="daily">Daily done: ${esc(t)}</li>`),
     ...e.records.map((t) => `<li class="record">New best · ${esc(t)}</li>`),
   ].join('');
@@ -790,7 +790,7 @@ export class Hud {
    * The emote wheel: open is false, 'hold' (the chat key held: the mouse or stick points, letting go plays it) or 'tap'
    * (a phone: tap a slice); sel is the slice pointed at; a ghost's wheel says so (it does the floating versions).
    */
-  emoteWheel(open, sel, ghost, pick) {
+  emoteWheel(open, sel, ghost, pick, level = 1) {
     let el = $('.emote-wheel', this.root);
     if (!el) {
       el = document.createElement('div');
@@ -806,17 +806,23 @@ export class Hud {
     el.classList.toggle('show', !!open);
     if (!open) return;
     const pad = usingPad();
-    const key = `${open}|${ghost}|${pad}`;
+    const key = `${open}|${ghost}|${pad}|${level}`;
     if (key !== this.emoteKey) {
       this.emoteKey = key;
       this.emoteSel = null;
       const PADKEY = ['↑', '→', '↓', '←'];
-      el.innerHTML = `<div class="ew-ring">${EMOTES.map((m, i) => `<button class="ew-slice ew-${i}" data-emote="${i}">${icon(m.id)}<span>${m.name}</span><kbd>${pad ? PADKEY[i] : i + 1}</kbd></button>`).join('')}
+      // eight slices round the hub; one not earned yet shows a padlock and the level it comes at
+      el.innerHTML = `<div class="ew-ring">${EMOTE_WHEEL.map((i, slot) => {
+        const m = EMOTES[i];
+        const locked = (m.level || 1) > level;
+        const key = pad ? PADKEY[i] || '' : i + 1;
+        return `<button class="ew-slice ew-s${slot}${locked ? ' locked' : ''}" data-emote="${i}">${icon(locked ? 'lock' : m.id)}<span>${m.name}</span>${locked ? `<small>Level ${m.level}</small>` : key ? `<kbd>${key}</kbd>` : ''}</button>`;
+      }).join('')}
         <div class="ew-hub"><b>${ghost ? 'Haunt' : 'Emote'}</b><small>${open === 'hold' ? 'point, let go' : 'tap one'}</small></div></div>`;
     }
     if (sel !== this.emoteSel) {
       this.emoteSel = sel;
-      el.querySelectorAll('.ew-slice').forEach((b, i) => b.classList.toggle('on', i === sel));
+      el.querySelectorAll('.ew-slice').forEach((b) => b.classList.toggle('on', +b.dataset.emote === sel));
     }
   }
 
