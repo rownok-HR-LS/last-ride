@@ -315,6 +315,48 @@ const BOW = 2;
 const DANCE = 3;
 const SHOW_HOLD = [2.2, 2.2, 2.4, 3.6];
 
+// ------------------------------------------------------------------ quick chat (shared/constants.js CHAT_LINES)
+
+const TRUCE = 1;
+const RUN = 3;
+const GHOST_NEAR = 5;
+const NICE = 6;
+const GG = 7;
+
+/**
+ * A bot says a quick-chat line, now and then (chance), never often (25 s a bot, 6 s between any two bots), and only
+ * where a person (not a bot) is near enough to see the bubble: the park should feel lived in, not chatty.
+ */
+function botSay(game, p, line, chance) {
+  const b = p.brain;
+  if (!b || game.time - (b.saidAt ?? -99) < 25 || game.time - (game.botSaidAt ?? -99) < 6) return;
+  if (b.rand() > chance) return;
+  let heard = false;
+  for (const q of game.players.values()) {
+    if (!q.bot && (q.state === 'alive' || q.state === 'ghost') && Math.hypot(q.x - p.x, q.z - p.z) < 40) {
+      heard = true;
+      break;
+    }
+  }
+  if (!heard) return;
+  b.saidAt = game.time;
+  game.botSaidAt = game.time;
+  game.command(p.id, { c: 'say', line });
+}
+
+/** After a kill (game.js kill): a beaten bot may say "Good game.", and a bot that saw it "Nice one." */
+export function chatAfterKill(game, k, v) {
+  if (v.brain) botSay(game, v, GG, 0.25);
+  if (!k) return;
+  for (const q of game.players.values()) {
+    if (q === k || q === v || !q.brain || q.state !== 'alive') continue;
+    if (Math.hypot(q.x - v.x, q.z - v.z) < 18) {
+      botSay(game, q, NICE, 0.15);
+      break;
+    }
+  }
+}
+
 /** After a kill (game.js kill): now and then a bow, a taunt or a little dance over the one just beaten. */
 export function showOverKill(game, k, v) {
   const b = k.brain;
@@ -448,6 +490,7 @@ function survivor(game, p, b, dt) {
     const foe = b.enemy ? game.players.get(b.enemy) : null;
     if (foe && b.retreatT <= 0 && p.hp + p.shield < P.retreat && (hasHeal(p) || foe.hp + foe.shield > p.hp + p.shield + 15)) {
       b.retreatT = 2.5 + b.rand() * 2;
+      if (!foe.bot) botSay(game, p, TRUCE, 0.35);
     }
     // they're running for it: only brawlers and vultures chase a beaten rider down; the rest let them go for a while
     if (foe && !P.vulture && b.persona !== 'brawler' && p.lastHitBy !== foe.id) {
@@ -456,6 +499,15 @@ function survivor(game, p, b, dt) {
       if (fd > 10 && away > 2.5) {
         (b.spared ||= {})[foe.id] = game.time + 15;
         b.enemy = null;
+      }
+    }
+    // a ghost drifting close: warn whoever is around
+    if (b.rand() < 0.05) {
+      for (const q of game.players.values()) {
+        if (q.state === 'ghost' && !q.possess && q.riseT <= 0 && Math.hypot(q.x - p.x, q.z - p.z) < 7) {
+          botSay(game, p, GHOST_NEAR, 0.25);
+          break;
+        }
       }
     }
     // now and then step in without waiting for an opening
@@ -487,6 +539,7 @@ function survivor(game, p, b, dt) {
       const prize = wantedPrize(p);
       if (prize && game.boothNear(p) >= 0) game.command(p.id, { c: 'buy', prize: prize.id });
       const zg = zoneGoal(game, p);
+      if (zg && game.zone.state === 'shrink') botSay(game, p, RUN, 0.03);
       if (zg) {
         if (b.goalKind !== 'zone' || Math.hypot(zg[0] - b.goal[0], zg[1] - b.goal[1]) > 10) setGoal(b, zg[0], zg[1], 'zone');
       } else if (prize && b.goalKind !== 'booth') {

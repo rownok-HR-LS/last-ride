@@ -16,7 +16,7 @@ import {
 } from './map.js';
 import { rayWorld, rayPlayer, groundAt, lineOfSight } from './collide.js';
 import { stepWalker, stepGhost, stepCar, wishDir, CAR_RADIUS, bodyContact, carContact, carsCollide } from './physics.js';
-import { createBrain, updateBot, showOverKill } from './bots.js';
+import { createBrain, updateBot, showOverKill, chatAfterKill } from './bots.js';
 
 const DEG = Math.PI / 180;
 const BOOTH_REACH = 4.4;
@@ -601,6 +601,7 @@ export class Game {
     this.events.push({ e: 'kill', killer: k ? k.id : null, victim: v.id, how, weapon, steal });
     // a bot that won it may show off over the body (shared/bots.js)
     if (k?.brain && !steal) showOverKill(this, k, v);
+    chatAfterKill(this, k, v);
     if (steal && this.finalT !== null) {
       this.finalT = FINAL_RIDE_RESET;
       this.events.push({ e: 'final', t: this.finalT, survivor: k.id });

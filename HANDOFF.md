@@ -543,3 +543,12 @@ sounds; lightning that lights the park, rides that light up, lived-in details (B
   frame (root, pivot, piece) whose pose place() writes into the instances.
 - world.js lamps.realLights(n): Low keeps 1 real lamp light instead of 3 (client.js applySettings): 7 -> 5 point lights.
 - Measured at the gate: Low ~490 draws (was ~560), High ~576.
+
+## Bots that use quick chat (2026-11-20)
+
+- shared/bots.js botSay: a bot says a CHAT_LINES line now and then, at most once per 25 s per bot and 6 s between any
+  two bots, and only when a person (not a bot) is within 40 m to see it. Lines: "Good game." when beaten (25%),
+  "Nice one." from a bot that saw a kill within 18 m (15%), "Truce?" when backing off hurt from a person (35%),
+  "Ghost nearby!" when a ghost drifts within 7 m (25%), "Run!" when caught outside the shrinking storm (3% a think).
+  game.js kill calls chatAfterKill. 4 test matches with a person wandering: ~5 lines a match, never closer than 6 s.
+  Needs Render (bots.js, game.js).
