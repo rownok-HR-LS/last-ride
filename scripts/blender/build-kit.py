@@ -241,6 +241,44 @@ def picnic_table(seed=3):
     return K
 
 
+# ------------------------------------------------------------------ the big top's light-string poles (3.2 m)
+
+def stringpole():
+    """A striped carnival pole on a base plate, a brass ball on top and a hook for the light string."""
+    K = Kit()
+    K.box('iron', (0, 0.03, 0), (0.34, 0.06, 0.34), bevel=0.01)
+    for k in range(8):
+        h = 3.2 / 8
+        K.cyl('#c42a2a' if k % 2 == 0 else '#efe6cf', (0, 0.06 + h * (k + 0.5), 0), 0.06, h, segs=10)
+    K.cyl('#c9a14a', (0, 3.29, 0), 0.075, 0.06, segs=10)
+    K.ball('#c9a14a', (0, 3.42, 0), 0.1, segs=10)
+    # the hook the string hangs from (toward the tent: -x in the pole's own frame)
+    K.box('iron', (-0.12, 3.1, 0), (0.24, 0.03, 0.03), bevel=0.005)
+    K.cyl('iron', (-0.23, 3.05, 0), 0.012, 0.1, segs=6)
+    return K
+
+
+# ------------------------------------------------------------------ an old floodlight at the foot of a themed front
+
+def floodlight():
+    """A flood lamp on a little steel stand, tipped back to throw its light up the wall behind it (toward -z)."""
+    K = Kit()
+    K.box('iron', (0, 0.05, 0), (0.46, 0.1, 0.34), bevel=0.012)
+    for sx in (-1, 1):
+        K.box('iron', (sx * 0.2, 0.22, 0), (0.04, 0.3, 0.05), bevel=0.006)
+    tilt = (math.radians(-125), 0, 0)
+    axis = (0, math.sin(math.radians(125)), math.cos(math.radians(-125)))
+    c = (0, 0.36, 0)
+    K.cyl('pipe', c, 0.16, 0.24, axis='z', segs=16, rot=tilt)
+    K.cyl('iron', (c[0] + axis[0] * 0.125, c[1] + axis[1] * 0.125, c[2] + axis[2] * 0.125), 0.175, 0.03, axis='z', segs=16, rot=tilt)
+    K.cyl('bulb', (c[0] + axis[0] * 0.13, c[1] + axis[1] * 0.13, c[2] + axis[2] * 0.13), 0.14, 0.012, axis='z', segs=16, rot=tilt)
+    for sx in (-1, 1):
+        K.cyl('iron', (sx * 0.18, 0.36, 0), 0.025, 0.05, axis='x', segs=8)
+    # the cable trailing off the back
+    K.box('dark', (0, 0.012, 0.32), (0.025, 0.025, 0.4), bevel=0.0)
+    return K
+
+
 # ------------------------------------------------------------------ the gate's brick posts (collider 0.9 x 0.9, 4.2 high)
 
 def gatepost():
@@ -889,6 +927,10 @@ for v in ('ringtoss', 'darts', 'milk', 'gallery', 'prize'):
         booth(v).export(f'{OUT}/kit_booth_{v}.glb')
 if not ONLY or 'table' in ONLY:
     picnic_table().export(f'{OUT}/kit_table.glb')
+if not ONLY or 'stringpole' in ONLY:
+    stringpole().export(f'{OUT}/kit_stringpole.glb')
+if not ONLY or 'floodlight' in ONLY:
+    floodlight().export(f'{OUT}/kit_floodlight.glb')
 if not ONLY or 'gatepost' in ONLY:
     gatepost().export(f'{OUT}/kit_gatepost.glb')
 if not ONLY or 'tentdress' in ONLY:

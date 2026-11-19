@@ -76,6 +76,15 @@ export const BOT_NAMES = [
 export const CHAT_LINES = ['Over here!', 'Truce?', 'Behind you!', 'Run!', 'Thanks!', 'Ghost nearby!', 'Nice one.', 'Good game.'];
 /** Seconds between two lines from one rider. */
 export const CHAT_GAP = 2.5;
+/** The emote wheel (hold the chat key): up, right, down, left. A ghost does its own floating version of each. */
+export const EMOTES = [
+  { id: 'wave', name: 'Wave' },
+  { id: 'taunt', name: 'Taunt' },
+  { id: 'bow', name: 'Bow' },
+  { id: 'dance', name: 'Dance' },
+];
+/** Seconds between two emotes from one rider. */
+export const EMOTE_GAP = 1.5;
 
 /**
  * Every ride is a different night. rain: how hard it rains [low, high] (it drifts between them), fog: how thick the

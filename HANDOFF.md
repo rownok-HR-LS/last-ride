@@ -479,3 +479,24 @@ sounds; lightning that lights the park, rides that light up, lived-in details (B
   weapons (OWN_RELOAD, timed to WEAPONS[w].reload), and RELOAD_TILT tips the launcher with the clip (placeWeapon
   pitch). After add-anims.mjs, run prune-anims.mjs once more: a second resample pass shrinks the file further
   (anims.glb 860 KB gzipped).
+
+## Emotes, blackout cloud, poles and floodlights (2026-11-19)
+
+- Emotes: shared/constants.js EMOTES (wave, taunt, bow, dance) and EMOTE_GAP 1.5 s; game.js command
+  { c: 'emote', n } (alive or ghost only) -> event { e: 'emote', id, n, g: ghost }. The server relays it like any
+  event, so others see it (needs Render). make-anims.py: emote_wave / emote_taunt / emote_bow / emote_dance and the
+  floating ghost versions ghost_wave / ghost_taunt / ghost_bow / ghost_dance (legs trailing); the dance loops for
+  6.4 s, the rest play once (characters.js ONCE). EMOTE_CLIP: an emote stops the moment its rider moves, attacks,
+  blocks or aims. Controls: T (the chat key) tapped opens quick chat as before; held 0.22 s it opens the emote
+  wheel (client.js openEmotes('hold'): the mouse or right stick points, up wave / right taunt / down bow / left
+  dance, letting go plays it; 1-4 or the D-pad pick too). Phones: a dance-note button above the chat button opens
+  the wheel in 'tap' mode (tap a slice; the hub closes it). hud.js emoteWheel; icons wave, taunt, bow, dance.
+- Blackout: scripts/blender/blackout-cloud.py makes a billowing half cloud with a torn skirt spreading on the ground
+  (vertex colour red = how solid), scripts/pack-blackout.mjs -> public/models/blackout_cloud.glb (26 KB). rides.js
+  draws it with a shader: billows in the vertex shader, two layers of drifting value noise for churning smoke, near
+  black with violet only in the streaks, rim and skirt fading out. Falls back to a dome until it loads.
+- build-kit.py stringpole (red/cream striped pole, brass ball, hook) replaces the big top's light-string pole
+  cylinders, and floodlight (lamp on a stand, tipped back at the wall) replaces the box-and-ball uplights in front of
+  the themed fronts (buildings.js returns their spots as signs.floods; world.js placeKitSpots clones one of each).
+- Distant riders: checked the runtime far version (meshopt, a quarter of the triangles past 24 m) zoomed right in:
+  it is nearly identical to the full rider, so no Blender LODs were made.

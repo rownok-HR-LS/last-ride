@@ -4,7 +4,8 @@
 // and A presses one. Hits rumble.
 //
 //   A jump · B slide / fly down · X pick up / open (at a booth: prize counter) · Y next weapon · LB dodge · RB reload
-//   RT attack · LT aim / block · L3 sprint · R3 quick chat (then D-pad, LB, RB, Y, X pick a line) · View map · Start pause
+//   RT attack · LT aim / block · L3 sprint · R3 quick chat (then D-pad, LB, RB, Y, X pick a line;
+//   held, the emote wheel: point with the right stick or the D-pad, let go to play) · View map · Start pause
 //   D-pad: medkit, bandage, shield soda, holy water (as a ghost: powers 1-4; LB, RB powers 5-6)
 
 import { setPad } from './prompts.js';
@@ -93,9 +94,9 @@ export class Pads {
       [key('chat'), now[B.R3]],
       [key('map'), now[B.VIEW]],
     ]);
-    // the D-pad picks items alive, powers as a ghost (and chat lines while the chat list is open)
+    // the D-pad picks items alive, powers as a ghost (and chat lines or emotes while the chat list or the emote wheel is open)
     const ghost = c.snap?.me?.state === 'ghost';
-    const pad = c.chatOpen
+    const pad = c.chatOpen || c.emoteOpen
       ? [[B.UP, 'Digit1'], [B.RIGHT, 'Digit2'], [B.DOWN, 'Digit3'], [B.LEFT, 'Digit4'], [B.LB, 'Digit5'], [B.RB, 'Digit6'], [B.Y, 'Digit7'], [B.X, 'Digit8'], [B.B, 'Escape']]
       : ghost
       ? [[B.UP, 'Digit1'], [B.RIGHT, 'Digit2'], [B.DOWN, 'Digit3'], [B.LEFT, 'Digit4'], [B.LB, 'Digit5'], [B.RB, 'Digit6']]

@@ -1,6 +1,6 @@
 // DOM heads-up display: vitals, weapons, ghost powers, minimap, landing map, kill feed, banners, end screen.
 import { kbd, usingPad } from './prompts.js';
-import { CHAT_LINES } from '../shared/constants.js';
+import { CHAT_LINES, EMOTES } from '../shared/constants.js';
 
 /** With a controller, items and ghost powers sit on the D-pad (and the bumpers): see gamepad.js. */
 const PAD_ITEM = { medkit: '↑', bandage: '↓', soda: '←', holy: '→' };
@@ -781,7 +781,41 @@ export class Hud {
     if (!open || key === this.chatKey) return;
     this.chatKey = key;
     const PADKEY = ['↑', '→', '↓', '←', 'LB', 'RB', 'Y', 'X'];
-    el.innerHTML = `<h4>Quick chat</h4>${CHAT_LINES.map((t, i) => `<button data-line="${i}"><kbd>${pad ? PADKEY[i] : i + 1}</kbd>${esc(t)}</button>`).join('')}`;
+    el.innerHTML = `<h4>Quick chat</h4>${CHAT_LINES.map((t, i) => `<button data-line="${i}"><kbd>${pad ? PADKEY[i] : i + 1}</kbd>${esc(t)}</button>`).join('')}<p class="ew-hint keys-only">Hold ${kbd('chat')} for emotes</p>`;
+  }
+
+  /**
+   * The emote wheel: open is false, 'hold' (the chat key held: the mouse or stick points, letting go plays it) or 'tap'
+   * (a phone: tap a slice); sel is the slice pointed at; a ghost's wheel says so (it does the floating versions).
+   */
+  emoteWheel(open, sel, ghost, pick) {
+    let el = $('.emote-wheel', this.root);
+    if (!el) {
+      el = document.createElement('div');
+      el.className = 'emote-wheel';
+      this.root.appendChild(el);
+      el.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-emote]');
+        if (b) this.emotePick?.(+b.dataset.emote);
+        else if (e.target.closest('.ew-hub')) this.emotePick?.(-1);
+      });
+    }
+    if (pick) this.emotePick = pick;
+    el.classList.toggle('show', !!open);
+    if (!open) return;
+    const pad = usingPad();
+    const key = `${open}|${ghost}|${pad}`;
+    if (key !== this.emoteKey) {
+      this.emoteKey = key;
+      this.emoteSel = null;
+      const PADKEY = ['↑', '→', '↓', '←'];
+      el.innerHTML = `<div class="ew-ring">${EMOTES.map((m, i) => `<button class="ew-slice ew-${i}" data-emote="${i}">${icon(m.id)}<span>${m.name}</span><kbd>${pad ? PADKEY[i] : i + 1}</kbd></button>`).join('')}
+        <div class="ew-hub"><b>${ghost ? 'Haunt' : 'Emote'}</b><small>${open === 'hold' ? 'point, let go' : 'tap one'}</small></div></div>`;
+    }
+    if (sel !== this.emoteSel) {
+      this.emoteSel = sel;
+      el.querySelectorAll('.ew-slice').forEach((b, i) => b.classList.toggle('on', i === sel));
+    }
   }
 
   /** The prize counter menu: number keys or clicks buy. */

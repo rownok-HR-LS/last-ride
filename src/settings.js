@@ -16,7 +16,7 @@ export const ACTIONS = [
   ['shoulder', 'Swap shoulder', ['KeyQ']],
   ['prizes', 'Prize counter', ['KeyB']],
   ['map', 'Map', ['KeyM']],
-  ['chat', 'Quick chat', ['KeyT']],
+  ['chat', 'Quick chat (hold: emotes)', ['KeyT']],
   ['help', 'Controls help', ['KeyH']],
   ['mute', 'Mute sound', ['KeyN']],
 ];

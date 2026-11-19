@@ -260,6 +260,7 @@ export function dressBuildings(B, scene, spots, X = B) {
   });
   const grime = [];
   const signs = {};
+  const floods = [];
   const washTex = washTexture();
   // old floodlights at the foot of the themed fronts, throwing light up the walls
   const uplight = (x, z, color, w = 4, h = 10) => {
@@ -269,8 +270,8 @@ export function dressBuildings(B, scene, spots, X = B) {
     m.position.set(x, h / 2, z);
     m.renderOrder = 2;
     scene.add(m);
-    B.box('pipe', { x: 0, z: 0, rot: 0 }, x, 0.18, z + 0.45, 0.5, 0.36, 0.35);
-    B.sphere('bulb', { x: 0, z: 0, rot: 0 }, x, 0.3, z + 0.3, 0.12, 8);
+    // the lamp itself is a Blender kit piece (kit_floodlight), placed by world.js from these
+    floods.push({ x, z: z + 0.35, rot: 0 });
   };
   for (const b of BUILDINGS) {
     const rr = rng(Math.round(b.cx * 13 + b.cz * 7));
@@ -382,5 +383,6 @@ export function dressBuildings(B, scene, spots, X = B) {
   mesh.renderOrder = 1;
   mesh.receiveShadow = true;
   scene.add(mesh);
+  signs.floods = floods;
   return signs;
 }

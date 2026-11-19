@@ -4,7 +4,8 @@
 # patching up from a medkit, pouring a salt circle, holding up a relic, picking something up, heaving a chest open,
 # a ghost's casting thrust and the winner's arms-up; and the launchers' own handling: the harpoon gun braced at the
 # hip, the firework tube on the shoulder, and their reloads (cranking the crossbow, loading the harpoon from the
-# muzzle, dropping in a rocket and lighting its fuse with a match).
+# muzzle, dropping in a rocket and lighting its fuse with a match); and the emotes: a wave, a taunt, a bow and a
+# dance, each with a floating ghost version.
 #
 #   blender --background --factory-startup --python scripts/blender/make-anims.py -- <mixamo anims folder> <out folder> [clip ...]
 #
@@ -576,7 +577,174 @@ def fireworks_reload():
     rig.bake('fireworks_reload', dur, pose)
 
 
+# ------------------------------------------------------------------ emotes (src/client.js emote wheel; src/characters.js EMOTE)
+# The living wave, taunt, bow and dance on their feet; the dead do the same floating, legs trailing, slower and wrong.
+
+def emote_wave():
+    """A big friendly wave: the right hand up beside the head, swung side to side three times."""
+    rig = Rig('breath_idle.fbx')
+    dur = 2.2
+    up = lambda t: smooth(t / 0.35) * smooth((dur - t) / 0.4)
+
+    def pose(r, t):
+        k = up(t)
+        w = math.sin(2 * math.pi * 1.6 * max(0.0, t - 0.3))
+        spine(r, -0.04 * k, 0.12 * k, -0.06 * k)
+        headturn(r, -0.05 * k, 0.1 * k, 0.12 * k)
+        rest, raised = (0.1, 0.3, 0.85), (0.12, 0.3 + 0.12 * w, 1.9 - 0.04 * abs(w))
+        # the elbow out and low, the forearm up: a hand held high, not an arm stuck out
+        arm_to(r, 'Right', tuple(a + (b - a) * k for a, b in zip(rest, raised)), (0.1, 1.2, 1.15))
+        arm_to(r, 'Left', (0.08, -0.3, 0.86), (-0.3, -0.8, 0.8))
+    rig.bake('emote_wave', dur, pose)
+
+
+def emote_taunt():
+    """Come on then: a shrug with the arms spread, chin up, then both hands beckoning in toward the chest twice."""
+    rig = Rig('breath_idle.fbx')
+    dur = 2.2
+    H = [(0.0, (0.1, 0.3, 0.85)), (0.3, (0.18, 0.56, 1.22)), (0.65, (0.2, 0.56, 1.24)), (0.85, (0.46, 0.2, 1.24)),
+         (1.05, (0.22, 0.22, 1.3)), (1.25, (0.46, 0.2, 1.24)), (1.45, (0.22, 0.22, 1.3)), (1.75, (0.3, 0.26, 1.15)), (2.2, (0.1, 0.3, 0.85))]
+    pitch = [(0.0, 0.0), (0.3, -0.16), (0.85, -0.1), (1.45, -0.12), (2.2, 0.0)]
+
+    def pose(r, t):
+        spine(r, track(pitch, t), 0.0, 0.0)
+        headturn(r, -0.25 * smooth(t / 0.3) * smooth((dur - t) / 0.4), 0.0, 0.1 * smooth(t / 0.3))
+        f, rr, u = track(H, t)
+        arm_to(r, 'Right', (f, rr, u), (-0.4, 0.8, 0.9))
+        arm_to(r, 'Left', (f, -rr, u), (-0.4, -0.8, 0.9))
+    rig.bake('emote_taunt', dur, pose)
+
+
+def emote_bow():
+    """A showman's bow: the right hand to the heart, the left arm swept out to the side, a deep bend from the waist."""
+    rig = Rig('breath_idle.fbx')
+    dur = 2.4
+    bend = [(0.0, 0.0), (0.35, 0.05), (0.85, 1.2), (1.45, 1.2), (2.0, 0.0), (2.4, 0.0)]
+    L = [(0.0, (0.1, -0.3, 0.85)), (0.4, (0.12, -0.62, 1.12)), (1.5, (0.05, -0.64, 1.0)), (2.0, (0.12, -0.5, 1.0)), (2.4, (0.1, -0.3, 0.85))]
+
+    def pose(r, t):
+        p = track(bend, t)
+        r.move('Hips', r.fwd * (-0.07 * p))
+        stand(r)
+        spine(r, p, 0.0, 0.0)
+        headturn(r, 0.25 * p, 0.0)
+        # the hand stays on the chest as it bends: a point 0.14 m ahead of and 0.3 m above the waist, turned with it
+        k = smooth(t / 0.35) * smooth((dur - t) / 0.35)
+        chest = (0.14 * math.cos(p) + 0.3 * math.sin(p) - 0.07 * p, 0.02, 1.0 + 0.3 * math.cos(p) - 0.14 * math.sin(p))
+        rest = (0.1, 0.3, 0.85)
+        arm_to(r, 'Right', tuple(a + (b - a) * k for a, b in zip(rest, chest)), (-0.3, 0.9, 0.9))
+        arm_to(r, 'Left', track(L, t), (-0.5, -0.5, 1.1))
+    rig.bake('emote_bow', dur, pose)
+
+
+def emote_dance():
+    """A carnival strut on the beat (0.8 s): hips swaying and bouncing, one arm pointing up and out then down across
+    the body while the other hand sits on the hip, then the other way round."""
+    rig = Rig('breath_idle.fbx')
+    dur = 3.2
+    R = [(0.0, (0.22, 0.5, 1.95)), (0.4, (0.22, 0.5, 1.95)), (0.8, (0.36, -0.12, 0.88)), (1.2, (0.36, -0.12, 0.88)), (1.6, (-0.02, 0.27, 1.0)),
+         (3.0, (-0.02, 0.27, 1.0)), (3.2, (0.22, 0.5, 1.95))]
+    L = [(0.0, (-0.02, -0.27, 1.0)), (1.4, (-0.02, -0.27, 1.0)), (1.6, (0.22, -0.5, 1.95)), (2.0, (0.22, -0.5, 1.95)), (2.4, (0.36, 0.12, 0.88)),
+         (2.8, (0.36, 0.12, 0.88)), (3.2, (-0.02, -0.27, 1.0))]
+    yaw = [(0.0, -0.25), (0.8, 0.2), (1.6, 0.25), (2.4, -0.2), (3.2, -0.25)]
+
+    def pose(r, t):
+        sway = math.sin(2 * math.pi * t / 1.6)
+        bounce = 0.5 + 0.5 * math.cos(2 * math.pi * t / 0.8)
+        r.move('Hips', r.right * (0.06 * sway) + r.up * (-0.05 * bounce))
+        # feet a little apart; the one the hips swing away from comes up on its toes
+        leg_to(r, 'Right', (0.0, 0.15, 0.08 + 0.05 * max(0.0, -sway)), (1.2, 0.2, 0.5))
+        leg_to(r, 'Left', (0.0, -0.15, 0.08 + 0.05 * max(0.0, sway)), (1.2, -0.2, 0.5))
+        spine(r, 0.04 * bounce, track(yaw, t), -0.12 * sway)
+        headturn(r, 0.12 * bounce - 0.1, track(yaw, t) * 0.6, 0.1 * sway)
+        arm_to(r, 'Right', track(R, t), (-0.3, 0.9, 1.1))
+        arm_to(r, 'Left', track(L, t), (-0.3, -0.9, 1.1))
+    rig.bake('emote_dance', dur, pose, loop=True)
+
+
+def trail(r, w=0.0, back=0.0):
+    """A ghost's legs hanging limp behind it as it floats (as in ghost_float)."""
+    leg_to(r, 'Right', (-0.12 - back + math.sin(w + 1) * 0.04, 0.1, 0.2), (0.8, 0.12, 0.6))
+    leg_to(r, 'Left', (-0.06 - back + math.sin(w + 2.5) * 0.04, -0.11, 0.16), (0.8, -0.12, 0.6))
+
+
+LIMP_R, LIMP_L = (0.14, 0.32, 0.74), (0.12, -0.32, 0.72)
+
+
+def ghost_wave():
+    """The dead wave back: slow, the arm raised stiffly, the hand drifting side to side, the head lolled over."""
+    rig = Rig('breath_idle.fbx')
+    dur = 2.6
+
+    def pose(r, t):
+        k = smooth(t / 0.6) * smooth((dur - t) / 0.5)
+        w = math.sin(2 * math.pi * 0.8 * max(0.0, t - 0.5))
+        spine(r, 0.18 - 0.1 * k, 0.1 * k, 0.1 * k)
+        headturn(r, 0.45 - 0.3 * k, 0.1 * k, 0.12 + 0.35 * k)
+        raised = (0.3, 0.42 + 0.12 * w, 1.62 + 0.04 * w)
+        arm_to(r, 'Right', tuple(a + (b - a) * k for a, b in zip(LIMP_R, raised)), (-0.2, 0.9, 1.0))
+        arm_to(r, 'Left', LIMP_L, (-0.4, -0.5, 1.1))
+        trail(r, 2 * math.pi * t / dur)
+    rig.bake('ghost_wave', dur, pose)
+
+
+def ghost_taunt():
+    """Come here...: leaning in, one long arm reaching out low and drawing back, twice, the head cocked."""
+    rig = Rig('breath_idle.fbx')
+    dur = 2.4
+    R = [(0.0, LIMP_R), (0.45, (0.7, 0.16, 1.18)), (0.8, (0.34, 0.2, 1.3)), (1.15, (0.7, 0.16, 1.18)), (1.5, (0.34, 0.2, 1.3)), (1.85, (0.6, 0.2, 1.1)), (2.4, LIMP_R)]
+    lean = [(0.0, 0.18), (0.45, 0.42), (1.85, 0.4), (2.4, 0.18)]
+
+    def pose(r, t):
+        k = smooth(t / 0.45) * smooth((dur - t) / 0.5)
+        spine(r, track(lean, t), -0.15 * k, 0.0)
+        headturn(r, 0.45 - 0.55 * k, 0.15 * k, 0.12 + 0.3 * k)
+        arm_to(r, 'Right', track(R, t), (-0.3, 0.8, 0.9))
+        arm_to(r, 'Left', LIMP_L, (-0.4, -0.5, 1.1))
+        trail(r, 2 * math.pi * t / dur, 0.08 * k)
+    rig.bake('ghost_taunt', dur, pose)
+
+
+def ghost_bow():
+    """A spectre's courtly bow: both arms spread wide and back like a cloak, bending low while the legs drift up behind."""
+    rig = Rig('breath_idle.fbx')
+    dur = 2.6
+    bend = [(0.0, 0.18), (0.5, 0.2), (1.0, 0.95), (1.7, 0.95), (2.3, 0.18), (2.6, 0.18)]
+    H = [(0.0, LIMP_R), (0.5, (0.05, 0.62, 1.2)), (1.7, (-0.08, 0.66, 1.0)), (2.3, (0.05, 0.55, 1.0)), (2.6, LIMP_R)]
+
+    def pose(r, t):
+        p = track(bend, t)
+        spine(r, p, 0.0, 0.0)
+        headturn(r, 0.45 + 0.1 * (p - 0.18), 0.0)
+        f, rr, u = track(H, t)
+        arm_to(r, 'Right', (f, rr, u), (-0.5, 0.6, 1.2))
+        arm_to(r, 'Left', (f, -rr, u), (-0.5, -0.6, 1.2))
+        trail(r, 2 * math.pi * t / dur, 0.22 * (p - 0.18))
+    rig.bake('ghost_bow', dur, pose)
+
+
+def ghost_dance():
+    """A marionette's waltz: hanging from strings, swaying side to side, one arm hauled up loose while the other drops,
+    then the other; the head lolling the other way and the legs swinging under it."""
+    rig = Rig('breath_idle.fbx')
+    dur = 3.2
+
+    def pose(r, t):
+        w = 2 * math.pi * t / dur
+        s = math.sin(w)
+        up_r, up_l = max(0.0, s), max(0.0, -s)
+        spine(r, 0.12, 0.15 * math.sin(w * 2), 0.25 * s)
+        headturn(r, 0.35, 0.1 * math.sin(w + 1), -0.4 * s)
+        arm_to(r, 'Right', (0.14 + 0.1 * up_r, 0.32 + 0.12 * up_r, 0.74 + 1.0 * up_r), (-0.3, 0.9, 1.2))
+        arm_to(r, 'Left', (0.12 + 0.1 * up_l, -0.32 - 0.12 * up_l, 0.72 + 1.0 * up_l), (-0.3, -0.9, 1.2))
+        leg_to(r, 'Right', (-0.1 + 0.1 * math.sin(w + 0.6), 0.1 + 0.05 * s, 0.2), (0.8, 0.12, 0.6))
+        leg_to(r, 'Left', (-0.08 + 0.1 * math.sin(w + 0.6 + math.pi), -0.11 + 0.05 * s, 0.16), (0.8, -0.12, 0.6))
+    rig.bake('ghost_dance', dur, pose, loop=True)
+
+
 CLIPS = {
+    'emote_wave': emote_wave, 'emote_taunt': emote_taunt, 'emote_bow': emote_bow, 'emote_dance': emote_dance,
+    'ghost_wave': ghost_wave, 'ghost_taunt': ghost_taunt, 'ghost_bow': ghost_bow, 'ghost_dance': ghost_dance,
     'harpoon_aim': harpoon_aim, 'fireworks_aim': fireworks_aim, 'crossbow_reload': crossbow_reload,
     'harpoon_reload': harpoon_reload, 'fireworks_reload': fireworks_reload,
     'heal_wrap': heal_wrap, 'heal_medkit': heal_medkit, 'salt_pour': salt_pour, 'relic_raise': relic_raise,

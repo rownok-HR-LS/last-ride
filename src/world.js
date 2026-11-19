@@ -16,7 +16,7 @@ import { plantTrees } from './trees.js';
 import { buildScatter } from './scatter.js';
 import { placeModels, setWorldMaterials } from './models.js';
 import { dressBuildings } from './buildings.js';
-import { buildKit, kitDraws, boothVariant, BOOTH_GAMES } from './kit.js';
+import { buildKit, kitDraws, kitPart, boothVariant, BOOTH_GAMES } from './kit.js';
 import { buildDecals } from './decals.js';
 import { whenCompiled } from './stage.js';
 import { bunting, lightStrings } from './motion.js';
@@ -400,6 +400,30 @@ function bigtop(B, p) {
   bigtopLights(B, p);
 }
 
+/**
+ * Small Blender kit pieces placed by the world's own code (scripts/blender/build-kit.py): the big top's striped
+ * light-string poles and the floodlights at the foot of the themed fronts. [name, { x, z, rot }].
+ */
+const kitSpots = [];
+/** Put a copy of each kit piece at its spots (one build per piece, shared by its copies). */
+async function placeKitSpots(scene) {
+  for (const name of new Set(kitSpots.map(([n]) => n))) {
+    let part;
+    try {
+      part = await kitPart(Builder, name);
+    } catch (e) {
+      console.warn('kit', name, e);
+      continue;
+    }
+    for (const [n, p] of kitSpots) {
+      if (n !== name) continue;
+      const g = part.clone();
+      g.position.set(p.x, 0, p.z);
+      g.rotation.y = p.rot || 0;
+      scene.add(g);
+    }
+  }
+}
 /** The big top's light strings' bulbs, collected while building (drawn by lightStrings). */
 const stringBulbs = [];
 /** Light strings from the big top down to the plaza. */
@@ -417,7 +441,7 @@ function bigtopLights(B, p) {
       // (they bob on their wires in the wind: drawn apart, src/motion.js lightStrings)
       stringBulbs.push({ key: i % 2 ? 'bulb' : 'bulbPink', x: x0 + (x1 - x0) * t, y, z: z0 + (z1 - z0) * t, t, strand: i });
     }
-    B.cyl('iron', { x: x1, z: z1 }, 0, 1.6, 0, 0.06, 0.08, 3.2, 6);
+    kitSpots.push(['stringpole', { x: x1, z: z1, rot: -a }]);
   }
 }
 
@@ -566,6 +590,7 @@ export function buildWorld(scene) {
   const X = new Builder();
   const outsideSpots = [];
   fronts = dressBuildings(B, scene, modelSpots, X);
+  for (const f of fronts.floods || []) kitSpots.push(['floodlight', f]);
   for (const p of PROPS) {
     const kit = kitDraws(p);
     if (builders[p.type]) builders[p.type](kit ? X : B, p, kit ? outsideSpots : modelSpots);
@@ -586,6 +611,7 @@ export function buildWorld(scene) {
   X.build(outside);
   scene.add(outside);
   for (const [name, list] of groupSpots(outsideSpots)) placeModels(outside, name, list).catch((e) => console.warn(name, e));
+  placeKitSpots(scene);
   // the kit swaps in once its shaders are ready (stage.js), so the buildings never blink out meanwhile
   buildKit(Builder, (key) => !!MATS[key] || key.startsWith('#')).then((kit) => whenCompiled(kit).then(() => kit)).then((kit) => {
     scene.remove(outside);

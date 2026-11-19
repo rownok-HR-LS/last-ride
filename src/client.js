@@ -43,7 +43,7 @@ import { loadSettings } from './settings.js';
 import { Touch, isTouch } from './touch.js';
 import { Pads } from './gamepad.js';
 import { lookItem } from '../shared/looks.js';
-import { CHAT_LINES, NIGHTS } from '../shared/constants.js';
+import { CHAT_LINES, EMOTES, NIGHTS } from '../shared/constants.js';
 import { loadProgress, award } from './progress.js';
 import { setBinds } from './prompts.js';
 import { updateLampLight } from './lamplight.js';
@@ -792,10 +792,50 @@ export class Client {
     if (inp.actHit('help')) this.guide.showKeys = !this.guide.showKeys;
     if (inp.actHit('map') && g.phase !== 'launch') this.hud.showMap(!this.hud.mapOpen, 'Map');
     if (inp.actHit('mute')) audio.setMuted(!audio.isMuted());
-    // quick chat: open the list, pick a line by its number
+    // quick chat and emotes share a key: a tap opens the chat list (pick a line by its number); held, it opens the
+    // emote wheel (point with the mouse or right stick, let go to play it). On a phone the emote button opens the wheel.
     const canChat = this.game?.phase !== 'end' && (this.snap?.me?.state === 'alive' || this.snap?.me?.state === 'ghost') && !this.snap?.me?.spectator;
-    if (canChat && inp.actHit('chat')) this.chatOpen = !this.chatOpen;
-    if (!canChat || this.pauseMenu.open) this.chatOpen = false;
+    if (canChat && inp.actHit('chat')) this.chatHeld = 0;
+    if (this.chatHeld != null) {
+      if (canChat && inp.act('chat')) {
+        this.chatHeld += dt;
+        if (this.chatHeld > 0.22 && this.emoteOpen !== 'hold') this.openEmotes('hold');
+      } else {
+        if (this.emoteOpen === 'hold') {
+          if (this.emoteSel >= 0) this.emote(this.emoteSel);
+          this.emoteOpen = false;
+        } else if (canChat) this.chatOpen = !this.chatOpen;
+        this.chatHeld = null;
+      }
+    }
+    if (!canChat || this.pauseMenu.open) {
+      this.chatOpen = false;
+      this.emoteOpen = false;
+      this.chatHeld = null;
+    }
+    if (this.emoteOpen) {
+      if (this.emoteOpen === 'hold') {
+        // the mouse points at a slice instead of turning the camera: up wave, right taunt, down bow, left dance
+        const a = this.emoteAim;
+        a.x += inp.dx;
+        a.y += inp.dy;
+        const r = Math.hypot(a.x, a.y);
+        if (r > 80) {
+          a.x *= 80 / r;
+          a.y *= 80 / r;
+        }
+        if (r > 16) this.emoteSel = (((Math.round(Math.atan2(a.x, -a.y) / (Math.PI / 2))) % 4) + 4) % 4;
+        inp.dx = inp.dy = 0;
+      }
+      if (inp.hit('Escape')) this.emoteOpen = false;
+      for (let i = 0; i < EMOTES.length; i++) {
+        if (inp.hit(`Digit${i + 1}`)) {
+          this.emote(i);
+          inp.pressed.delete(`Digit${i + 1}`);
+        }
+      }
+    }
+    this.hud.emoteWheel(this.emoteOpen, this.emoteSel, this.snap?.me?.state === 'ghost', (i) => (i < 0 ? (this.emoteOpen = false) : this.emote(i)));
     if (this.chatOpen) {
       if (inp.hit('Escape')) this.chatOpen = false;
       for (let i = 0; i < CHAT_LINES.length; i++) {
@@ -933,6 +973,21 @@ export class Client {
     const a = Math.atan2(Math.sin(Math.atan2(-dx, -dz) - this.camYaw), Math.cos(Math.atan2(-dx, -dz) - this.camYaw));
     const dir = d < 3 ? 'close' : Math.abs(a) < 0.6 ? 'ahead' : Math.abs(a) > 2.5 ? 'behind' : a > 0 ? 'left' : 'right';
     this.hud.caption(label, dir);
+  }
+
+  /** Open the emote wheel: 'hold' (the chat key held, the mouse points) or 'tap' (the phone's button; tap a slice). */
+  openEmotes(how) {
+    this.emoteOpen = how;
+    this.emoteAim = { x: 0, y: 0 };
+    this.emoteSel = -1;
+    this.chatOpen = false;
+  }
+
+  /** Play emote EMOTES[i] (everyone near sees it) and close the wheel. */
+  emote(i) {
+    this.game.command(this.myId, { c: 'emote', n: i });
+    this.emoteOpen = false;
+    this.emoteSel = -1;
   }
 
   /** Say a quick-chat line (CHAT_LINES[i]) and close the list. */
@@ -1168,6 +1223,12 @@ export class Client {
           this.bubbles.push({ id: e.id, el, t: 3.2 });
           const meP = this.game.players.get(me);
           if (e.id !== me && (!meP || Math.hypot(pl.x - meP.x, pl.z - meP.z) > 35)) this.hud.feed(`<b>${esc(pl.name)}</b>: ${esc(text)}`, 'say');
+          break;
+        }
+        case 'emote': {
+          // the living on their feet, a ghost floating; the dance keeps going a couple of rounds
+          const em = EMOTES[e.n];
+          if (em) this.chars.get(e.id)?.char.gesture(`${e.g ? 'ghost' : 'emote'}_${em.id}`, em.id === 'dance' ? 6.4 : undefined);
           break;
         }
         case 'hit':

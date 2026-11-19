@@ -1,6 +1,8 @@
 // Moving attractions: Ferris wheel, roller coaster, bumper cars, carousel, Free Fall, plus ghost hazards
 // (flung gondolas, bear traps, phantom footprints, blackout domes).
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { FERRIS, CAROUSEL, TRACK, TRACK_SUPPORTS, FREEFALL, trackAt } from '../shared/map.js';
 import { RIDES } from '../shared/items.js';
 import { Builder, mat } from './world.js';
@@ -582,7 +584,68 @@ uniform float chaseT;`)
     this.stepGeo = new THREE.PlaneGeometry(0.18, 0.36);
     this.stepMarks = [];
     this.domes = [];
-    this.domeMat = new THREE.MeshBasicMaterial({ color: '#05020a', transparent: true, opacity: 0.6, depthWrite: false, side: THREE.DoubleSide });
+    // the blackout: a cloud of shadow (scripts/blender/blackout-cloud.py) that churns, thick at the crown and thinning
+    // to wisps along the ground and at its rim (a plain dome until the cloud has loaded)
+    this.domeGeo = new THREE.SphereGeometry(1, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2);
+    this.domeTime = { value: 0 };
+    this.domeMat = new THREE.ShaderMaterial({
+      uniforms: { time: this.domeTime, hasSolid: { value: 0 } },
+      vertexShader: `
+        uniform float time;
+        uniform float hasSolid;
+        attribute vec3 color;
+        varying float vSolid;
+        varying vec3 vN;
+        varying vec3 vView;
+        varying vec3 vPos;
+        void main() {
+          vec3 p = position;
+          vPos = position;
+          // slow rolling billows
+          float w = sin(time * 0.9 + p.x * 4.0 + p.y * 3.0) * 0.5 + sin(time * 0.6 - p.z * 5.0 + p.y * 2.0) * 0.5;
+          p += normal * w * 0.05 * (0.4 + p.y);
+          vSolid = hasSolid > 0.5 ? color.r : 0.7;
+          vec4 mv = modelViewMatrix * vec4(p, 1.0);
+          vN = normalize(normalMatrix * normal);
+          vView = normalize(-mv.xyz);
+          gl_Position = projectionMatrix * mv;
+        }`,
+      fragmentShader: `
+        uniform float time;
+        varying float vSolid;
+        varying vec3 vN;
+        varying vec3 vView;
+        varying vec3 vPos;
+        float h3(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
+        float vn(vec3 p) {
+          vec3 i = floor(p), f = fract(p);
+          f = f * f * (3.0 - 2.0 * f);
+          return mix(mix(mix(h3(i), h3(i + vec3(1, 0, 0)), f.x), mix(h3(i + vec3(0, 1, 0)), h3(i + vec3(1, 1, 0)), f.x), f.y),
+                     mix(mix(h3(i + vec3(0, 0, 1)), h3(i + vec3(1, 0, 1)), f.x), mix(h3(i + vec3(0, 1, 1)), h3(i + vec3(1, 1, 1)), f.x), f.y), f.z);
+        }
+        void main() {
+          float facing = abs(dot(normalize(vN), vView));
+          // smoke churning across it: two layers of noise drifting up and round
+          vec3 q = vPos * 3.2 + vec3(0.0, -time * 0.35, time * 0.12);
+          float n = vn(q) * 0.6 + vn(q * 2.3 + vec3(time * 0.2, 0.0, 0.0)) * 0.4;
+          // the rim fades out: a soft-edged cloud, not a shell
+          float a = vSolid * smoothstep(0.0, 0.6, facing) * (0.55 + 0.6 * n);
+          // near black, a bruise of violet only in the thin churning streaks
+          vec3 c = mix(vec3(0.004, 0.002, 0.008), vec3(0.03, 0.008, 0.045), smoothstep(0.45, 0.85, n));
+          gl_FragColor = vec4(c, clamp(a, 0.0, 0.92));
+        }`,
+      transparent: true,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync('./models/blackout_cloud.glb').then((g) => {
+      g.scene.traverse((o) => {
+        if (!o.isMesh) return;
+        this.domeGeo = o.geometry;
+        this.domeMat.uniforms.hasSolid.value = o.geometry.attributes.color ? 1 : 0;
+        for (const d of this.domes) d.geometry = this.domeGeo;
+      });
+    }, () => {});
   }
 
   /**
@@ -740,10 +803,11 @@ uniform float chaseT;`)
 
     // blackout domes and dead lamps
     while (this.domes.length < snap.blackouts.length) {
-      const d = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), this.domeMat);
+      const d = new THREE.Mesh(this.domeGeo, this.domeMat);
       this.scene.add(d);
       this.domes.push(d);
     }
+    this.domeTime.value = time;
     this.domes.forEach((d, i) => {
       const b = snap.blackouts[i];
       d.visible = !!b;

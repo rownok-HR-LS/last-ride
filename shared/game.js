@@ -4,7 +4,7 @@ import { cleanLook, botLook } from './looks.js';
 import {
   MAX_PLAYERS, PLAYER_RADIUS, EYE_HEIGHT, RUN_SPEED, AIM_SPEED, SPRINT_SPEED, COMBAT_SPEED, MAX_HP, MAX_SHIELD, MAX_REVIVES, REVIVE_HP, REVIVE_PROTECT, GHOST_RISE,
   GHOST_SPEED, GHOST_FAST, ECTO_MAX, ECTO_REGEN, ECTO_START, GHOST_FLASH, LAUNCH_SECONDS,
-  FINAL_RIDE_SECONDS, FINAL_RIDE_RESET, END_SCREEN_SECONDS, BUS_SPEED, OUTFITS, BOT_NAMES, CHAT_LINES, CHAT_GAP, NIGHTS } from './constants.js';
+  FINAL_RIDE_SECONDS, FINAL_RIDE_RESET, END_SCREEN_SECONDS, BUS_SPEED, OUTFITS, BOT_NAMES, CHAT_LINES, CHAT_GAP, EMOTES, EMOTE_GAP, NIGHTS } from './constants.js';
 import { rng, dirFromAngles, pick, angleDiff } from './rng.js';
 import {
   WEAPONS, FISTS, RARITIES, AMMO, ITEMS, POWERS, RIDES, PRIZES, TICKETS, STAMINA, HEAVY, DODGE, SLIDE, BLOCK, PARRY, THROW, COMBO, IMPACT, ASSIST,
@@ -292,6 +292,15 @@ export class Game {
         if (line < 0 || line >= CHAT_LINES.length || this.time - (p.saidAt ?? -99) < CHAT_GAP) break;
         p.saidAt = this.time;
         this.events.push({ e: 'say', id: p.id, line });
+        break;
+      }
+      case 'emote': {
+        // a wave, taunt, bow or dance from the wheel (the living on their feet, a ghost floating), not too often
+        const n = cmd.n | 0;
+        if (n < 0 || n >= EMOTES.length || (p.state !== 'alive' && p.state !== 'ghost')) break;
+        if (this.time - (p.emotedAt ?? -99) < EMOTE_GAP) break;
+        p.emotedAt = this.time;
+        this.events.push({ e: 'emote', id: p.id, n, g: p.state === 'ghost' });
         break;
       }
       default:

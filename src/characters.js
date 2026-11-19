@@ -1011,7 +1011,10 @@ const tiltAt = (keys, u) => {
 /** Healing has moves of its own (make-anims.py): a bandage is wound round the arm, a medkit dabbed at a wound. */
 const HEAL = { bandage: 'heal_wrap', medkit: 'heal_medkit' };
 /** One-off gestures (Character.gesture) that play once and hold their last pose until they end (the rest loop). */
-const ONCE = new Set(['salt_pour', 'relic_raise', 'pickup', 'open_chest', 'ghost_cast']);
+const ONCE = new Set(['salt_pour', 'relic_raise', 'pickup', 'open_chest', 'ghost_cast',
+  'emote_wave', 'emote_taunt', 'emote_bow', 'ghost_wave', 'ghost_taunt', 'ghost_bow']);
+/** The emotes (the chat key held: src/client.js), living and ghost: they stop the moment their rider moves or fights. */
+const EMOTE_CLIP = /^(emote|ghost)_(wave|taunt|bow|dance)$/;
 /** The big two-handed weapons fight with the great-sword set: both hands on the haft, the weight behind each swing. */
 const TWO_HANDED = new Set(['sledge', 'axe', 'lever']);
 /** Cuts that live inside a longer clip (the great-sword combo holds three slashes). */
@@ -1478,6 +1481,7 @@ export class Character {
     }
     // a one-off gesture (pouring salt, the relic held up, a pickup, a chest heaved open, a ghost's cast, the winner's
     // arms up): only standing or walking slowly, and never over a dodge, a stagger, a slide or a fall
+    if (this.gestT > 0 && EMOTE_CLIP.test(this.gest) && (speed > 1.2 || p.atk || p.blocking || p.aim || (ghost && Math.hypot(p.vx, p.vz) > 1.5))) this.gestT = 0;
     if (this.gestT > 0) {
       this.gestT -= dt;
       const g = this.gest;

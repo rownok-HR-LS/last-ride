@@ -1021,6 +1021,27 @@ body.pad .slot kbd, body.pad .item kbd:empty, body.pad .power kbd:empty { displa
 .feed .say b { color: #ffe14f; }
 /* quick chat on touch: a small button up out of the thumb fan */
 .tb-chat { right: 24px; bottom: 236px; width: 44px; height: 44px; font-size: 17px; }
+.tb-emote { right: 24px; bottom: 290px; width: 44px; height: 44px; font-size: 17px; }
+
+/* the emote wheel (the chat key held, or the phone's emote button): four slices round a hub */
+.emote-wheel { position: absolute; left: 50%; top: 50%; width: 300px; height: 300px; transform: translate(-50%, -50%); display: none; pointer-events: auto; z-index: 12; }
+.emote-wheel.show { display: block; }
+.ew-ring { position: relative; width: 100%; height: 100%; border-radius: 50%; background: radial-gradient(circle, rgba(10,9,12,0.62) 0 30%, rgba(10,9,12,0.82) 31% 100%);
+  border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(8px); box-shadow: 0 10px 40px rgba(0,0,0,0.45); }
+.ew-slice { position: absolute; width: 96px; height: 84px; margin: -42px 0 0 -48px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  border: 1px solid transparent; border-radius: 14px; background: none; color: #f1ece2; font: 700 14px/1 var(--hud); letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer;
+  transition: background 0.12s, color 0.12s, transform 0.12s; }
+.ew-slice .ico { width: 30px; height: 30px; }
+.ew-slice kbd { font-size: 10px; opacity: 0.7; }
+.ew-slice:hover, .ew-slice.on { background: rgba(255,225,79,0.16); border-color: rgba(255,225,79,0.5); color: #ffe14f; transform: scale(1.08); }
+.ew-0 { left: 50%; top: 18%; }
+.ew-1 { left: 82%; top: 50%; }
+.ew-2 { left: 50%; top: 82%; }
+.ew-3 { left: 18%; top: 50%; }
+.ew-hub { position: absolute; left: 50%; top: 50%; width: 84px; height: 84px; margin: -42px 0 0 -42px; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  color: #a9a092; text-align: center; cursor: pointer; }
+.ew-hub b { font: 700 13px/1 var(--hud); letter-spacing: 0.2em; text-transform: uppercase; color: #f1ece2; }
+.ew-hub small { font: 500 10px/1.2 var(--hud); letter-spacing: 0.08em; text-transform: uppercase; }
 
 /* the bus stop: who is in line, and the invite button */
 .lb-names { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin: 6px 0 2px; }
@@ -1090,7 +1111,7 @@ body.pad .slot kbd, body.pad .item kbd:empty, body.pad .power kbd:empty { displa
 
 /* ---------------------------------------------------------------- accessibility: HUD size, sound captions */
 .hud .vitals, .hud .weapons, .hud .items, .hud .ghost-ui, .hud .objective, .hud .hud-top-right, .hud .hud-top-left, .hud .prompt,
-.hud .chat-wheel, .hud .captions, .hud .keys-card { zoom: var(--hud-zoom, 1); }
+.hud .chat-wheel, .hud .emote-wheel, .hud .captions, .hud .keys-card { zoom: var(--hud-zoom, 1); }
 .captions { position: absolute; left: 16px; top: 46%; display: flex; flex-direction: column; gap: 4px; pointer-events: none; }
 .captions div { padding: 4px 10px; border-radius: 6px; background: rgba(10,9,12,0.72); color: #f1ece2; font: 600 15px/1.3 var(--hud);
   letter-spacing: 0.04em; transition: opacity 0.4s; }
@@ -1175,3 +1196,4 @@ body.touch .feed { margin-right: 100px; }
   .end-sign { padding-bottom: 0; }
   .end-sign .board-buttons { position: sticky; bottom: 0; margin: 12px 0 0; padding: 10px 0 14px; background: rgba(12,10,14,0.97); box-shadow: 0 -14px 14px -6px rgba(12,10,14,0.97); z-index: 1; }
 }
+.chat-wheel .ew-hint { margin: 6px 8px 0; font: 500 12px/1.2 var(--hud); color: #a9a092; letter-spacing: 0.04em; }

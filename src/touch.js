@@ -21,6 +21,7 @@ const BUTTONS = [
   ['reload', 'R', 'reload', 'alive'],
   ['swap', '⇄', 'wheel', 'alive'],
   ['chat', icon('chat'), 'chat', 'any'],
+  ['emote', icon('dance'), 'emote', 'any'],
   ['prizes', icon('ticket'), 'prizes', 'booth'],
   ['cast', icon('spark'), 'lmb', 'ghost'],
   ['up', '⤒', 'jump', 'ghost'],
@@ -67,7 +68,12 @@ export class Touch {
       inp.rmb = true;
       inp.rmbPressed = true;
     } else if (what === 'wheel') inp.wheel += 1;
-    else {
+    // the emote button opens the wheel (tap a slice; tap the middle or the button again to close it)
+    else if (what === 'emote') {
+      const c = this.client;
+      if (c.emoteOpen) c.emoteOpen = false;
+      else c.openEmotes('tap');
+    } else {
       const k = this.keys(what)[0];
       if (!k) return;
       if (!inp.keys.has(k)) inp.pressed.add(k);
@@ -79,7 +85,7 @@ export class Touch {
     const inp = this.input;
     if (what === 'lmb') inp.lmb = false;
     else if (what === 'rmb') inp.rmb = false;
-    else if (what !== 'wheel') inp.keys.delete(this.keys(what)[0]);
+    else if (what !== 'wheel' && what !== 'emote') inp.keys.delete(this.keys(what)[0]);
   }
 
   /** A one-off key press (a HUD slot, the map). */
