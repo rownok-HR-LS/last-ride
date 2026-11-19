@@ -499,7 +499,17 @@ export class Client {
     // already as soft as it goes and still slow: drop the costly effects too (once)
     if (this.frameAvg > 1 / 45 && k <= 0.55 && !this.autoFxOff && this.time > (this.noDropUntil ?? 0)) {
       this.autoFxOff = true;
+      this.fxBack = 2;
       this.setEffects(false);
+      return;
+    }
+    // the effects are off (a phone starts that way) yet frames come fast at full sharpness: put them back, once; if
+    // that turns out too much, the step above takes them away again for good
+    if (this.autoFxOff && !this.fxBack && k >= 1 && this.frameAvg < 1 / 70) {
+      this.fxBack = 1;
+      this.autoFxOff = false;
+      this.setEffects(true);
+      this.noDropUntil = 0;
       return;
     }
     if (this.frameAvg > 1 / 50 && k > 0.55 && this.time > (this.noDropUntil ?? 0)) {
@@ -642,8 +652,11 @@ export class Client {
       medium: [0.8, 0.7, 1536, true, true, 1.5, 3, 0.85],
       low: [0.62, 0.4, 1024, false, false, 1.5, 4, 0.65],
     }[s.quality];
-    // auto starts sharp with everything on, then adapts (see adaptQuality)
-    const [res, rain, shadow, fx, smaa, dpr, shadowEvery, reach] = Q || [1, 1, 2048, true, true, 1.5, 2, 1];
+    // auto starts sharp with everything on, then adapts (see adaptQuality). A phone or tablet starts lighter, near
+    // Medium with the costly effects off, so its first minute is smooth rather than spent stepping down; the effects
+    // come back on their own once there is plenty of room (adaptQuality).
+    const phone = !Q && isTouch();
+    const [res, rain, shadow, fx, smaa, dpr, shadowEvery, reach] = Q || (phone ? [0.8, 0.6, 1536, false, false, 1.5, 3, 0.8] : [1, 1, 2048, true, true, 1.5, 2, 1]);
     this.shadowEvery = shadowEvery;
     setCullScale(reach);
     this.cpuSave = false;
@@ -656,7 +669,8 @@ export class Client {
     this.post.smaa.enabled = smaa;
     // Low: one real lamp light near you instead of three (the baked lamp light carries the rest)
     this.lamps?.realLights?.(s.quality === 'low' ? 1 : 3);
-    this.autoFxOff = false;
+    this.autoFxOff = phone;
+    this.fxBack = 0;
     const sh = this.moonLight.shadow;
     if (sh.mapSize.x !== shadow) {
       sh.mapSize.set(shadow, shadow);

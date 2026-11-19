@@ -552,3 +552,12 @@ sounds; lightning that lights the park, rides that light up, lived-in details (B
   "Ghost nearby!" when a ghost drifts within 7 m (25%), "Run!" when caught outside the shrinking storm (3% a think).
   game.js kill calls chatAfterKill. 4 test matches with a person wandering: ~5 lines a match, never closer than 6 s.
   Needs Render (bots.js, game.js).
+
+## Phones start lighter (2026-11-20)
+
+- client.js applySettings: on Auto, a touch device (touch.js isTouch) starts at [0.8 sharpness, rain 0.6, shadow map
+  1536, effects off, no SMAA, shadows every 3rd frame, reach 0.8] with autoFxOff set. adaptQuality raises the
+  sharpness as before and, at full sharpness with frames under 1/70 s, puts the effects back once (fxBack = 1); if it
+  later has to drop them (the existing step at k <= 0.55), fxBack = 2 and they stay off. Desktop Auto is unchanged.
+  Checked in the mobile preset: starts light, a fast machine is back to full with effects in ~7 s; a forced slow run
+  drops them and they do not come back.
