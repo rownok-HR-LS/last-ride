@@ -1205,3 +1205,6 @@ body.touch .feed { margin-right: 100px; }
   .end-sign .board-buttons { position: sticky; bottom: 0; margin: 12px 0 0; padding: 10px 0 14px; background: rgba(12,10,14,0.97); box-shadow: 0 -14px 14px -6px rgba(12,10,14,0.97); z-index: 1; }
 }
 .chat-wheel .ew-hint { margin: 6px 8px 0; font: 500 12px/1.2 var(--hud); color: #a9a092; letter-spacing: 0.04em; }
+
+/* a blood moon night's banner on the bus */
+.banner.blood .big { color: #ff4a3a; text-shadow: 0 0 24px rgba(255,40,20,0.6); }

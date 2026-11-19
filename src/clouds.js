@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import { windAmp } from './motion.js';
 
 /** How much of the sky the clouds cover on each kind of night (shared/constants.js NIGHTS). */
-const COVER = { thunder: 0.95, storm: 0.82, drizzle: 0.66, fog: 0.6, moon: 0.24 };
+const COVER = { thunder: 0.95, storm: 0.82, drizzle: 0.66, fog: 0.6, moon: 0.24, blood: 0.4 };
 /** The way the wind carries them (as the flags stream: src/flags.js HEADING). */
 const WIND = new THREE.Vector2(Math.cos(0.9), -Math.sin(0.9));
 

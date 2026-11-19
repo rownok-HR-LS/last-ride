@@ -4,7 +4,7 @@ import { cleanLook, botLook } from './looks.js';
 import {
   MAX_PLAYERS, PLAYER_RADIUS, EYE_HEIGHT, RUN_SPEED, AIM_SPEED, SPRINT_SPEED, COMBAT_SPEED, MAX_HP, MAX_SHIELD, MAX_REVIVES, REVIVE_HP, REVIVE_PROTECT, GHOST_RISE,
   GHOST_SPEED, GHOST_FAST, ECTO_MAX, ECTO_REGEN, ECTO_START, GHOST_FLASH, LAUNCH_SECONDS,
-  FINAL_RIDE_SECONDS, FINAL_RIDE_RESET, END_SCREEN_SECONDS, BUS_SPEED, OUTFITS, BOT_NAMES, CHAT_LINES, CHAT_GAP, EMOTES, EMOTE_GAP, NIGHTS } from './constants.js';
+  FINAL_RIDE_SECONDS, FINAL_RIDE_RESET, END_SCREEN_SECONDS, BUS_SPEED, OUTFITS, BOT_NAMES, CHAT_LINES, CHAT_GAP, EMOTES, EMOTE_GAP, NIGHTS, BLOOD, powerCost } from './constants.js';
 import { rng, dirFromAngles, pick, angleDiff } from './rng.js';
 import {
   WEAPONS, FISTS, RARITIES, AMMO, ITEMS, POWERS, RIDES, PRIZES, TICKETS, STAMINA, HEAVY, DODGE, SLIDE, BLOCK, PARRY, THROW, COMBO, IMPACT, ASSIST,
@@ -597,7 +597,7 @@ export class Game {
     } else this.dropAll(v);
     Object.assign(v, {
       state: 'ghost', y: v.y + 1.2, vx: 0, vy: 0, vz: 0, ecto: ECTO_START, cds: {}, possess: null,
-      flashT: 2, rootT: 0, shakeT: 0, slowT: 0, revealT: 0, shield: 0, protT: 0, riseT: GHOST_RISE,
+      flashT: 2, rootT: 0, shakeT: 0, slowT: 0, revealT: 0, shield: 0, protT: 0, riseT: GHOST_RISE * (NIGHTS[this.night]?.blood ? BLOOD.rise : 1),
       atk: null, charge: 0, blocking: false, blockAt: -9, staggerT: 0, dodgeT: 0, slideT: 0, iframeT: 0, wardT: 0, burnT: 0, exposedT: 0,
     });
     this.events.push({ e: 'kill', killer: k ? k.id : null, victim: v.id, how, weapon, steal });
@@ -1096,7 +1096,7 @@ export class Game {
       const t = this.players.get(cmd.target);
       if (!t || t.state !== 'alive') return;
       if (Math.hypot(t.x - p.x, t.y - p.y, t.z - p.z) > def.range + 1 || this.inSalt(t.x, t.y, t.z)) return;
-      if (!this.spend(p, def.cost, 'scare', def.cd)) return;
+      if (!this.spend(p, powerCost(def.cost, this.night), 'scare', def.cd)) return;
       t.revealT = def.reveal;
       t.shakeT = def.shake;
       t.slowT = def.shake;
@@ -1107,7 +1107,7 @@ export class Game {
     if (cmd.id !== 'storm' && Math.hypot(x - p.x, z - p.z) > def.range + 2) return;
     if (cmd.id === 'storm' && this.zone.state !== 'wait') return;
     if (cmd.id !== 'storm' && cmd.id !== 'blackout' && this.inSalt(x, +cmd.y || 0, z, 0.5)) return;
-    if (!this.spend(p, def.cost, cmd.id, def.cd)) return;
+    if (!this.spend(p, powerCost(def.cost, this.night), cmd.id, def.cd)) return;
     const y = groundAt(x, z, 0.3, Math.max(0.5, +cmd.y || 0) + 0.6, 0);
     if (cmd.id === 'trap') {
       const mine = this.traps.filter((t) => t.owner === p.id);
@@ -1581,7 +1581,7 @@ export class Game {
     p.burnT = Math.max(0, p.burnT - dt);
     p.exposedT = Math.max(0, p.exposedT - dt);
     // a burning or exposed ghost cannot gather ectoplasm
-    if (p.burnT <= 0 && p.exposedT <= 0) p.ecto = Math.min(ECTO_MAX, p.ecto + ECTO_REGEN * dt);
+    if (p.burnT <= 0 && p.exposedT <= 0) p.ecto = Math.min(ECTO_MAX, p.ecto + ECTO_REGEN * (NIGHTS[this.night]?.blood ? BLOOD.regen : 1) * dt);
     p.flashT = Math.max(0, p.flashT - dt);
     p.riseT = Math.max(0, p.riseT - dt);
     for (const k in p.cds) p.cds[k] = Math.max(0, p.cds[k] - dt);

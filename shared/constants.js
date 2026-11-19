@@ -107,4 +107,12 @@ export const NIGHTS = {
   fog: { name: 'Thick fog', rain: [0.06, 0.18], fog: 3.2, bolts: null, moon: 0.75, sky: 0.22, weight: 2 },
   thunder: { name: 'Thunderstorm', rain: [0.9, 1], fog: 1.05, bolts: [5, 14], moon: 0.9, sky: 0.75, weight: 2 },
   moon: { name: 'Clear moon', rain: [0, 0], fog: 0.7, bolts: null, moon: 1.45, sky: 1.2, weight: 1 },
+  // about one ride in eight: a red moon, and the dead are restless (BLOOD)
+  blood: { name: 'Blood moon', rain: [0.04, 0.16], fog: 1.15, bolts: [60, 140], moon: 1.2, sky: 0.9, weight: 1.4, blood: true },
 };
+
+/** A blood moon: ghosts rise in this share of the usual time, their powers cost this share, ecto comes back this much faster. */
+export const BLOOD = { rise: 0.5, cost: 0.75, regen: 1.4 };
+
+/** What a ghost power costs tonight (cheaper under a blood moon). */
+export const powerCost = (cost, night) => (NIGHTS[night]?.blood ? Math.round(cost * BLOOD.cost) : cost);

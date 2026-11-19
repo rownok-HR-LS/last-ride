@@ -591,3 +591,15 @@ sounds; lightning that lights the park, rides that light up, lived-in details (B
   .ew-s0..7), the mouse/stick picks by eighths, keys 1-8, the D-pad the first four. progress.js award lists emote
   unlocks on the end screen. audio.js 'emote' n 4-7: clap, bugle, whimper, ha-ha. Bots now also laugh (brawlers,
   opportunists) and salute (duelists) over a kill. Needs Render (shared/constants.js, bots.js).
+
+## Blood moon nights (2026-11-20)
+
+- The user picked: ghosts stronger; about 1 ride in 8; a red moon and a warning.
+- shared/constants.js NIGHTS.blood (weight 1.4 of 11.4: 1 in 8.2 over 4000 seeds; little rain, light wind/cloud),
+  BLOOD { rise 0.5, cost 0.75, regen 1.4 } and powerCost(cost, night). game.js: a ghost rises in 4 s instead of 8,
+  powers cost 25% less (spend in usePower; rides are unchanged), ecto comes back 40% faster; bots, the HUD power bar
+  and client.js's power check use powerCost. 8 bot matches each: body steals 4 -> 7.5 a match, kills 23 -> 26.5,
+  length 6.0 -> 5.8 min.
+- client.js nightLook(night): fog #3a1a1e, sky light #a8686c, moonlight #ff8a74 (the usual colours restored on other
+  nights) and a painted red moon sprite at camera + moonDir * 700 (scale 107; far plane 2500). The doors-open
+  banner says BLOOD MOON (style.css .banner.blood). Needs Render (constants.js, game.js, bots.js).

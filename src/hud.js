@@ -1,6 +1,6 @@
 // DOM heads-up display: vitals, weapons, ghost powers, minimap, landing map, kill feed, banners, end screen.
 import { kbd, usingPad } from './prompts.js';
-import { CHAT_LINES, EMOTES, EMOTE_WHEEL } from '../shared/constants.js';
+import { CHAT_LINES, EMOTES, EMOTE_WHEEL, powerCost } from '../shared/constants.js';
 
 /** With a controller, items and ghost powers sit on the D-pad (and the bumpers): see gamepad.js. */
 const PAD_ITEM = { medkit: '↑', bandage: '↓', soda: '←', holy: '→' };
@@ -507,9 +507,10 @@ export class Hud {
         return `<div class="power locked" data-power="${id}" title="${esc(P.help)} Unlocks after ${P.unlock} s as a ghost.">
           <div class="pi">${POWER_ICON[id]}</div><div class="pn">${P.name}</div><div class="pcd lock">${wait}s</div></div>`;
       }
-      const ok = me.ecto >= P.cost && cd <= 0 && me.riseT <= 0 && !me.possess;
+      const cost = powerCost(P.cost, snap.night);
+      const ok = me.ecto >= cost && cd <= 0 && me.riseT <= 0 && !me.possess;
       return `<div class="power ${ok ? '' : 'off'} ${view.power === id ? 'sel' : ''}" data-power="${id}" title="${esc(P.help)}">
-        <kbd>${usingPad() ? PAD_POWER[P.key - 1] ?? '' : P.key}</kbd><div class="pi">${POWER_ICON[id]}</div><div class="pn">${P.name}</div><div class="pc">${P.cost}</div>
+        <kbd>${usingPad() ? PAD_POWER[P.key - 1] ?? '' : P.key}</kbd><div class="pi">${POWER_ICON[id]}</div><div class="pn">${P.name}</div><div class="pc">${cost}</div>
         ${cd > 0 ? `<div class="pcd">${Math.ceil(cd)}</div>` : ''}</div>`;
     }).join('');
     this.set('.powers', html);

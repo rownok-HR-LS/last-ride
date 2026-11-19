@@ -43,7 +43,7 @@ import { loadSettings } from './settings.js';
 import { Touch, isTouch } from './touch.js';
 import { Pads } from './gamepad.js';
 import { lookItem } from '../shared/looks.js';
-import { CHAT_LINES, EMOTES, EMOTE_WHEEL, NIGHTS } from '../shared/constants.js';
+import { CHAT_LINES, EMOTES, EMOTE_WHEEL, NIGHTS, powerCost } from '../shared/constants.js';
 import { loadProgress, award, levelOf } from './progress.js';
 import { setBinds } from './prompts.js';
 import { updateLampLight } from './lamplight.js';
@@ -219,6 +219,7 @@ export class Client {
     this.clouds = buildClouds(scene);
     this.moonLight = sky.moonLight;
     this.moonDir = sky.moonDir;
+    this.hemi = sky.hemi;
     // (lightning swings the light round for a moment: updateWeather)
     this.moonDirBase = this.moonDir.clone();
     this.flashDir = new THREE.Vector3(0, 1, 0);
@@ -790,7 +791,7 @@ export class Client {
       this.hud.toast(`${P.name} unlocks in ${wait}s`);
       return;
     }
-    if (me.riseT > 0 || me.ecto < P.cost || (me.cds[id] || 0) > 0) {
+    if (me.riseT > 0 || me.ecto < powerCost(P.cost, this.snap?.night) || (me.cds[id] || 0) > 0) {
       audio.play('deny');
       return;
     }
@@ -990,6 +991,53 @@ export class Client {
     const a = Math.atan2(Math.sin(Math.atan2(-dx, -dz) - this.camYaw), Math.cos(Math.atan2(-dx, -dz) - this.camYaw));
     const dir = d < 3 ? 'close' : Math.abs(a) < 0.6 ? 'ahead' : Math.abs(a) > 2.5 ? 'behind' : a > 0 ? 'left' : 'right';
     this.hud.caption(label, dir);
+  }
+
+  /**
+   * A blood moon night (shared/constants.js NIGHTS.blood) looks the part: a huge red moon in the sky, the mist, the sky's
+   * light and the moonlight stained red. Any other night puts the usual colours back.
+   */
+  nightLook(night) {
+    const blood = !!night.blood;
+    this.lookBase ??= { fog: this.scene.fog.color.clone(), sky: this.hemi.color.clone(), moon: this.moonLight.color.clone() };
+    const b = this.lookBase;
+    this.scene.fog.color.copy(blood ? new THREE.Color('#3a1a1e') : b.fog);
+    this.hemi.color.copy(blood ? new THREE.Color('#a8686c') : b.sky);
+    this.moonLight.color.copy(blood ? new THREE.Color('#ff8a74') : b.moon);
+    if (blood && !this.bloodMoon) {
+      // painted once on a canvas: a red disc with darker seas and a soft glow round it
+      const cv = document.createElement('canvas');
+      cv.width = cv.height = 256;
+      const g = cv.getContext('2d');
+      const halo = g.createRadialGradient(128, 128, 40, 128, 128, 128);
+      halo.addColorStop(0, 'rgba(255,80,50,0.55)');
+      halo.addColorStop(1, 'rgba(255,40,20,0)');
+      g.fillStyle = halo;
+      g.fillRect(0, 0, 256, 256);
+      const disc = g.createRadialGradient(112, 112, 6, 128, 128, 52);
+      disc.addColorStop(0, '#ff8a5c');
+      disc.addColorStop(0.7, '#d2321e');
+      disc.addColorStop(1, '#8a1410');
+      g.fillStyle = disc;
+      g.beginPath();
+      g.arc(128, 128, 52, 0, Math.PI * 2);
+      g.fill();
+      // (dark seas, irregular and off to one side, as the real ones are)
+      g.fillStyle = 'rgba(90,10,8,0.28)';
+      for (const [x, y, r] of [[106, 118, 17], [120, 104, 10], [97, 136, 9], [143, 141, 13], [134, 158, 6], [160, 120, 5], [124, 128, 7]]) {
+        g.beginPath();
+        g.arc(x, y, r, 0, Math.PI * 2);
+        g.fill();
+      }
+      const tex = new THREE.CanvasTexture(cv);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      this.bloodMoon = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, fog: false, depthWrite: false, transparent: true, color: new THREE.Color(1.6, 1.6, 1.6) }));
+      this.bloodMoon.scale.setScalar(107);
+      // (over the cloud dome, under the rain)
+      this.bloodMoon.renderOrder = -1;
+      this.scene.add(this.bloodMoon);
+    }
+    if (this.bloodMoon) this.bloodMoon.visible = blood;
   }
 
   /** Open the emote wheel: 'hold' (the chat key held, the mouse points) or 'tap' (the phone's button; tap a slice). */
@@ -1479,7 +1527,8 @@ export class Client {
           this.hud.banner(e.winner === me ? 'YOU SURVIVED' : 'RIDE OVER', `${this.name(e.winner)} survived the Last Ride`, 4);
           break;
         case 'live':
-          this.hud.banner('THE DOORS ARE OPEN', `Jump off whenever you like · tonight: ${(NIGHTS[this.snap?.night] || NIGHTS.storm).name}`, 3);
+          if (NIGHTS[this.snap?.night]?.blood) this.hud.banner('BLOOD MOON', 'The dead are restless: ghosts rise twice as fast and their powers cost less. Jump off whenever you like.', 5, 'blood');
+          else this.hud.banner('THE DOORS ARE OPEN', `Jump off whenever you like · tonight: ${(NIGHTS[this.snap?.night] || NIGHTS.storm).name}`, 3);
           break;
         default:
       }
@@ -1735,6 +1784,12 @@ export class Client {
     // tonight's rain, easing and thickening over a few minutes between its low and its high
     const night = NIGHTS[snap.night] || NIGHTS.storm;
     this.night = night;
+    if (snap.night !== this.lookNight) {
+      this.lookNight = snap.night;
+      this.nightLook(night);
+    }
+    // the blood moon hangs where the moon is, far off
+    if (this.bloodMoon?.visible) this.bloodMoon.position.copy(this.camera.position).addScaledVector(this.moonDirBase, 700);
     const rainAmount = night.rain[0] + (night.rain[1] - night.rain[0]) * (0.5 + Math.sin(this.time * 0.05) * 0.5);
     this.rain.update(dt, this.camera, { amount: rainAmount, flash: this.weather.flash, bus: snap.bus });
     groundRain.time.value = this.time % 1000;

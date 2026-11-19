@@ -13,7 +13,7 @@ export const motionTime = { value: 0 };
 /** How hard the wind blows tonight (eased toward each night's value by the client). */
 export const windAmp = { value: 0.6 };
 /** Wind per night (shared/constants.js NIGHTS). */
-export const NIGHT_WIND = { storm: 1, thunder: 1.25, drizzle: 0.6, fog: 0.18, moon: 0.3 };
+export const NIGHT_WIND = { storm: 1, thunder: 1.25, drizzle: 0.6, fog: 0.18, moon: 0.3, blood: 0.45 };
 
 const cache = new Map();
 
