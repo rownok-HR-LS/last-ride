@@ -47,6 +47,9 @@ class Kit:
         self._take(mat, bm, Matrix.Translation(Vector(at)) @ R)
 
     def ball(self, mat, at, r, segs=8):
+        # marquee bulbs are a few centimetres across and there are thousands: six sides is round enough
+        if mat.startswith('bulb'):
+            segs = min(segs, 6)
         bm = bmesh.new()
         bmesh.ops.create_uvsphere(bm, u_segments=segs, v_segments=max(4, segs // 2), radius=r)
         self._take(mat, bm, Matrix.Translation(Vector(at)))

@@ -245,7 +245,7 @@ def coaster():
     fr = [(rt, up) for rt, up, _ in F]
     # the running rails and the box spine under them
     for s in (-1, 1):
-        K.sweep('metal', pts, fr, circle(0.085, 8, s * GAUGE, 0.0))
+        K.sweep('metal', pts, fr, circle(0.085, 6, s * GAUGE, 0.0))
     K.sweep(RED, pts, fr, rect(0.17, 0.24, 0, -0.48, 0.04))
     # ties every second point: a crossbar under the rails braced down to the spine
     for i in range(0, n, 2):

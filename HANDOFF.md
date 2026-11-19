@@ -457,3 +457,11 @@ sounds; lightning that lights the park, rides that light up, lived-in details (B
   chest, pickup, fling, trapSet, scare (by), steps and blackout (game.js now puts the ghost's id on those two), and
   victory for the winner on 'end'. A repeated gesture restarts its action (clearing this.over orphaned it at full
   weight). No shove clip: shoves are body contacts, not an action. Needs Render (game.js events).
+- Group 6, lighter models: kitlib.py Kit.ball gives bulb materials 6 sides (thousands of marquee bulbs), the coaster
+  rails 6 sides; all kits rebuilt and packed (kit 197k -> 188k triangles). scripts/thin-ferris.mjs simplifies only
+  the Ferris wheel's bolts (sloppy: they are separate flat faces) 13.4k -> 5.5k (wheel 36k -> 28k). 14 unused clips
+  removed (scripts/prune-anims.mjs: fall, hang, gs_low, idle_crouching_aiming, m_run_*, m_walk_*,
+  walk_crouching_*), and add-anims / prune-anims resample at 1e-3 (the Blender clips are keyed every frame):
+  anims.glb 1.13 MB -> 745 KB gzipped, so group 5's eight clips cost ~90 KB net. Honest note: the triangle trims are
+  small next to ~1.8M drawn per frame; the big lever left is code (the AO pass drawing the scene a second time on
+  Low, and draw calls), not Blender.

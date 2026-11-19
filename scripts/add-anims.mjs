@@ -34,6 +34,7 @@ for (const f of files) {
   add.getRoot().listAnimations().forEach((a, i) => a.setName(i ? `${clip}_${i}` : clip));
   mergeDocuments(doc, add);
 }
-await doc.transform(unpartition(), resample(), dedup(), prune({ keepLeaves: true }), meshopt({ encoder: MeshoptEncoder, level: 'medium' }));
+// keys within a tenth of a degree of the line between their neighbours go (the Blender clips are keyed every frame)
+await doc.transform(unpartition(), resample({ tolerance: 1e-3 }), dedup(), prune({ keepLeaves: true }), meshopt({ encoder: MeshoptEncoder, level: 'medium' }));
 await io.write(FILE, doc);
 console.log('added', [...names].join(', '), '|', doc.getRoot().listAnimations().length, 'clips,', Math.round(statSync(FILE).size / 1024), 'KB');
