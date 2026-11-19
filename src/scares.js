@@ -25,6 +25,8 @@ const REST = 14;
 const scares = [];
 let fps = 30;
 const _a = new THREE.Quaternion();
+const _m = new THREE.Matrix4();
+const _n = new THREE.Matrix4();
 const _b = new THREE.Quaternion();
 
 function pose(s, f) {
@@ -44,6 +46,18 @@ function pose(s, f) {
   }
 }
 
+/** Put a scare's pose into the shared meshes (its slot k in each). */
+function place(s) {
+  s.root.updateMatrix();
+  s.pivot.updateMatrix();
+  s.piece.updateMatrix();
+  _m.multiplyMatrices(s.root.matrix, s.pivot.matrix).multiply(s.piece.matrix);
+  for (const im of s.parts) {
+    im.setMatrixAt(s.k, _n.multiplyMatrices(_m, im.userData.local));
+    im.instanceMatrix.needsUpdate = true;
+  }
+}
+
 /** Every scare in the park, as one group to add to the scene. Builder: the world's merged builder. */
 export async function buildScares(Builder) {
   const data = await fetch('./models/motion/scares.json').then((r) => r.json());
@@ -56,25 +70,35 @@ export async function buildScares(Builder) {
     const spots = PROPS.filter((p) => p.type === 'interior' && p.kind === kind);
     const anim = data.scares[K.anim];
     if (!spots.length || !anim) continue;
+    // every scare of a kind is drawn together (one draw per material for all of them, not one per scare): each scare
+    // is only a moving frame (root, pivot, piece) whose pose goes into the shared meshes (place)
     const part = await kitPart(Builder, K.part);
+    part.updateMatrixWorld(true);
+    const parts = [];
     part.traverse((o) => {
-      if (o.isMesh) {
-        o.castShadow = true;
-        o.receiveShadow = true;
-      }
+      if (!o.isMesh) return;
+      const im = new THREE.InstancedMesh(o.geometry, o.material, spots.length);
+      im.castShadow = true;
+      im.receiveShadow = true;
+      // (they are spread through the buildings)
+      im.frustumCulled = false;
+      im.userData.local = o.matrixWorld.clone();
+      group.add(im);
+      parts.push(im);
     });
-    for (const p of spots) {
+    for (const [k, p] of spots.entries()) {
       const root = new THREE.Group();
       root.position.set(p.x, 0, p.z);
       root.rotation.y = p.rot || 0;
       const pivot = new THREE.Group();
-      const piece = part.clone();
+      const piece = new THREE.Object3D();
       piece.position.fromArray(K.offset);
       pivot.add(piece);
       root.add(pivot);
       group.add(root);
-      const s = { K, anim, pivot, at: K.pivot, x: p.x, z: p.z, rot: p.rot || 0, t: -1, rest: Math.random() * 4, sound: 0, mirror: false };
+      const s = { K, anim, pivot, piece, root, parts, k, at: K.pivot, x: p.x, z: p.z, rot: p.rot || 0, t: -1, rest: Math.random() * 4, sound: 0, mirror: false };
       pose(s, 0);
+      place(s);
       scares.push(s);
     }
   }
@@ -116,5 +140,6 @@ export function updateScares(dt, riders) {
       s.t = -1;
       s.rest = REST;
     }
+    place(s);
   }
 }

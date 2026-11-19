@@ -530,3 +530,16 @@ sounds; lightning that lights the park, rides that light up, lived-in details (B
 - audio.js 'emote' (opt.n, opt.ghost), synthesized like the music: a two-note whistle (wave), nyah-nyah (taunt),
   ta-da (bow), a two-bar calliope oom-pah (dance); a ghost's are a fifth lower, 1.6x slower, minor (thirds and sixths
   flattened), sine with vibrato, over a quiet moan. Caption: "Organ tune". Needs Render (bots.js, game.js).
+
+## Lighter drawing, round 2 (2026-11-20)
+
+- world.js mergeNeon (called after dressBooths, once every sign's tubes have loaded): every neon sign's posts and
+  brackets merged per look, every sign's tubes merged per colour (4 draws), and the boards of steady signs with the
+  same words merged. The sputter of a merged tube is in its shader (neonTubeMat: aFlick = [0 steady / 1 tired /
+  2 dying, seed], uNeonT = neonTime set by updateNeon), the same sum as the boards', so board and tubes go out
+  together. Sputtering boards and one-off boards stay separate (22). Originals stay hidden (export-glows finds them).
+- signs.js: the ride signposts are one kitSpots group; each board's two name faces are one mesh.
+- scares.js: each scare kind is drawn instanced (13 draws for all 29 pieces, frustumCulled off); each scare is a
+  frame (root, pivot, piece) whose pose place() writes into the instances.
+- world.js lamps.realLights(n): Low keeps 1 real lamp light instead of 3 (client.js applySettings): 7 -> 5 point lights.
+- Measured at the gate: Low ~490 draws (was ~560), High ~576.

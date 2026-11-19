@@ -654,6 +654,8 @@ export class Client {
     this.rain.setDensity(rain);
     this.setEffects(fx);
     this.post.smaa.enabled = smaa;
+    // Low: one real lamp light near you instead of three (the baked lamp light carries the rest)
+    this.lamps?.realLights?.(s.quality === 'low' ? 1 : 3);
     this.autoFxOff = false;
     const sh = this.moonLight.shadow;
     if (sh.mapSize.x !== shadow) {

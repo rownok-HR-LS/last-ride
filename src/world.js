@@ -273,7 +273,7 @@ export function neonSign(text, color, w, flicker = null) {
   // the words in glass tube, in the sign's colour (the glass a little tinted even when a tube is out)
   const glass = new THREE.Color(color).multiplyScalar(0.35);
   const tm = new THREE.MeshStandardMaterial({ color: glass, emissive: color, emissiveIntensity: TUBE_ON, roughness: 0.25, metalness: 0 });
-  neonTubes(text).then((src) => {
+  const ready = neonTubes(text).then((src) => {
     if (!src) {
       m.map = signTex(text, { color }).texture;
       m.needsUpdate = true;
@@ -292,7 +292,131 @@ export function neonSign(text, color, w, flicker = null) {
   const h = Math.abs(Math.sin(text.length * 12.9898 + w * 78.233) * 43758.5453) % 1;
   const kind = flicker ?? (h < 0.45 ? 'tired' : h < 0.6 ? 'dying' : null);
   if (kind) FLICKER.push({ m, tm, kind, seed: h * 100 });
+  NEON.push({ sign, text, color, tm, steady: !kind, flick: [kind === 'dying' ? 2 : kind ? 1 : 0, h * 100], ready });
   return sign;
+}
+
+/** Every neon sign made (neonSign), for mergeNeon. */
+const NEON = [];
+
+/** A mesh's geometry in world space as plain floats (position, normal, and uv when keepUv), always indexed. */
+function bakedGeometry(o, keepUv) {
+  const g = o.geometry;
+  const M = o.matrixWorld;
+  const N = new THREE.Matrix3().getNormalMatrix(M);
+  const pos = g.attributes.position;
+  const nor = g.attributes.normal;
+  const uv = g.attributes.uv;
+  const n = pos.count;
+  const P = new Float32Array(n * 3);
+  const Nn = new Float32Array(n * 3);
+  const v = new THREE.Vector3();
+  for (let i = 0; i < n; i++) {
+    v.set(pos.getX(i), pos.getY(i), pos.getZ(i)).applyMatrix4(M);
+    P.set([v.x, v.y, v.z], i * 3);
+    if (nor) v.set(nor.getX(i), nor.getY(i), nor.getZ(i)).applyMatrix3(N).normalize();
+    else v.set(0, 1, 0);
+    Nn.set([v.x, v.y, v.z], i * 3);
+  }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.BufferAttribute(P, 3));
+  out.setAttribute('normal', new THREE.BufferAttribute(Nn, 3));
+  if (keepUv) {
+    const U = new Float32Array(n * 2);
+    if (uv) for (let i = 0; i < n; i++) U.set([uv.getX(i), uv.getY(i)], i * 2);
+    out.setAttribute('uv', new THREE.BufferAttribute(U, 2));
+  }
+  out.setIndex(g.index ? Array.from(g.index.array) : Array.from({ length: n }, (_, i) => i));
+  return out;
+}
+
+/**
+ * The neon signs drawn together instead of one by one (they never move): the posts and brackets of every sign as one
+ * mesh per look, the steady signs' tubes as one mesh per colour, and the boards of steady signs that say the same
+ * thing (the prize counters, the ticket kiosks, the booth games) as one mesh each. The sputtering signs keep their own
+ * tubes and boards, which updateNeon dims. The originals stay, hidden (the light bake tool finds signs by them).
+ * Call once every sign has been made; it waits for their tubes.
+ */
+export async function mergeNeon(scene) {
+  const signs = NEON.splice(0);
+  await Promise.all(signs.map((n) => n.ready));
+  scene.updateMatrixWorld(true);
+  const groups = new Map();
+  const put = (key, o, mat, keepUv, flick = null) => {
+    if (!groups.has(key)) groups.set(key, { mat, keepUv, list: [], flicks: [], cast: o.castShadow, tube: !!flick });
+    groups.get(key).list.push(o);
+    groups.get(key).flicks.push(flick);
+  };
+  for (const n of signs) {
+    if (!n.sign.parent) continue;
+    if (n.steady) put(`board|${n.text}|${n.color}`, n.sign, n.sign.material, true);
+    n.sign.traverse((o) => {
+      if (!o.isMesh || o === n.sign) return;
+      const m = o.material;
+      // every sign's tubes of a colour together, sputtering or not (the sputter moves into the shader: neonTubeMat)
+      if (m === n.tm) put(`tube|${n.color}`, o, m, false, n.flick);
+      else put(`part|${m?.name}|${m?.color?.getHexString?.()}|${m?.map?.uuid || ''}`, o, m, !!m?.map);
+    });
+  }
+  const out = new THREE.Group();
+  out.name = 'neonMerged';
+  for (const g of groups.values()) {
+    // (nothing gained from merging one)
+    if (g.list.length < 2) continue;
+    const geos = g.list.map((o, i) => {
+      const geo = bakedGeometry(o, g.keepUv);
+      // each tube carries its sign's sputter: [0 steady / 1 tired / 2 dying, seed]
+      if (g.tube) geo.setAttribute('aFlick', new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count * 2).map((_, j) => g.flicks[i][j % 2]), 2));
+      return geo;
+    });
+    const mesh = new THREE.Mesh(mergeGeometries(geos), g.tube ? neonTubeMat(g.mat) : g.mat);
+    mesh.castShadow = g.cast;
+    mesh.userData.neonMerged = true;
+    out.add(mesh);
+    for (const o of g.list) {
+      // a board with its tubes still on it (they are only merged with other signs of their colour): keep them showing,
+      // stop drawing the board itself
+      if (o.children.length) {
+        o.material = o.material.clone();
+        o.material.visible = false;
+      } else o.visible = false;
+    }
+  }
+  scene.add(out);
+  return out;
+}
+
+/** The clock the merged tubes sputter by (updateNeon sets it). */
+const neonTime = { value: 0 };
+
+/**
+ * A merged tube mesh's material: the sign's own, sputtering per tube in the shader by its aFlick, with exactly the
+ * sum updateNeon does for the boards (same clock), so a board and its tubes go out together.
+ */
+function neonTubeMat(base) {
+  const m = base.clone();
+  m.emissiveIntensity = TUBE_ON;
+  m.onBeforeCompile = (sh) => {
+    sh.uniforms.uNeonT = neonTime;
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', `#include <common>
+        attribute vec2 aFlick;
+        uniform float uNeonT;
+        varying float vFlickK;`)
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+        {
+          float sp = uNeonT * (aFlick.x > 1.5 ? 1.0 : 0.35) + aFlick.y;
+          float burst = sin(sp * 0.9) * sin(sp * 0.37 + 1.7);
+          float stut = sin(uNeonT * 41.0 + aFlick.y) * sin(uNeonT * 17.3 + aFlick.y * 2.1);
+          vFlickK = 1.0;
+          if (aFlick.x > 0.5 && burst > (aFlick.x > 1.5 ? -0.2 : 0.55)) vFlickK = stut > 0.1 ? 1.0 : stut > -0.4 ? 0.35 : 0.05;
+        }`);
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying float vFlickK;')
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance *= vFlickK;');
+  };
+  m.customProgramCacheKey = () => 'neonTube';
+  return m;
 }
 
 /** The neon signs that sputter (neonSign), and their state. */
@@ -300,6 +424,7 @@ const FLICKER = [];
 
 /** Sputter the tired and dying neon (call every frame with the time in seconds). */
 export function updateNeon(t) {
+  neonTime.value = t;
   for (const f of FLICKER) {
     const s = t * (f.kind === 'dying' ? 1 : 0.35) + f.seed;
     // a tired tube: steady, then a burst of stutters every so often; a dying one stutters most of the time
@@ -609,6 +734,8 @@ export function buildWorld(scene) {
     }
     scene.add(kit);
     dressBooths(kit);
+    // every neon sign is out now: draw the still ones together
+    mergeNeon(scene).catch((e) => console.warn('neon', e));
     // the tents' bunting flaps in the wind (src/motion.js); the kit's tent dressing leaves it out
     bunting(PROPS.filter((p) => p.type === 'gametent')).then((b) => b && scene.add(b)).catch((e) => console.warn('bunting', e));
   }).catch((e) => console.warn('building kit', e));
@@ -1189,6 +1316,15 @@ function buildLamps(scene) {
   const level = new Float32Array(n);
   const c = new THREE.Color();
   return {
+    /**
+     * How many of the closest lamps get a real light (3; Low uses 1): every lit surface adds up every light in the scene
+     * on every pixel, which is what a phone's graphics chip feels. (Changing it makes the shaders build again once.)
+     */
+    realLights(n) {
+      lights.forEach((pl, k) => {
+        pl.visible = k < n;
+      });
+    },
     update(blackouts, time, cx, cz, power = 1) {
       LAMPS.forEach((l, i) => {
         let v = kind[i] === 'dead' ? 0 : 1;

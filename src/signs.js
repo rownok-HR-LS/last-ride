@@ -3,7 +3,8 @@
 // wind, harder in a storm (src/motion.js windAmp), each in its own rhythm.
 import * as THREE from 'three';
 import { FERRIS, STATION, CAROUSEL, FREEFALL, PROPS } from '../shared/map.js';
-import { kitPart } from './kit.js';
+import { kitPart, kitSpots } from './kit.js';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { signTex } from './textures.js';
 import { motionTime, windAmp } from './motion.js';
 
@@ -30,15 +31,22 @@ function spots() {
 
 /** The signs, as one group to add to the scene. Builder: the world's merged builder (kit parts use it). */
 export async function buildSigns(Builder) {
-  const [post, board] = await Promise.all([kitPart(Builder, 'signpost'), kitPart(Builder, 'signboard')]);
+  const list = spots();
+  // the posts never move: all of them built into one piece (one draw per material, not per sign)
+  const [posts, board] = await Promise.all([kitSpots(Builder, list.map((s) => ['signpost', { x: s.x, z: s.z, rot: s.face + Math.PI / 2 }])), kitPart(Builder, 'signboard')]);
+  posts.traverse((o) => {
+    if (o.isMesh) {
+      o.castShadow = true;
+      o.receiveShadow = true;
+    }
+  });
   const group = new THREE.Group();
   group.name = 'signs';
-  spots().forEach((s, i) => {
+  list.forEach((s, i) => {
     const g = new THREE.Group();
     g.position.set(s.x, 0, s.z);
     // the arm points along the board's face, so the name reads from the path
     g.rotation.y = s.face + Math.PI / 2;
-    g.add(post.clone());
     const pivot = new THREE.Group();
     pivot.position.copy(PIVOT);
     const b = board.clone();
@@ -46,12 +54,13 @@ export async function buildSigns(Builder) {
     // the ride's name on both faces of the board
     const { texture: tex } = signTex(s.name, { color: '#e8c25a' });
     const face = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.8, transparent: true });
-    for (const side of [1, -1]) {
-      const plane = new THREE.Mesh(new THREE.PlaneGeometry(1.36, 0.36), face);
-      plane.position.set(0, -0.95, side * 0.034);
-      if (side < 0) plane.rotation.y = Math.PI;
-      pivot.add(plane);
-    }
+    // (both faces in one mesh)
+    const faces = [1, -1].map((side) => {
+      const f = new THREE.PlaneGeometry(1.36, 0.36);
+      if (side < 0) f.rotateY(Math.PI);
+      return f.translate(0, -0.95, side * 0.034);
+    });
+    pivot.add(new THREE.Mesh(mergeGeometries(faces), face));
     // swing about the hook (along the board's face) and twist a little, each sign in its own time
     const phase = i * 1.7;
     const swing = b.children.find((o) => o.isMesh) || b;
@@ -71,7 +80,10 @@ export async function buildSigns(Builder) {
       o.receiveShadow = true;
     }
   });
-  // the boards swing: they keep their own shadows (src/shadowproxy.js)
+  // the boards swing: they keep their own shadows (src/shadowproxy.js); the posts stand still beside them
   group.userData.moves = true;
-  return group;
+  const all = new THREE.Group();
+  all.name = 'signsAll';
+  all.add(posts, group);
+  return all;
 }
