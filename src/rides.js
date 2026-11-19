@@ -574,8 +574,12 @@ uniform float chaseT;`)
       }
       return g;
     })();
-    this.stepMat = new THREE.MeshBasicMaterial({ color: '#7dffcf', transparent: true, opacity: 0.7, depthWrite: false, toneMapped: false });
-    this.stepGeo = new THREE.CircleGeometry(0.16, 8);
+    // a ghost's bare footprints (scripts/blender/make-footprint.py): mint-green glow, the newest brightest
+    const foot = new THREE.TextureLoader().load('./tex/footprint.png');
+    foot.colorSpace = THREE.SRGBColorSpace;
+    // (added on: they glow, and stay readable on pale stone in the ghost's washed-out view)
+    this.stepMats = [1, 0.75, 0.5, 0.3].map((o) => new THREE.MeshBasicMaterial({ color: '#8affd6', map: foot, transparent: true, opacity: o, depthWrite: false, toneMapped: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
+    this.stepGeo = new THREE.PlaneGeometry(0.18, 0.36);
     this.stepMarks = [];
     this.domes = [];
     this.domeMat = new THREE.MeshBasicMaterial({ color: '#05020a', transparent: true, opacity: 0.6, depthWrite: false, side: THREE.DoubleSide });
@@ -717,14 +721,18 @@ uniform float chaseT;`)
       for (let j = 0; j < 4; j++) {
         let mk = this.stepMarks[k];
         if (!mk) {
-          mk = new THREE.Mesh(this.stepGeo, this.stepMat);
-          mk.rotation.x = -Math.PI / 2;
+          mk = new THREE.Mesh(this.stepGeo, this.stepMats[0]);
+          mk.rotation.order = 'YXZ';
           this.scene.add(mk);
           this.stepMarks.push(mk);
         }
         const side = j % 2 ? 0.18 : -0.18;
         mk.visible = true;
         mk.position.set(st.x - st.dx * j * 0.7 - st.dz * side, st.y + 0.05, st.z - st.dz * j * 0.7 + st.dx * side);
+        // flat, toes the way it walks, the right foot the left one mirrored; older prints fainter
+        mk.rotation.set(-Math.PI / 2, Math.atan2(-st.dx, -st.dz), 0);
+        mk.scale.x = side > 0 ? -1 : 1;
+        mk.material = this.stepMats[j];
         k++;
       }
     }

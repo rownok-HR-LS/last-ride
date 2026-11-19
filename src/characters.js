@@ -978,13 +978,36 @@ const LOWER_BODY = /(Hips|UpLeg|Leg|Foot|Toe)/;
 /** Clips that play on the upper body only (an _up copy without the hips and legs is made at load). */
 const UPPER = ['m_idle', 'fight_idle', 'm_light', 'm_light2', 'm_heavy', 'm_block', 'm_block_hit', 'm_stagger', 'punch', 'punch2', 'punch_hook', 'punch_upper', 'throw', 'bow_draw',
   'gs_idle', 'gs_combo', 'gs_down', 'gs_power', 'gs_block', 'gs_block_hit', 'gs_hit', 'react_left', 'react_right', 'react_gut', 'head_hit_big', 'mc_combo3',
-  'spike_stab', 'mallet_whack', 'saw_idle', 'saw_rev'];
+  'spike_stab', 'mallet_whack', 'saw_idle', 'saw_rev', 'harpoon_aim', 'fireworks_aim'];
 /**
  * Weapons with moves of their own (made in Blender, scripts/blender/make-anims.py): the spike stabs, the mallet
  * comes down overhead like the whack-a-mole it was made for, the chainsaw is held in both hands and pushed in.
  */
 const OWN_SWING = { spike: 'spike_stab', mallet: 'mallet_whack', chainsaw: 'saw_rev' };
 const OWN_GUARD = { chainsaw: 'saw_idle' };
+/**
+ * The launchers' own handling (make-anims.py): the harpoon gun braced at the hip and the firework tube on the shoulder
+ * (upper body, held while walking), and each launcher's reload, with how far the weapon tips while it plays (fraction
+ * of the clip -> radians of pitch: the crossbow's nose goes to the ground, the harpoon gun stands up for loading, the
+ * tube lifts for a rocket and dips to the match).
+ */
+const OWN_AIM = { harpoon: 'harpoon_aim', fireworks: 'fireworks_aim' };
+const OWN_RELOAD = { crossbow: 'crossbow_reload', harpoon: 'harpoon_reload', fireworks: 'fireworks_reload' };
+const RELOAD_TILT = {
+  crossbow: [[0, 0], [0.18, -1.3], [0.58, -1.3], [0.79, -0.4], [1, 0]],
+  harpoon: [[0, 0], [0.15, 1.2], [0.73, 1.2], [0.96, 0], [1, 0]],
+  fireworks: [[0, 0], [0.14, 0.9], [0.45, 0.9], [0.68, 0.2], [0.8, -0.3], [0.93, 0], [1, 0]],
+};
+const tiltAt = (keys, u) => {
+  for (let i = 1; i < keys.length; i++) {
+    if (u <= keys[i][0]) {
+      const k = (u - keys[i - 1][0]) / (keys[i][0] - keys[i - 1][0] || 1);
+      const e = k * k * (3 - 2 * k);
+      return keys[i - 1][1] + (keys[i][1] - keys[i - 1][1]) * e;
+    }
+  }
+  return keys[keys.length - 1][1];
+};
 /** Healing has moves of its own (make-anims.py): a bandage is wound round the arm, a medkit dabbed at a wound. */
 const HEAL = { bandage: 'heal_wrap', medkit: 'heal_medkit' };
 /** One-off gestures (Character.gesture) that play once and hold their last pose until they end (the rest loop). */
@@ -1328,6 +1351,9 @@ export class Character {
     }
     this.staggerAt = null;
     if (guard) return { name: guard, t: time % this.clips[guard].duration };
+    // a harpoon gun or a firework tube is carried braced, aiming or not
+    const aimHold = OWN_AIM[w];
+    if (aimHold && this.clips[aimHold] && (p.aim || p.combat)) return { name: aimHold, t: time % this.clips[aimHold].duration };
     return null;
   }
 
@@ -1434,8 +1460,15 @@ export class Character {
       }
       else if (speed < 0.6 && p.using) over = this.clips[HEAL[p.using]] ? HEAL[p.using] : 'drink';
       else if (speed < 0.6 && p.reloading) {
-        over = 'reload';
-        overSpeed = 1.4;
+        // a launcher's own reload, fitted to how long it takes; anything else the generic one
+        const own = OWN_RELOAD[w];
+        if (own && this.clips[own]) {
+          over = own;
+          overSpeed = this.clips[own].duration / (WEAPONS[w]?.reload || 2);
+        } else {
+          over = 'reload';
+          overSpeed = 1.4;
+        }
       }
     }
     // rammed by a bumper car: arms and legs flailing until they land and get up
@@ -1613,7 +1646,13 @@ export class Character {
         if (bone) bone.rotateX(-bend - this.recoil * 0.05 + this.flinch * 0.12);
       }
       this.model.updateMatrixWorld(true);
-      this.placeWeapon(p.yaw, p.pitch + this.recoil * 0.08);
+      // a launcher tips as its reload clip handles it
+      let tilt = 0;
+      if (this.over && this.over === OWN_RELOAD[w] && RELOAD_TILT[w]) {
+        const a = this.action(this.over);
+        tilt = tiltAt(RELOAD_TILT[w], Math.min(1, a.time / a.getClip().duration)) * this.overW;
+      }
+      this.placeWeapon(p.yaw, p.pitch + this.recoil * 0.08 + tilt);
       this.updateTrail(p, dt, melee && w !== 'fists' && !!p.atk && p.atk.u > 0.22 && p.atk.u < 0.85 && this.hitstop <= 0);
     }
     this.headLook(p, dt, ghost || p.state !== 'alive' || !!this.over || !!opts.seat ? null : opts.lookAt);

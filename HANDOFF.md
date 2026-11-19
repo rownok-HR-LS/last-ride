@@ -465,3 +465,17 @@ sounds; lightning that lights the park, rides that light up, lived-in details (B
   anims.glb 1.13 MB -> 745 KB gzipped, so group 5's eight clips cost ~90 KB net. Honest note: the triangle trims are
   small next to ~1.8M drawn per frame; the big lever left is code (the AO pass drawing the scene a second time on
   Low, and draw calls), not Blender.
+
+## Footprints and launcher moves (2026-11-19)
+
+- Ghost footprints: scripts/blender/make-footprint.py renders a bare left foot (heel, arch edge, ball, five toes,
+  a faint smear) white on clear; scripts/pack-footprint.mjs softens it -> public/tex/footprint.png. rides.js draws
+  each footsteps trail as 0.18 x 0.36 prints, toes along the walk, the right foot mirrored (DoubleSide), additive
+  mint glow, opacity 1 / 0.75 / 0.5 / 0.3 newest to oldest.
+- Launchers (make-anims.py): harpoon_aim (braced at the hip) and fireworks_aim (tube on the shoulder) are upper-body
+  clips held while aiming or in a fight (characters.js OWN_AIM, in UPPER); crossbow_reload (nose to the ground, foot
+  in the stirrup, string hauled up, a bolt laid in), harpoon_reload (gun stood up, harpoon rammed down the muzzle),
+  fireworks_reload (rocket dropped in, a match struck and put to the fuse) replace the generic reload for those
+  weapons (OWN_RELOAD, timed to WEAPONS[w].reload), and RELOAD_TILT tips the launcher with the clip (placeWeapon
+  pitch). After add-anims.mjs, run prune-anims.mjs once more: a second resample pass shrinks the file further
+  (anims.glb 860 KB gzipped).

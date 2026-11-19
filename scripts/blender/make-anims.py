@@ -2,7 +2,9 @@
 # overhead mallet whack, a chainsaw hold and revving thrust, a ghost's limp float, flailing on a long fall (off the
 # bus), two deaths (to the knees and forward; a twisting fall sideways), and the gestures: wrapping a bandage,
 # patching up from a medkit, pouring a salt circle, holding up a relic, picking something up, heaving a chest open,
-# a ghost's casting thrust and the winner's arms-up.
+# a ghost's casting thrust and the winner's arms-up; and the launchers' own handling: the harpoon gun braced at the
+# hip, the firework tube on the shoulder, and their reloads (cranking the crossbow, loading the harpoon from the
+# muzzle, dropping in a rocket and lighting its fuse with a match).
 #
 #   blender --background --factory-startup --python scripts/blender/make-anims.py -- <mixamo anims folder> <out folder> [clip ...]
 #
@@ -484,7 +486,99 @@ def victory():
     rig.bake('victory', dur, pose, loop=True)
 
 
+# ------------------------------------------------------------------ the launchers (src/characters.js OWN_AIM, OWN_RELOAD)
+
+def harpoon_aim():
+    """The harpoon gun braced at the right hip, the left hand forward under the barrel."""
+    rig = Rig('breath_idle.fbx')
+    dur = 2.0
+
+    def pose(r, t):
+        b = math.sin(2 * math.pi * t / dur)
+        spine(r, 0.12, -0.18, 0.0)
+        headturn(r, 0.05, 0.12)
+        arm_to(r, 'Right', (0.2 + 0.005 * b, 0.22, 1.02 + 0.01 * b), (-0.4, 0.7, 0.9))
+        arm_to(r, 'Left', (0.56, 0.02, 1.1 + 0.01 * b), (-0.1, -0.6, 0.8))
+    rig.bake('harpoon_aim', dur, pose, loop=True)
+
+
+def fireworks_aim():
+    """The firework tube up on the right shoulder: the right hand on its grip, the left steadying the front, the head
+    leant over to sight along it."""
+    rig = Rig('breath_idle.fbx')
+    dur = 2.0
+
+    def pose(r, t):
+        b = math.sin(2 * math.pi * t / dur)
+        spine(r, 0.04, -0.1, 0.0)
+        headturn(r, 0.05, 0.08, 0.22)
+        arm_to(r, 'Right', (0.26, 0.2, 1.38 + 0.008 * b), (-0.3, 0.8, 1.0))
+        arm_to(r, 'Left', (0.56, 0.08, 1.44 + 0.008 * b), (0.0, -0.6, 1.0))
+    rig.bake('fireworks_aim', dur, pose, loop=True)
+
+
+def crossbow_reload():
+    """Cranking a crossbow: its nose put to the ground with a foot in the stirrup, the string hauled up to the latch with
+    both hands, a bolt taken from the hip and laid in, then back up to aim."""
+    rig = Rig('breath_idle.fbx')
+    dur = 1.9
+    down = [(0.0, 0.0), (0.35, -0.2), (1.1, -0.16), (1.5, -0.05), (1.9, 0.0)]
+    pitch = [(0.0, 0.0), (0.35, 0.6), (0.8, 0.45), (1.1, 0.3), (1.5, 0.1), (1.9, 0.0)]
+    R = [(0.0, (0.35, 0.15, 1.3)), (0.35, (0.45, 0.14, 0.5)), (0.8, (0.4, 0.18, 0.95)), (1.1, (0.38, 0.16, 0.98)), (1.5, (0.36, 0.15, 1.15)), (1.9, (0.35, 0.15, 1.3))]
+    Lh = [(0.0, (0.55, -0.05, 1.35)), (0.35, (0.48, -0.1, 0.46)), (0.8, (0.4, -0.16, 0.95)), (1.1, (-0.05, -0.26, 0.95)), (1.35, (0.42, -0.02, 1.0)), (1.5, (0.5, -0.04, 1.2)), (1.9, (0.55, -0.05, 1.35))]
+
+    def pose(r, t):
+        r.move('Hips', r.up * track(down, t))
+        leg_to(r, 'Right', (0.0, 0.11, 0.08), (1.2, 0.15, 0.5))
+        # the left foot forward into the stirrup while the nose is down
+        k = smooth(t / 0.3) * smooth((1.5 - t) / 0.3)
+        leg_to(r, 'Left', (0.28 * k, -0.11, 0.08 + 0.04 * k), (1.2, -0.15, 0.5))
+        spine(r, track(pitch, t))
+        headturn(r, 0.35 * smooth(t / 0.35) * smooth((1.6 - t) / 0.4))
+        arm_to(r, 'Right', track(R, t), (-0.3, 0.8, 0.6))
+        arm_to(r, 'Left', track(Lh, t), (-0.3, -0.8, 0.6))
+    rig.bake('crossbow_reload', dur, pose)
+
+
+def harpoon_reload():
+    """Loading a harpoon: the gun stood upright at the hip, a fresh harpoon drawn from over the shoulder and rammed down
+    the muzzle, then levelled again."""
+    rig = Rig('breath_idle.fbx')
+    dur = 2.6
+    R = [(0.0, (0.2, 0.22, 1.02)), (0.4, (0.24, 0.16, 1.0)), (1.9, (0.24, 0.16, 1.0)), (2.6, (0.2, 0.22, 1.02))]
+    Lh = [(0.0, (0.56, 0.02, 1.1)), (0.4, (0.3, 0.0, 1.35)), (0.8, (-0.12, -0.2, 1.62)), (1.1, (0.28, 0.08, 1.85)), (1.6, (0.28, 0.08, 1.35)), (1.9, (0.3, 0.06, 1.3)), (2.6, (0.56, 0.02, 1.1))]
+    yaw = [(0.0, -0.18), (0.8, -0.45), (1.1, -0.1), (2.6, -0.18)]
+
+    def pose(r, t):
+        spine(r, 0.08, track(yaw, t), 0.0)
+        headturn(r, 0.25, -track(yaw, t) * 0.5)
+        arm_to(r, 'Right', track(R, t), (-0.4, 0.7, 0.9))
+        arm_to(r, 'Left', track(Lh, t), (-0.3, -0.7, 1.0))
+    rig.bake('harpoon_reload', dur, pose)
+
+
+def fireworks_reload():
+    """Reloading the firework tube: brought down off the shoulder, a rocket dropped into its mouth, a match struck and
+    put to the fuse at the back, shaken out, and the tube back up on the shoulder."""
+    rig = Rig('breath_idle.fbx')
+    dur = 2.8
+    R = [(0.0, (0.26, 0.2, 1.38)), (0.4, (0.3, 0.2, 1.05)), (1.9, (0.3, 0.2, 1.05)), (2.5, (0.28, 0.2, 1.3)), (2.8, (0.26, 0.2, 1.38))]
+    Lh = [(0.0, (0.56, 0.08, 1.44)), (0.4, (-0.08, -0.22, 1.0)), (0.75, (0.42, 0.16, 1.42)), (1.25, (0.42, 0.16, 1.2)),
+          (1.45, (0.25, -0.06, 1.2)), (1.55, (0.3, -0.02, 1.22)), (1.65, (0.25, -0.06, 1.2)), (1.75, (0.3, -0.02, 1.22)),
+          (2.05, (0.0, 0.26, 1.02)), (2.3, (0.05, 0.1, 1.05)), (2.4, (0.08, -0.05, 1.1)), (2.8, (0.56, 0.08, 1.44))]
+    pitch = [(0.0, 0.04), (0.4, 0.2), (1.9, 0.25), (2.8, 0.04)]
+
+    def pose(r, t):
+        spine(r, track(pitch, t), -0.1, 0.0)
+        headturn(r, 0.35 * smooth(t / 0.4) * smooth((2.6 - t) / 0.3), 0.0)
+        arm_to(r, 'Right', track(R, t), (-0.3, 0.8, 0.8))
+        arm_to(r, 'Left', track(Lh, t), (-0.3, -0.7, 0.9))
+    rig.bake('fireworks_reload', dur, pose)
+
+
 CLIPS = {
+    'harpoon_aim': harpoon_aim, 'fireworks_aim': fireworks_aim, 'crossbow_reload': crossbow_reload,
+    'harpoon_reload': harpoon_reload, 'fireworks_reload': fireworks_reload,
     'heal_wrap': heal_wrap, 'heal_medkit': heal_medkit, 'salt_pour': salt_pour, 'relic_raise': relic_raise,
     'pickup': pickup, 'open_chest': open_chest, 'ghost_cast': ghost_cast, 'victory': victory,
     'possess_ride': possess_ride, 'possess_wheel': possess_wheel,
