@@ -1438,7 +1438,7 @@ export class Character {
     if (ghost && this.clips.ghost_float) over = 'ghost_float';
     // ...unless they have taken a ride: hunched into a car gripping it, or arms raised to the Ferris wheel
     if (ghost && (p.possess === 'car' || p.possess === 'coaster') && this.clips.possess_ride) over = 'possess_ride';
-    if (ghost && p.possess === 'ferris' && this.clips.possess_wheel) over = 'possess_wheel';
+    if (ghost && (p.possess === 'ferris' || p.possess === 'carousel') && this.clips.possess_wheel) over = 'possess_wheel';
     if (!ghost) {
       // sitting on the tour bus (riders) or behind its wheel (the driver)
       if (opts.seat && this.clips[opts.seat]) over = opts.seat;

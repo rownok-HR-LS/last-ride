@@ -561,3 +561,20 @@ sounds; lightning that lights the park, rides that light up, lived-in details (B
   later has to drop them (the existing step at k <= 0.55), fxBack = 2 and they stay off. Desktop Auto is unchanged.
   Checked in the mobile preset: starts light, a fast machine is back to full with effects in ~7 s; a forced slow run
   drops them and they do not come back.
+
+## The haunted carousel (2026-11-20)
+
+- The user picked: the carousel; hurts, rarely kills; warned by sound and lights.
+- shared/items.js RIDES.carousel { cost 40, cd 22, reach 11, dmg 35, warn 1.5, spin 2.4, edge 1.4, throw 12 }.
+  game.js this.carousel { angle, v, driver, owner, phase warn|fling|slow, t, cd, hits }; rideNear/possess/release/
+  ghostSpot know it; updateCarousel: wind-up 1.5 s (speed 0.18 -> 1.2 rad/s), spin 2.4 s at 4.5 rad/s throwing every
+  living rider within r + 1.4 m (y < 2.6) once: outward and along the turn at 12 m/s, up 6.5, tumbling (tumbleHow
+  'carousel' so wall bounces credit it), 35 damage; then 2 s winding down, the ghost is let go, 22 s rest. Letting
+  go during the wind-up cancels it (ecto spent). The ghost sits on the centre pole (y 5.2) with the possess_wheel
+  pose. Snapshot carries carousel { angle, v, phase, cd, driver }; events 'carousel' {phase warn|fling}.
+- Client: rides.js turns it by the snapshot (own angle run on at v and eased toward it, so a fast spin stays smooth
+  online), horses bob with the angle, the bulbs' chase follows it and blaze/stutter while haunted (carouselHaunt).
+  audio.js 'carousel': warn = a music box wound up wrong (two detuned reeds, speeding up); fling = whoosh, creak,
+  groan. HUD prompt/possessed text, guide marker + icon, death cause "the carousel".
+- Bots: planGhost takes it when 2+ riders are on it (or 1, 70%). 8 bot matches: 7 spins, 2 kills (Ferris 4, cars 3,
+  coaster 1), match length 5.6 min. Needs Render (shared/).

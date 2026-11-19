@@ -715,6 +715,30 @@ export function play(name, pos = null, opt = {}) {
       noise(d, t, 0.8, { type: 'bandpass', freq: 3000, sweepTo: 300, q: 3, vol: 0.5 });
       break;
     }
+    case 'carousel': {
+      // a ghost has the carousel: its music box wound up wrong (two reeds out of tune, speeding up), then the rush of it
+      // spinning and the old steel groaning as it throws them
+      const d = out(pos, 0.7, 45);
+      if (!d) return;
+      if (opt.phase === 'fling') {
+        sample(d, 'whoosh', t, { vol: 0.8, rate: 0.6 });
+        sample(d, 'creak', t + 0.1, { vol: 0.7, rate: 0.5 });
+        sample(d, 'groan', t + 0.25, { vol: 0.5, rate: 0.7 });
+        if (!has('whoosh')) noise(d, t, 1.6, { type: 'bandpass', freq: 500, sweepTo: 1800, q: 0.8, vol: 0.6, attack: 0.3 });
+        break;
+      }
+      const hz = (m) => 440 * 2 ** ((m - 69) / 12);
+      const tune = [76, 75, 76, 79, 76, 75, 72, 74, 76, 75, 76, 81, 79, 76, 75, 72];
+      let at = 0;
+      tune.forEach((m, i) => {
+        const len = 0.16 - i * 0.0065;
+        for (const det of [-22, 31]) tone(d, t + at, len * 1.2, { type: 'triangle', freq: hz(m), vol: 0.13, detune: det });
+        tone(d, t + at, len, { type: 'square', freq: hz(m) * 2, vol: 0.025, detune: 9 });
+        at += len;
+      });
+      sample(d, 'creak', t, { vol: 0.35, rate: 0.8 });
+      break;
+    }
     case 'emote': {
       // the emote wheel's moves (opt.n: wave, taunt, bow, dance), played on the park's own little organ: a whistle,
       // a "nyah-nyah", a ta-da, a calliope tune. A ghost's are slower, lower, in a minor key and wavering.

@@ -108,6 +108,8 @@ export class Rides {
     this.scene = scene;
     // where the carousel's bulb chase has got to (its shader: upgradeCarousel)
     this.carouselChase = { value: 0 };
+    // how haunted the carousel is (0..1: a ghost winding it up and spinning it; its bulbs blaze and stutter)
+    this.carouselHaunt = { value: 0 };
     this.buildFerris();
     this.buildCoaster();
     this.buildCars();
@@ -168,6 +170,7 @@ export class Rides {
       if (!m.emissive || m.emissive.getHex() === 0) continue;
       m.onBeforeCompile = (sh) => {
         sh.uniforms.chaseT = this.carouselChase;
+        sh.uniforms.haunt = this.carouselHaunt;
         sh.vertexShader = sh.vertexShader
           .replace('#include <common>', `#include <common>
 varying vec2 vChase;`)
@@ -176,9 +179,10 @@ varying vec2 vChase;`)
         sh.fragmentShader = sh.fragmentShader
           .replace('#include <common>', `#include <common>
 varying vec2 vChase;
-uniform float chaseT;`)
+uniform float chaseT;
+uniform float haunt;`)
           .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-  { float a = atan(vChase.y, vChase.x) / 6.2832; float band = pow(max(0.0, cos((a * 4.0 - chaseT) * 6.2832)), 6.0); totalEmissiveRadiance *= 1.0 + band * 14.0; }`);
+  { float a = atan(vChase.y, vChase.x) / 6.2832; float band = pow(max(0.0, cos((a * 4.0 - chaseT) * 6.2832)), 6.0); totalEmissiveRadiance *= (1.0 + band * 14.0) * (1.0 + haunt * 2.5); }`);
       };
       m.customProgramCacheKey = () => 'lr-carousel-chase';
     }
@@ -690,13 +694,19 @@ uniform float chaseT;`)
       B.setColorAt(i, c);
     }
     B.instanceColor.needsUpdate = true;
-    this.carouselChase.value = time * 0.5;
+    // the chase runs with the platform (faster as a ghost spins it); a ghost's wind-up makes every bulb stutter on
+    const ang = this.carAng ?? time * 0.18;
+    this.carouselChase.value = ang * 2.8;
+    const want = snap.carousel?.phase && snap.carousel.phase !== 'slow' ? 1 : 0;
+    this.carouselLit = (this.carouselLit ?? 0) + (want - (this.carouselLit ?? 0)) * Math.min(1, dt * (want ? 1.8 : 0.7));
+    const hl = this.carouselLit;
+    this.carouselHaunt.value = hl * (hl < 0.7 ? (Math.sin(time * 41) > 0.1 ? 1 : 0.1) : 1);
     const C = this.carouselBulbs;
     if (!C) return;
     for (let i = 0; i < 40; i++) {
       const works = i % 5 === 0 || i % 7 === 3;
-      const chase = Math.max(0, Math.cos((i / 40 - time * 0.12) * Math.PI * 2 * 4)) ** 4;
-      const v = works ? 0.5 + chase * 1.1 : 0;
+      const chase = Math.max(0, Math.cos((i / 40 - ang * 0.67) * Math.PI * 2 * 4)) ** 4;
+      const v = Math.max(works ? 0.5 + chase * 1.1 : 0, this.carouselHaunt.value * (0.5 + chase * 1.3));
       c.copy(dead).lerp(warm, Math.min(1, v)).multiplyScalar(1 + v * 1.8);
       C.setColorAt(i, c);
     }
@@ -738,11 +748,19 @@ uniform float chaseT;`)
 
     this.updateBulbs(snap, dt, time);
 
-    // carousel spins slowly; horses bob
-    this.carousel.rotation.y = time * 0.18;
+    // the carousel turns as the park says (slowly; fast when a ghost spins it): run on at its speed between updates and
+    // ease toward where it should be, so a quick spin stays smooth online; the horses bob in step with it
+    const cs = snap.carousel;
+    if (cs) {
+      if (this.carAng === undefined) this.carAng = cs.angle;
+      this.carAng += cs.v * dt;
+      const err = Math.atan2(Math.sin(cs.angle - this.carAng), Math.cos(cs.angle - this.carAng));
+      this.carAng += err * Math.min(1, dt * 3);
+    } else this.carAng = time * 0.18;
+    this.carousel.rotation.y = this.carAng;
     this.horses.forEach((h, i) => {
       const y0 = h.userData.y0 ?? 1.6;
-      h.position.y = y0 + Math.sin(time * 1.6 + i * 1.3) * (h.userData.amp ?? 0.35);
+      h.position.y = y0 + Math.sin(this.carAng * 9 + i * 1.3) * (h.userData.amp ?? 0.35);
     });
     this.freefallSeat.position.y = 30 + Math.sin(time * 0.25) * 12;
 

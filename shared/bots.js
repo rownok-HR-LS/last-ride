@@ -3,7 +3,7 @@ import { EYE_HEIGHT, LANDING_GRACE } from './constants.js';
 import {
   WEAPONS, RIDES, POWERS, ITEMS, AMMO, PRIZES, RARITIES, HEAVY, THROW, STAMINA, weaponDef,
 } from './items.js';
-import { CHEST_SPOTS, LOOT_SPOTS, PRIZE_BOOTHS, FERRIS, STATION, TRACK, trackAt, PARK_EDGE, BUS_ROUTE, busAt } from './map.js';
+import { CHEST_SPOTS, LOOT_SPOTS, PRIZE_BOOTHS, FERRIS, STATION, CAROUSEL, TRACK, trackAt, PARK_EDGE, BUS_ROUTE, busAt } from './map.js';
 import { lineOfSight } from './collide.js';
 import { findPath } from './nav.js';
 import { anglesTo, angleDiff, pick } from './rng.js';
@@ -921,7 +921,8 @@ function ghost(game, p, b, dt) {
     void aimAt;
     game.setInput(p.id, { yaw: p.yaw, pitch: 0 });
     return;
-  } else if (pos?.kind === 'coaster') {
+  } else if (pos?.kind === 'coaster' || pos?.kind === 'carousel') {
+    // (the ride runs its course and lets go by itself)
     game.setInput(p.id, { yaw: p.yaw, pitch: 0 });
     return;
   }
@@ -970,6 +971,18 @@ function planGhost(game, p, b, v) {
   if (!game.ferris.driver && p.ecto >= 60 && Math.hypot(v.x - FERRIS.x, v.z - FERRIS.z) < RIDES.ferris.range - 10 && r < 0.5) {
     b.ghostPlan = { kind: 'possess', x: FERRIS.x, y: FERRIS.hubY - 6, z: FERRIS.z + 4, reach: 10, t: T };
     return;
+  }
+  // the carousel when survivors are on it or right beside it (the more the better)
+  const C = game.carousel;
+  if (C && !C.phase && C.cd <= 0 && p.ecto >= RIDES.carousel.cost) {
+    let on = 0;
+    for (const q of game.players.values()) {
+      if (q.state === 'alive' && q.y < 2.6 && Math.hypot(q.x - CAROUSEL.x, q.z - CAROUSEL.z) < CAROUSEL.r + RIDES.carousel.edge - 0.3) on++;
+    }
+    if (on >= 2 || (on === 1 && r < 0.7)) {
+      b.ghostPlan = { kind: 'possess', x: CAROUSEL.x, y: 6, z: CAROUSEL.z, reach: 7, t: T };
+      return;
+    }
   }
   // coaster when the victim stands near a low stretch of track
   if (!game.coaster.running && game.coaster.cd <= 0 && p.ecto >= RIDES.coaster.cost) {

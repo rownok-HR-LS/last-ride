@@ -11,7 +11,7 @@ import {
   rollWeapon, rollFloor, weaponLabel, weaponDef, makeWeapon,
 } from './items.js';
 import {
-  LOOT_SPOTS, CHEST_SPOTS, PRIZE_BOOTHS, FERRIS, STATION, CAR_SPAWNS, TRACK, trackAt, PARK_EDGE, BUS_ROUTE, busAt,
+  LOOT_SPOTS, CHEST_SPOTS, PRIZE_BOOTHS, FERRIS, STATION, CAROUSEL, CAR_SPAWNS, TRACK, trackAt, PARK_EDGE, BUS_ROUTE, busAt,
   BREAKABLES, BREAKABLE_MODELS,
 } from './map.js';
 import { rayWorld, rayPlayer, groundAt, lineOfSight } from './collide.js';
@@ -72,6 +72,8 @@ export class Game {
     this.salts = [];
     this.gondolas = [];
     this.ferris = { angle: 0, driver: null };
+    // the carousel turns slowly on its own; a ghost can wind it up and spin it (phase warn, then fling, then slow)
+    this.carousel = { angle: 0, v: 0.18, driver: null, owner: null, phase: null, t: 0, cd: 0, hits: new Map() };
     this.coaster = { s: 0, v: 0, dist: 0, running: false, driver: null, cd: 0, hits: new Map() };
     this.bus = { s: 0, v: 0, x: 0, z: 0, dx: 0, dz: -1, yaw: 0 };
     this.placeBus();
@@ -948,6 +950,7 @@ export class Game {
       return { x: t.x, y: t.y + 1, z: t.z };
     }
     if (g.possess?.kind === 'ferris') return { x: FERRIS.x, y: 2, z: FERRIS.z }; // the wheel's base
+    if (g.possess?.kind === 'carousel') return { x: CAROUSEL.x, y: 2, z: CAROUSEL.z };
     return g;
   }
 
@@ -985,6 +988,9 @@ export class Game {
     if (!this.coaster.running && Math.hypot(p.x - STATION.x, p.z - STATION.z) < RIDES.coaster.reach) {
       return { kind: 'coaster', ready: this.coaster.cd <= 0 };
     }
+    if (!this.carousel.driver && !this.carousel.phase && Math.hypot(p.x - CAROUSEL.x, p.z - CAROUSEL.z) < RIDES.carousel.reach) {
+      return { kind: 'carousel', ready: this.carousel.cd <= 0 };
+    }
     let best = null;
     let bestD = RIDES.car.reach;
     this.cars.forEach((c, i) => {
@@ -1011,6 +1017,15 @@ export class Game {
       Object.assign(this.coaster, { running: true, driver: p.id, owner: p.id, dist: 0, v: 0 });
       this.coaster.hits.clear();
       p.possess = { kind: 'coaster' };
+    } else if (r.kind === 'carousel') {
+      if (!r.ready || p.ecto < RIDES.carousel.cost) return;
+      p.ecto -= RIDES.carousel.cost;
+      Object.assign(this.carousel, { driver: p.id, owner: p.id, phase: 'warn', t: 0 });
+      this.carousel.hits.clear();
+      // up on top of the centre pole, arms raised to it
+      Object.assign(p, { x: CAROUSEL.x, y: 5.2, z: CAROUSEL.z, vx: 0, vy: 0, vz: 0 });
+      p.possess = { kind: 'carousel' };
+      this.events.push({ e: 'carousel', phase: 'warn', x: CAROUSEL.x, z: CAROUSEL.z });
     } else {
       if (p.ecto < RIDES.car.cost) return;
       p.ecto -= RIDES.car.cost;
@@ -1029,6 +1044,14 @@ export class Game {
     const k = p.possess.kind;
     if (k === 'ferris' && this.ferris.driver === p.id) this.ferris.driver = null;
     if (k === 'coaster' && this.coaster.driver === p.id) this.coaster.driver = null;
+    if (k === 'carousel' && this.carousel.driver === p.id) {
+      // let go while it is still winding up: it never throws (the ecto is spent); once spinning it runs its course
+      if (this.carousel.phase === 'warn') {
+        this.carousel.phase = 'slow';
+        this.carousel.t = 0;
+      }
+      this.carousel.driver = null;
+    }
     if (k === 'car') {
       const c = this.cars[p.possess.car];
       if (c && c.driver === p.id) {
@@ -1441,7 +1464,7 @@ export class Game {
           p.vz = (vz - 2 * vn * nz) * 0.5;
           this.events.push({ e: 'wallhit', id: p.id, x: p.x, y: p.y + 1, z: p.z });
           // (the wall's damage goes to whoever sent them flying)
-          this.damage(p, Math.min(8, -vn * 0.7), this.players.get(p.tumbleBy) || null, 'car');
+          this.damage(p, Math.min(8, -vn * 0.7), this.players.get(p.tumbleBy) || null, p.tumbleHow || 'car');
         }
       }
     } else {
@@ -1575,6 +1598,14 @@ export class Game {
       if (c.t <= 0) this.release(p);
       return;
     }
+    if (pos?.kind === 'carousel') {
+      // up on the centre pole, turning with it
+      p.x = CAROUSEL.x;
+      p.y = 5.2;
+      p.z = CAROUSEL.z;
+      p.yaw = -this.carousel.angle;
+      return;
+    }
     if (pos?.kind === 'coaster') {
       const t = trackAt(this.coaster.s);
       p.x = t.x;
@@ -1680,6 +1711,7 @@ export class Game {
   updateRides(dt) {
     const f = this.ferris;
     f.angle += (f.driver ? 0.28 : 0.05) * dt;
+    this.updateCarousel(dt);
 
     // coaster
     const c = this.coaster;
@@ -1771,6 +1803,7 @@ export class Game {
         q.knockT = Math.max(q.knockT, 0.9);
         q.tumbleT = 1.1;
         q.tumbleBy = car.driver;
+        q.tumbleHow = 'car';
         q.atk = null;
         car.vx *= 0.5;
         car.vz *= 0.5;
@@ -1778,6 +1811,69 @@ export class Game {
         this.damage(q, RIDES.car.dmg * Math.min(1.2, speed / RIDES.car.speed + 0.3), owner, 'car');
       }
     }
+  }
+
+  /** The carousel: its slow turn, and a ghost's wind-up, spin and throw (RIDES.carousel). */
+  updateCarousel(dt) {
+    const C = this.carousel;
+    const R = RIDES.carousel;
+    C.cd = Math.max(0, C.cd - dt);
+    let want = 0.18;
+    if (C.phase) {
+      C.t += dt;
+      if (C.phase === 'warn') {
+        want = 0.18 + 1.0 * Math.min(1, C.t / R.warn);
+        if (C.t >= R.warn) {
+          C.phase = 'fling';
+          C.t = 0;
+          this.events.push({ e: 'carousel', phase: 'fling', x: CAROUSEL.x, z: CAROUSEL.z });
+        }
+      } else if (C.phase === 'fling') {
+        want = 4.5;
+        const owner = this.players.get(C.owner) || null;
+        for (const q of this.players.values()) {
+          if (q.state !== 'alive' || q.y > 2.6 || C.hits.has(q.id)) continue;
+          const dx = q.x - CAROUSEL.x;
+          const dz = q.z - CAROUSEL.z;
+          const d = Math.hypot(dx, dz);
+          if (d > CAROUSEL.r + R.edge) continue;
+          // (the platform needs a moment to get going: the ones on it go first, those beside it a little later)
+          if (C.t < 0.15 + Math.max(0, d - CAROUSEL.r) * 0.2) continue;
+          C.hits.set(q.id, this.time);
+          const nx = dx / (d || 1);
+          const nz = dz / (d || 1);
+          // out and along the way it turns, up off the boards, tumbling (bouncing off whatever wall they meet)
+          q.vx = nx * R.throw - nz * R.throw * 0.6;
+          q.vz = nz * R.throw + nx * R.throw * 0.6;
+          q.vy = 6.5;
+          q.onGround = false;
+          q.knockT = Math.max(q.knockT || 0, 0.9);
+          q.tumbleT = 1.1;
+          q.tumbleBy = C.owner;
+          q.tumbleHow = 'carousel';
+          q.atk = null;
+          this.events.push({ e: 'bump', x: q.x, z: q.z });
+          this.damage(q, R.dmg, owner, 'carousel');
+        }
+        if (C.t >= R.spin) {
+          C.phase = 'slow';
+          C.t = 0;
+        }
+      } else if (C.phase === 'slow') {
+        want = 0.18;
+        if (C.t >= 2) {
+          C.phase = null;
+          C.cd = R.cd;
+          const d = this.players.get(C.driver);
+          if (d && d.possess?.kind === 'carousel') this.release(d);
+          C.driver = null;
+          C.owner = null;
+        }
+      }
+    }
+    // the platform's speed follows along (quick to spin up, slower to run down)
+    C.v += (want - C.v) * Math.min(1, dt * (want > C.v ? 2.5 : 1.2));
+    C.angle += C.v * dt;
   }
 
   updateHazards(dt) {
@@ -1891,6 +1987,7 @@ export class Game {
       zone: { cx: zn.cx, cz: zn.cz, r: zn.r, nx: zn.nx, nz: zn.nz, nr: zn.nr, state: zn.state, t: zn.t, idx: zn.idx, dps: this.zoneDps() },
       bus: { x: this.bus.x, z: this.bus.z, yaw: this.bus.yaw, s: this.bus.s, v: this.bus.v, open: this.phase === 'live' && this.bus.s < BUS_ROUTE.len },
       ferris: { angle: this.ferris.angle, driver: this.ferris.driver },
+      carousel: { angle: this.carousel.angle, v: this.carousel.v, phase: this.carousel.phase, cd: this.carousel.cd, driver: this.carousel.driver },
       coaster: { s: this.coaster.s, v: this.coaster.v, running: this.coaster.running, cd: this.coaster.cd },
       cars: this.cars.map((c) => ({ x: c.x, y: c.y, z: c.z, yaw: c.yaw, driver: c.driver, t: c.t })),
       broken: this.broken.size ? [...this.broken] : null,

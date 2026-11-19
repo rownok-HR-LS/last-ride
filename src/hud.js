@@ -22,7 +22,7 @@ const fmt = (t) => {
 
 const ITEM_ICON = Object.fromEntries(['bandage', 'medkit', 'soda', 'holy', 'flare', 'salt', 'relic'].map((k) => [k, icon(k)]));
 const POWER_ICON = Object.fromEntries(['trap', 'cursed', 'steps', 'blackout', 'scare', 'storm'].map((k) => [k, icon(k)]));
-const HOW = { storm: 'the storm', trap: 'a bear trap', cursed: 'cursed loot', ferris: 'a flying gondola', coaster: 'the coaster', car: 'a bumper car' };
+const HOW = { storm: 'the storm', trap: 'a bear trap', cursed: 'cursed loot', ferris: 'a flying gondola', coaster: 'the coaster', car: 'a bumper car', carousel: 'the carousel' };
 
 /**
  * Pre-rendered top-down park map, drawn like a modern tactical map: the ground photo darkened and drained, a faint
@@ -414,11 +414,13 @@ export class Hud {
       const cost = me.ride.kind === 'ferris' ? `${R.cost} per gondola` : `${R.cost} ecto`;
       prompt = me.ride.kind === 'coaster' && !me.ride.ready
         ? `Coaster recharging… ${Math.ceil(snap.coaster.cd)}s`
+        : me.ride.kind === 'carousel' && !me.ride.ready ? `Carousel winding down… ${Math.ceil(snap.carousel?.cd || 0)}s`
         : me.riseT > 0 ? `Still rising from the grave… ${Math.ceil(me.riseT)}s` : `${kbd('interact')} Possess <b>${R.name}</b> <span class="dim">(${cost})</span>`;
     } else if (ghost && me.possess) {
       const k = me.possess.kind;
       prompt = k === 'ferris' ? `${kbd('attack')} fling a gondola · ${kbd('interact')} let go`
         : k === 'car' ? `Drive with ${kbd('move')} and ram survivors · ${Math.ceil(me.carT)}s · ${kbd('interact')} let go`
+          : k === 'carousel' ? 'Spinning the carousel… anyone on it is going flying'
           : 'Riding the coaster… hold on!';
     } else if (ghost && view.power) {
       const P = POWERS[view.power];

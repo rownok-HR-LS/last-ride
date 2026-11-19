@@ -23,6 +23,7 @@ const P = {
   weapon: '<path d="M14 4l6 6-2 2-6-6zM12 6L4 20M15 3c3 0 6 3 6 6"/>',
   ferris: '<circle cx="12" cy="10" r="7"/><circle cx="12" cy="10" r="1.5"/><path d="M12 3v14M5 10h14M7 5l10 10M17 5L7 15M8 21l4-9 4 9"/>',
   coaster: '<path d="M2 18c3 0 3-10 6-10s3 8 6 8 3-12 8-12"/><path d="M2 21h20"/>',
+  carousel: '<path d="M3 9l9-5 9 5z"/><path d="M4 9v1M20 9v1M12 9v11M7 9v8M17 9v8M3 20h18"/><path d="M6 14h2M16 15h2"/>',
   car: '<path d="M4 16v-4l2-4h12l2 4v4zM3 16h18v2H3z"/><circle cx="7.5" cy="18.5" r="1.5"/><circle cx="16.5" cy="18.5" r="1.5"/>',
   menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
   wave: '<path d="M8 13V6.5a1.5 1.5 0 0 1 3 0V11M11 10.5V4.5a1.5 1.5 0 0 1 3 0V11M14 11V6a1.5 1.5 0 0 1 3 0v8a7 7 0 0 1-7 7c-3 0-4.4-2-6-4.5L2.8 14.2a1.5 1.5 0 0 1 2.5-1.6L8 16"/><path d="M19 2.5c1.6 1 2.5 2.6 2.5 4.5"/>',

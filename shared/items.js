@@ -136,6 +136,9 @@ export const RIDES = {
   ferris: { name: 'Ferris Wheel', cost: 35, cd: 3, range: 80, reach: 18, dmg: 45, radius: 4.6, warn: 1.25, help: 'Fling gondolas at survivors.' },
   coaster: { name: 'Roller Coaster', cost: 60, cd: 28, reach: 12, dmg: 100, speed: 32, laps: 2, help: 'Send the train screaming around the track.' },
   car: { name: 'Bumper Car', cost: 45, reach: 6, dur: 12, dmg: 30, speed: 14, help: 'Ram survivors with a bumper car.' },
+  // wind it up (warn s: its dead bulbs flicker on and the music box starts, wrong), then spin (spin s) and throw anyone
+  // on or right beside the platform (reach of the edge: edge m) outward; it rests cd s after
+  carousel: { name: 'Carousel', cost: 40, cd: 22, reach: 11, dmg: 35, warn: 1.5, spin: 2.4, edge: 1.4, throw: 12, help: 'Spin it up and hurl everyone off it.' },
 };
 
 // ------------------------------------------------------------------ prize counter

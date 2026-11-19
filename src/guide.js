@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { icon as svgIcon } from './icons.js';
 import { keyOf, press, usingPad, usingTouch } from './prompts.js';
-import { FERRIS, STATION, PRIZE_BOOTHS } from '../shared/map.js';
+import { FERRIS, CAROUSEL, STATION, PRIZE_BOOTHS } from '../shared/map.js';
 
 const TUT_KEY = 'last-ride-ghost-tutorial';
 const v = new THREE.Vector3();
@@ -180,6 +180,7 @@ export class Guide {
       // ghosts see the rides and nearby survivors
       if (!me.possess) {
         if (!snap.ferris.driver) this.place(n++, cam, FERRIS.x, FERRIS.hubY, FERRIS.z, 'ferris', `Ferris wheel · ${dist(FERRIS.x, FERRIS.z)} m`, 'ride');
+        if (snap.carousel && !snap.carousel.phase) this.place(n++, cam, CAROUSEL.x, 6, CAROUSEL.z, 'carousel', snap.carousel.cd > 0 ? `Carousel ${Math.ceil(snap.carousel.cd)}s` : `Carousel · ${dist(CAROUSEL.x, CAROUSEL.z)} m`, 'ride');
         if (!snap.coaster.running) this.place(n++, cam, STATION.x, 3, STATION.z, 'coaster', snap.coaster.cd > 0 ? `Coaster ${Math.ceil(snap.coaster.cd)}s` : `Coaster · ${dist(STATION.x, STATION.z)} m`, 'ride');
         let car = null;
         let cd = Infinity;
@@ -255,8 +256,8 @@ export class Guide {
       1: me.riseT > 0
         ? [`${gh} Rising from the grave… ${Math.ceil(me.riseT)}s`, `Then pick the Bear Trap (${trap}) and ${use} the ground in front of a survivor.`]
         : [`${gh} Use a power`, `Pick the Bear Trap (${trap}), then ${use} the ground in front of a survivor (${svgIcon('target')} markers).`],
-      2: [`${gh} Possess a ride`, `Rides hit hardest. Fly to a ${svgIcon('ferris')} ${svgIcon('coaster')} ${svgIcon('car')} marker and ${press('interact')}.`],
-      3: [`${gh} You control the ride!`, me.possess?.kind === 'ferris' ? `Aim at a survivor and ${use} to fling a gondola. ${lets}` : me.possess?.kind === 'car' ? `Drive into survivors. ${lets}` : 'Hold on. Anyone on the track gets hit.'],
+      2: [`${gh} Possess a ride`, `Rides hit hardest. Fly to a ${svgIcon('ferris')} ${svgIcon('coaster')} ${svgIcon('carousel')} ${svgIcon('car')} marker and ${press('interact')}.`],
+      3: [`${gh} You control the ride!`, me.possess?.kind === 'ferris' ? `Aim at a survivor and ${use} to fling a gondola. ${lets}` : me.possess?.kind === 'car' ? `Drive into survivors. ${lets}` : me.possess?.kind === 'carousel' ? 'It winds up, then hurls everyone on it.' : 'Hold on. Anyone on the track gets hit.'],
     }[this.tut];
     if (step) this.setObjective(step[0], step[1]);
     else this.setObjective(`${gh} Steal a body · ${revives}`, me.revivesLeft > 0 ? `Land the final hit on a survivor (${svgIcon('target')}) with a power or a ride to come back in their body.` : 'Lost soul: you can still haunt the survivors.');

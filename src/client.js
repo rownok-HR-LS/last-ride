@@ -74,7 +74,7 @@ function nearestRegion(x, z) {
 function killCause(how) {
   const OTHER = {
     fists: 'bare hands', trap: 'a bear trap', cursed: 'a cursed chest', ferris: 'a Ferris wheel gondola', coaster: 'the roller coaster',
-    car: 'a bumper car', storm: 'the storm', fall: 'the fall', gondola: 'a Ferris wheel gondola', firework: 'a firework', fireworks: 'a firework',
+    car: 'a bumper car', carousel: 'the carousel', storm: 'the storm', fall: 'the fall', gondola: 'a Ferris wheel gondola', firework: 'a firework', fireworks: 'a firework',
   };
   return OTHER[how] || (WEAPONS[how] ? `a ${WEAPONS[how].name}` : how || 'something in the dark');
 }
@@ -167,7 +167,7 @@ export class Client {
     }
     const how = String(e.how || '');
     const type = WEAPONS[how]?.type;
-    const [h, up] = how === 'car' ? [8, 4] : how === 'coaster' ? [9, 4] : how === 'gondola' || how === 'fling' ? [5, 3]
+    const [h, up] = how === 'car' || how === 'carousel' ? [8, 4] : how === 'coaster' ? [9, 4] : how === 'gondola' || how === 'fling' ? [5, 3]
       : /rocket|grenade|firework|launcher|blast|bomb|mortar|cannon/i.test(how) ? [7, 5]
         : how === 'fists' || type === 'melee' ? [3.5, 1.2] : type ? [2.2, 0.4] : [1, 0.5];
     const vel = c.vel || [0, 0, 0];
@@ -976,7 +976,7 @@ export class Client {
     const LABEL = {
       step: 'Footsteps', fire: 'Shot', impact: 'Fighting', swing: 'Swing', pain: 'A cry', boom: 'Explosion', chest: 'Chest opened',
       possess: 'A ride wakes up', fling: 'Gondola flung', scare: 'Scream', trapSet: 'Trap set', reload: 'Reloading', land: 'Landing',
-      block: 'Blocked blow', splash: 'Holy water', burn: 'Burning', emote: 'Organ tune',
+      block: 'Blocked blow', splash: 'Holy water', burn: 'Burning', emote: 'Organ tune', carousel: 'Carousel music',
     };
     const label = LABEL[name];
     if (!label) return;
@@ -1241,6 +1241,9 @@ export class Client {
           if (e.id !== me && (!meP || Math.hypot(pl.x - meP.x, pl.z - meP.z) > 35)) this.hud.feed(`<b>${esc(pl.name)}</b>: ${esc(text)}`, 'say');
           break;
         }
+        case 'carousel':
+          audio.play('carousel', [e.x, 1.5, e.z], { phase: e.phase });
+          break;
         case 'emote': {
           // the living on their feet, a ghost floating; the dance keeps going a couple of rounds
           const em = EMOTES[e.n];
