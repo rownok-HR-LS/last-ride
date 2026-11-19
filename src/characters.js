@@ -1176,6 +1176,7 @@ export class Character {
     if (!clip) return;
     this.gest = name;
     this.gestT = dur ?? clip.duration;
+    this.gestFull = this.gestT;
     // already playing (two pickups in a row): start it again (clearing this.over would leave the old one running)
     if (this.over === name) this.action(name).reset().play();
   }
@@ -1481,7 +1482,12 @@ export class Character {
     }
     // a one-off gesture (pouring salt, the relic held up, a pickup, a chest heaved open, a ghost's cast, the winner's
     // arms up): only standing or walking slowly, and never over a dodge, a stagger, a slide or a fall
-    if (this.gestT > 0 && EMOTE_CLIP.test(this.gest) && (speed > 1.2 || p.atk || p.blocking || p.aim || (ghost && Math.hypot(p.vx, p.vz) > 1.5))) this.gestT = 0;
+    // (moving only counts once it has had a moment: a rider, or a bot, is often still slowing to a stop as it starts)
+    if (this.gestT > 0 && EMOTE_CLIP.test(this.gest)) {
+      const age = (this.gestFull ?? 0) - this.gestT;
+      const moving = age > 0.4 && (speed > 1.2 || (ghost && Math.hypot(p.vx, p.vz) > 1.5));
+      if (moving || p.atk || p.blocking || p.aim) this.gestT = 0;
+    }
     if (this.gestT > 0) {
       this.gestT -= dt;
       const g = this.gest;

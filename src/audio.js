@@ -715,6 +715,53 @@ export function play(name, pos = null, opt = {}) {
       noise(d, t, 0.8, { type: 'bandpass', freq: 3000, sweepTo: 300, q: 3, vol: 0.5 });
       break;
     }
+    case 'emote': {
+      // the emote wheel's moves (opt.n: wave, taunt, bow, dance), played on the park's own little organ: a whistle,
+      // a "nyah-nyah", a ta-da, a calliope tune. A ghost's are slower, lower, in a minor key and wavering.
+      const d = out(pos, 0.42, 28);
+      if (!d) return;
+      const ghost = !!opt.ghost;
+      const slow = ghost ? 1.6 : 1;
+      const hz = (m) => 440 * 2 ** ((m - 69) / 12);
+      // a ghost's tunes drop the major thirds and sixths a semitone, and the whole lot a fifth
+      const key = (m) => (ghost ? m - 7 - ([4, 9].includes(m % 12) ? 1 : 0) : m);
+      const note = (at, m, dur, { type = 'triangle', vol = 0.3, glide = 0, oct = true } = {}) => {
+        const t0 = t + at * slow;
+        const f = hz(key(m));
+        const o = tone(d, t0, dur * slow, { type: ghost ? 'sine' : type, freq: f, to: glide ? f * 2 ** (glide / 12) : null, vol, attack: ghost ? 0.06 : 0.008 });
+        // an organ's reedy octave on top; for a ghost, a slow wobble instead
+        if (!ghost && oct) tone(d, t0, dur * 0.8, { type: 'square', freq: f * 2, vol: vol * 0.12, attack: 0.008 });
+        if (ghost) {
+          const lfo = ctx.createOscillator();
+          const lg = ctx.createGain();
+          lfo.frequency.value = 5 + Math.random() * 2;
+          lg.gain.value = f * 0.025;
+          lfo.connect(lg);
+          lg.connect(o.frequency);
+          lfo.start(t0);
+          lfo.stop(t0 + dur * slow + 0.1);
+        }
+      };
+      if (ghost) sample(d, 'moan', t, { vol: 0.25, rate: 0.9 });
+      if (opt.n === 0) {
+        // a two-note whistle: hey-hey
+        note(0, 84, 0.16, { type: 'sine', vol: 0.32, glide: 4, oct: false });
+        note(0.2, 86, 0.26, { type: 'sine', vol: 0.32, glide: 5, oct: false });
+      } else if (opt.n === 1) {
+        // nyah-nyah-na-nyah-nyah
+        [[0, 79, 0.2], [0.22, 76, 0.12], [0.36, 81, 0.12], [0.5, 79, 0.2], [0.72, 76, 0.3]].forEach(([a, m, l]) => note(a, m, l, { vol: 0.26 }));
+      } else if (opt.n === 2) {
+        // ta-da
+        for (const m of [72, 76, 79]) note(0, m, 0.12, { vol: 0.14 });
+        for (const m of [72, 76, 79, 84]) note(0.16, m, 0.9, { vol: 0.13 });
+      } else if (opt.n === 3) {
+        // a calliope's oom-pah, two bars
+        const tune = [76, 79, 84, 79, 81, 79, 76, 79, 77, 81, 86, 81, 79, 77, 74, 71];
+        tune.forEach((m, i) => note(i * 0.15, m, 0.14, { vol: 0.2 }));
+        [48, 55, 48, 55, 50, 55, 43, 55].forEach((m, i) => note(i * 0.3, m, 0.2, { type: 'sine', vol: 0.3, oct: false }));
+      }
+      break;
+    }
     case 'ghost': {
       const d = out(pos, 0.45, 30);
       if (!d) return;

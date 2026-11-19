@@ -306,6 +306,86 @@ function useOccult(game, p, b) {
   return null;
 }
 
+// ------------------------------------------------------------------ showing off (the emote wheel: src/client.js)
+
+/** Emote numbers (shared/constants.js EMOTES) and how long a bot stands still for each. */
+const WAVE = 0;
+const TAUNT = 1;
+const BOW = 2;
+const DANCE = 3;
+const SHOW_HOLD = [2.2, 2.2, 2.4, 3.6];
+
+/** After a kill (game.js kill): now and then a bow, a taunt or a little dance over the one just beaten. */
+export function showOverKill(game, k, v) {
+  const b = k.brain;
+  if (!b || b.rand() > 0.5) return;
+  const r = b.rand();
+  b.show = k.state === 'ghost' ? (r < 0.6 ? TAUNT : r < 0.85 ? BOW : DANCE)
+    : b.persona === 'brawler' ? (r < 0.7 ? TAUNT : DANCE)
+    : b.persona === 'duelist' ? (r < 0.75 ? BOW : TAUNT)
+    : r < 0.5 ? DANCE : TAUNT;
+  b.showAt = game.time + 0.7 + b.rand() * 0.6;
+  b.showFace = { x: v.x, z: v.z };
+}
+
+/** Is a living rider other than p within r metres? */
+function someoneNear(game, p, r) {
+  for (const q of game.players.values()) {
+    if (q !== p && q.state === 'alive' && Math.hypot(q.x - p.x, q.z - p.z) < r) return true;
+  }
+  return false;
+}
+
+/**
+ * A bot's emotes: over a rider it has just beaten (showOverKill), and a wave to a person (not a bot) met while still
+ * looting after the landing. It stands still facing them for the move, and drops it the moment anyone else comes
+ * close or it is hit. Returns true while it is holding still (the caller skips its own moves).
+ */
+function showOff(game, p, b, dt) {
+  const ghost = p.state === 'ghost';
+  if (b.showT > 0) {
+    b.showT -= dt;
+    const hit = game.time - (p.lastHitAt ?? -99) < 0.6;
+    if (hit || (!ghost && someoneNear(game, p, 9)) || p.possess) b.showT = 0;
+    else {
+      const f = b.showFace;
+      const yaw = f ? anglesTo(p.x, 0, p.z, f.x, 0, f.z).yaw : p.yaw;
+      game.setInput(p.id, { fwd: 0, side: 0, up: 0, yaw, pitch: 0 });
+      return true;
+    }
+  }
+  if (b.showAt != null && game.time >= b.showAt) {
+    b.showAt = null;
+    // (not with somebody else already coming for them)
+    if (ghost ? !p.possess : !someoneNear(game, p, 9) && game.time - (p.lastHitAt ?? -99) > 2) {
+      game.command(p.id, { c: 'emote', n: b.show });
+      b.showT = SHOW_HOLD[b.show];
+      return true;
+    }
+  }
+  // a wave to a person spotted nearby while still looting (once each, and not too often)
+  b.waveT = (b.waveT ?? 1 + b.rand() * 2) - dt;
+  if (!ghost && b.waveT <= 0) {
+    b.waveT = 0.5;
+    const settling = p.landedAt !== null && game.time - p.landedAt < b.P.loot;
+    if (settling && !b.enemy && game.time - (b.wavedAt ?? -99) > 60) {
+      for (const q of game.players.values()) {
+        if (q === p || q.bot || q.state !== 'alive' || (b.waved ||= {})[q.id]) continue;
+        const d = Math.hypot(q.x - p.x, q.z - p.z);
+        if (d < 6 || d > 16 || !lineOfSight(p.x, p.y + EYE_HEIGHT, p.z, q.x, q.y + 1.2, q.z)) continue;
+        b.waved[q.id] = true;
+        if (b.rand() > 0.4) continue;
+        b.wavedAt = game.time;
+        b.show = WAVE;
+        b.showAt = game.time + 0.3 + b.rand() * 0.4;
+        b.showFace = { x: q.x, z: q.z };
+        break;
+      }
+    }
+  }
+  return false;
+}
+
 function survivor(game, p, b, dt) {
   b.think -= dt;
   b.strafeT -= dt;
@@ -315,6 +395,7 @@ function survivor(game, p, b, dt) {
   b.guardT = Math.max(0, (b.guardT || 0) - dt);
   b.backT = Math.max(0, (b.backT || 0) - dt);
   b.retreatT = Math.max(0, (b.retreatT || 0) - dt);
+  if (showOff(game, p, b, dt)) return;
   const eyeY = p.y + EYE_HEIGHT;
 
   if (b.think <= 0) {
@@ -744,6 +825,7 @@ function chooseVictim(game, p, b) {
 }
 
 function ghost(game, p, b, dt) {
+  if (showOff(game, p, b, dt)) return;
   b.think -= dt;
   const pos = p.possess;
   let gx = p.x;

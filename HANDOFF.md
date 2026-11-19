@@ -516,3 +516,17 @@ sounds; lightning that lights the park, rides that light up, lived-in details (B
 - Net on Low here: ~575 -> ~560 draws after the poles, ~1.5-2 ms less processor time per frame from the shading
   skip; more on a phone's graphics chip. Not done: 7 point lights (3 lamps, tent, muzzle, flare, bus cabin) cost
   every lit pixel; the 72 duplicate materials are mostly per-sign neon (flicker), so sharing them saves no draws.
+
+## Bots that emote, emote sounds (2026-11-19)
+
+- shared/bots.js showOff / showOverKill: after a kill (game.js kill, not a body steal) a bot shows off half the time,
+  0.7-1.3 s later: brawlers taunt (or dance), duelists bow (or taunt), opportunists dance or taunt, ghosts mostly
+  taunt. A survivor still looting after the landing waves (40%) at a person (never a bot) 6-16 m away in sight, once
+  each, at most once a minute. The bot stands still facing them for the move (SHOW_HOLD) and drops it if anyone
+  comes within 9 m or it is hit; it skips it if someone is already near. 4 bot matches: 17 emotes from 83 kills
+  (~4 a match), match length unchanged (~6 min).
+- characters.js: an emote is only cancelled by moving after 0.4 s (gestFull): a bot, or a rider, is often still
+  slowing to a stop as it starts. Attacking, blocking or aiming still cancel at once.
+- audio.js 'emote' (opt.n, opt.ghost), synthesized like the music: a two-note whistle (wave), nyah-nyah (taunt),
+  ta-da (bow), a two-bar calliope oom-pah (dance); a ghost's are a fifth lower, 1.6x slower, minor (thirds and sixths
+  flattened), sine with vibrato, over a quiet moan. Caption: "Organ tune". Needs Render (bots.js, game.js).

@@ -960,7 +960,7 @@ export class Client {
     const LABEL = {
       step: 'Footsteps', fire: 'Shot', impact: 'Fighting', swing: 'Swing', pain: 'A cry', boom: 'Explosion', chest: 'Chest opened',
       possess: 'A ride wakes up', fling: 'Gondola flung', scare: 'Scream', trapSet: 'Trap set', reload: 'Reloading', land: 'Landing',
-      block: 'Blocked blow', splash: 'Holy water', burn: 'Burning',
+      block: 'Blocked blow', splash: 'Holy water', burn: 'Burning', emote: 'Organ tune',
     };
     const label = LABEL[name];
     if (!label) return;
@@ -1229,6 +1229,7 @@ export class Client {
           // the living on their feet, a ghost floating; the dance keeps going a couple of rounds
           const em = EMOTES[e.n];
           if (em) this.chars.get(e.id)?.char.gesture(`${e.g ? 'ghost' : 'emote'}_${em.id}`, em.id === 'dance' ? 6.4 : undefined);
+          if (em) audio.play('emote', e.id === me ? null : pos, { n: e.n, ghost: e.g });
           break;
         }
         case 'hit':
