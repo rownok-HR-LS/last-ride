@@ -119,6 +119,28 @@ export async function kitPart(Builder, name) {
   return group;
 }
 
+/**
+ * Small kit parts placed many times ([name, { x, z, rot }], ...): all merged into one group, one draw per material
+ * however many there are (cloning a part per spot cost a draw per material per copy).
+ */
+export async function kitSpots(Builder, spots) {
+  const B = new Builder();
+  for (const name of new Set(spots.map(([n]) => n))) {
+    let g;
+    try {
+      g = await loader.loadAsync(`./models/kit/kit_${name}.glb`);
+    } catch (e) {
+      console.warn('kit', name, e);
+      continue;
+    }
+    for (const [n, P] of spots) if (n === name) placeInto(B, g, P, {}, () => true);
+  }
+  const group = new THREE.Group();
+  group.name = 'kit_spots';
+  B.build(group);
+  return group;
+}
+
 /** Is this map prop one the kit draws (the walk-in buildings' walls and roofs, the booths, trailers, the gate)? */
 export function kitDraws(p) {
   if (p.gatepost || ['trailer', 'arch', 'booth', 'fence', 'cart', 'ticket', 'watertower', 'freefall', 'station', 'control', 'arena', 'table'].includes(p.type)) {

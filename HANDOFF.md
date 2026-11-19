@@ -500,3 +500,19 @@ sounds; lightning that lights the park, rides that light up, lived-in details (B
   the themed fronts (buildings.js returns their spots as signs.floods; world.js placeKitSpots clones one of each).
 - Distant riders: checked the runtime far version (meshopt, a quarter of the triangles past 24 m) zoomed right in:
   it is nearly identical to the full rider, so no Blender LODs were made.
+
+## Lighter drawing (2026-11-19)
+
+- Measured in a practice ride (src/tools-style console timing, pane shown): on Low the scene is drawn once (the old
+  note that the shading pass draws it twice was wrong; transparencyAware is off). The cost is the processor issuing
+  draws: ~710 draws, ~20 us each; the graphics card waited ~1.5 ms. 331 different materials in a frame.
+- kit.js kitSpots(Builder, spots): the big top's poles and the floodlights are built into one merged group
+  (world.js kitPlaces / placeKitSpots): 96 draws -> 7 (cloning kitPart per spot cost a draw per material per copy).
+- rides.js: the Ferris gondolas on the wheel are one InstancedMesh per template mesh (gondolaParts, matrices set in
+  update from the gondola transforms, which are now plain Object3Ds): 20 draws -> 1. Flung gondolas still use
+  cabTemplate.
+- post.js: with the shading off (intensity 0: Low, or Auto's fallback) the N8AO pass only draws the scene and copies
+  it on, instead of computing, denoising and blending shading at strength 0 (same picture: 1 edge pixel differs).
+- Net on Low here: ~575 -> ~560 draws after the poles, ~1.5-2 ms less processor time per frame from the shading
+  skip; more on a phone's graphics chip. Not done: 7 point lights (3 lamps, tent, muzzle, flare, bus cabin) cost
+  every lit pixel; the 72 duplicate materials are mostly per-sign neon (flicker), so sharing them saves no draws.

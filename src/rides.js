@@ -101,6 +101,8 @@ function horseMesh(color) {
   return g;
 }
 
+const _cab = new THREE.Matrix4();
+
 export class Rides {
   constructor(scene) {
     this.scene = scene;
@@ -305,12 +307,23 @@ uniform float chaseT;`)
       return grp;
     };
     for (const old of this.gondolas) this.scene.remove(old);
-    this.gondolas = [];
-    for (let i = 0; i < F.n; i++) {
-      const g = this.cabTemplate();
-      this.scene.add(g);
-      this.gondolas.push(g);
-    }
+    // the cabins on the wheel are all the same model: drawn together (one draw per material for all of them, not one
+    // per cabin); each cabin is just a position and a swing (update)
+    const tpl = this.cabTemplate();
+    tpl.updateMatrixWorld(true);
+    this.gondolaParts = [];
+    tpl.traverse((o) => {
+      if (!o.isMesh) return;
+      const im = new THREE.InstancedMesh(o.geometry, o.material, F.n);
+      im.castShadow = true;
+      im.receiveShadow = true;
+      // (the cabins go all the way round the wheel)
+      im.frustumCulled = false;
+      im.userData.local = o.matrixWorld.clone();
+      this.scene.add(im);
+      this.gondolaParts.push(im);
+    });
+    this.gondolas = Array.from({ length: F.n }, () => new THREE.Object3D());
   }
 
   /** Rusty abandoned coaster cars (Matt-AeroLab, CC-BY) instead of the boxes. */
@@ -700,7 +713,12 @@ uniform float chaseT;`)
       // the empty cabins rock in the wind: a creak on a still night, swinging in a thunderstorm
       const gust = 0.6 + 0.4 * Math.sin(time * 0.35 + i * 0.7);
       g.rotation.z = Math.sin(time * 1.3 + i) * (snap.ferris.driver ? 0.25 : 0.012 + 0.1 * windAmp.value * gust);
+      if (this.gondolaParts) {
+        g.updateMatrix();
+        for (const im of this.gondolaParts) im.setMatrixAt(i, _cab.multiplyMatrices(g.matrix, im.userData.local));
+      }
     });
+    if (this.gondolaParts) for (const im of this.gondolaParts) im.instanceMatrix.needsUpdate = true;
 
     // coaster train
     const s = snap.coaster.s;

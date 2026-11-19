@@ -192,6 +192,25 @@ export function createPost(renderer, scene, camera) {
   // its transparency mode re-renders the whole scene twice more each frame; mist, glow and glass do fine without it
   ao.autoDetectTransparency = false;
   ao.configuration.transparencyAware = false;
+  // with the shading switched off (Low, or Auto on a struggling machine: client.js setEffects) the pass still worked
+  // out the shading, blurred it and blended it in at strength 0 every frame. Then it only draws the scene and passes
+  // the picture on: the depth it keeps is still there for the glow, the reflections and depth of field.
+  const aoRender = ao.render.bind(ao);
+  const plain = new FullScreenQuad(new THREE.ShaderMaterial({
+    uniforms: { tDiffuse: { value: null } },
+    vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+    fragmentShader: 'uniform sampler2D tDiffuse; varying vec2 vUv; void main(){ gl_FragColor = texture2D(tDiffuse, vUv); }',
+    depthTest: false,
+    depthWrite: false,
+  }));
+  ao.render = (r, writeBuffer, readBuffer, dt, mask) => {
+    if (ao.configuration.intensity > 0) return aoRender(r, writeBuffer, readBuffer, dt, mask);
+    r.setRenderTarget(ao.beautyRenderTarget);
+    r.render(scene, camera);
+    plain.material.uniforms.tDiffuse.value = ao.beautyRenderTarget.texture;
+    r.setRenderTarget(ao.renderToScreen ? null : writeBuffer);
+    plain.render(r);
+  };
   composer.addPass(ao);
   // keep a half-size copy of this frame (light, and distance from the camera in alpha) for the ground's reflections
   // next frame (ssr.js); it leaves the image itself alone
