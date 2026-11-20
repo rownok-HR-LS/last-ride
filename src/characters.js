@@ -1171,6 +1171,31 @@ export class Character {
     this.squint = 0;
   }
 
+  /**
+   * Give a rider built ahead of time (the client's pool) the look the seed would have given it: the same draws in the
+   * same order as the constructor (size, grime, colour turn, face timing).
+   */
+  reseed(seed) {
+    const tpl = T[this.outfit];
+    const r = seeded(seed + 1);
+    const tall = 0.95 + r() * 0.1;
+    const broad = 0.95 + r() * 0.1;
+    this.model.scale.set(tpl.scale * tall * broad, tpl.scale * tall, tpl.scale * tall * broad);
+    this.baseY = tpl.footY * tpl.scale * tall;
+    this.look.grime.value = 0.35 + r() * 0.6;
+    this.look.seed.value = r() * 50;
+    this.look.tint.value.set((r() - 0.5) * 3.2, 0.62 + r() * 0.55, r() < 0.15 ? 0 : 0.6 + r() * 0.4);
+    this.facePhase = r() * 6.28;
+    this.blinkIn = 1 + r() * 4;
+  }
+
+  /** Put on (on) or take off the ghost look, cloak and all, so its shaders can be built before anyone dies. */
+  warmGhost(on) {
+    this.applyGhost(on);
+    if (on && !this.cloak && cloakReady()) this.cloak = new Cloak(this, OUTFIT_TINT[this.outfit]);
+    if (this.cloak) this.cloak.group.visible = on;
+  }
+
 /** Play a gesture clip (make-anims.py) for dur seconds (by default its own length); a repeat starts it again. */
   gesture(name, dur) {
     const clip = this.clips[name];

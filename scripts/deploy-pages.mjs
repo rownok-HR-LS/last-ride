@@ -1,7 +1,7 @@
 // Build the client and publish it to the gh-pages branch (GitHub Pages serves that branch).
 // Usage: node scripts/deploy-pages.mjs wss://your-server.onrender.com
 import { execSync } from 'node:child_process';
-import { mkdtempSync, rmSync, cpSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, cpSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -20,6 +20,10 @@ const dir = mkdtempSync(join(tmpdir(), 'last-ride-pages-'));
 try {
   cpSync('dist', dir, { recursive: true });
   writeFileSync(join(dir, '.nojekyll'), '');
+  // the offline copy's version (public/sw.js): every deploy is a new one, so players' copies check for changes
+  const sw = join(dir, 'sw.js');
+  const version = `${execSync('git rev-parse --short HEAD').toString().trim()}-${Date.now().toString(36)}`;
+  writeFileSync(sw, readFileSync(sw, 'utf8').replace('__SW_VERSION__', version));
   run('git init -q -b gh-pages', { cwd: dir });
   run(`git -c user.name="${name}" -c user.email="${email}" add -A`, { cwd: dir });
   run(`git -c user.name="${name}" -c user.email="${email}" commit -q -m "Deploy LAST RIDE client"`, { cwd: dir });

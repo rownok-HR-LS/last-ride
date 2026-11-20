@@ -12,6 +12,11 @@ import { loading } from './loading.js';
 import { fadeOut, fadeIn } from './fade.js';
 
 const app = document.getElementById('app');
+
+// the game keeps its own copy on this device (public/sw.js): a returning rider loads it from there, not the network
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch((e) => console.warn('offline copy', e)));
+}
 let parkInfo = Promise.resolve(null);
 // knock on the ride server's door right away: the free host sleeps when nobody plays and takes most of a minute to
 // wake, so by the time you have picked a rider it is usually up (the online sign keeps knocking if it is not)
@@ -223,9 +228,11 @@ async function title() {
   const step = (what) => {
     statusEl.textContent = what;
   };
+  // (while the park is being prepared the line says what it is doing instead of the download count)
+  let preparing = false;
   const offBar = loading.on((u) => {
     bar.style.width = `${Math.round(u * 100)}%`;
-    if (!loading.done) step(`Loading the park… ${Math.round(u * 100)}%`);
+    if (!loading.done && !preparing) step(`Loading the park… ${Math.round(u * 100)}%`);
   });
   // a tip every few seconds while it loads
   const tipEl = el.querySelector('.t-tip');
@@ -282,9 +289,13 @@ async function title() {
     app.insertBefore(client.renderer.domElement, app.firstChild);
     ridersReady = true;
     client.showcase(profile.outfit, profile.look);
-    // the park's shaders compile in the background first (client.ready), so the page never freezes for them
-    step('Getting the park ready…');
-    await client.ready;
+    // everything that could make the game stutter later is prepared now, with the loading screen still up: the park's
+    // and every rider's shaders, weapons, effects and the ghost look (client.preload); Practice and Ride wait for it
+    preparing = true;
+    await client.preload((what, p) => {
+      loading.set(p);
+      step(`${what} ${Math.round(loading.pct * 100)}%`);
+    });
     // the still of the park fades into the live one, and the loading line goes
     loading.finish();
     offBar();

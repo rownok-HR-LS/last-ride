@@ -632,3 +632,26 @@ sounds; lightning that lights the park, rides that light up, lived-in details (B
   weapons.js GRIP whip 'hand' + a fallback model. audio.js: the swing cracks (a sharp high-passed snap at the end of
   the throw), 'yank' snap + leather + grunt; client.js toasts "Yanked by a whip!" to the one pulled.
 - 8 bot matches: 9 of 172 kills with it (machete 12, bow 10), 20 yanks, ~6 min. Needs Render (shared/).
+
+## Preloading: the loading screen prepares everything (2026-11-21)
+
+- Measured first (live site, this PC): the park came up at 10.5 s (49 MB, 250 files; downloads 7.7 s, building 2.8 s);
+  GitHub Pages caches files only 10 minutes and there was no offline copy. In a ride: a 0.5 s freeze as it began
+  (7 rider shaders built on the spot), 0.1-0.26 s stutters at the doors and after landing, 4 ghost shaders on death.
+- client.js had two methods called warmUp: the later one (shaders only) replaced the first, so the texture uploads
+  and first-use effects never ran. Now warmFirstUses() (effects, every texture, HUD layout) is called from warmUp(),
+  which returns its compile promise.
+- Ready-built riders (fillRiderPool / takeRider): two per outfit (28) under the park at y -400, shaders compiled
+  while shown, then hidden; one wears the ghost look and cloak meanwhile (Character.warmGhost), so the ghost shaders
+  are ready too. A ride takes riders from the pool and gives each its own look (Character.reseed: the constructor's
+  draws in the same order). Refilled on the end screen.
+- client.preload(onStep): park shaders -> weapons/effects (warmUp) -> every rider's model -> the pool -> a last compile
+  pass. main.js runs it under the loading screen with steps on the bar (downloads now fill 85%, preparing the rest);
+  Practice and Ride wait for it (parkReady resolves after it).
+- public/sw.js: the game's own copy (service worker, production only): each file stamped with VERSION (set per deploy
+  by deploy-pages.mjs: commit + time); same version: served from the copy, no network; new version: checked once with
+  If-None-Match (304 keeps the copy), hashed /assets/ files kept as they are. The page and manifest are always asked
+  first (copy only offline). Tested with vite preview: second visit served all 250 files from the copy.
+- Result (dev/preview): no shader built during a whole ride (start, doors, landing, fights, death); the worst frame
+  87 ms (at death). Loading: preparing adds ~8 s on this PC (riders' animation retargeting ~4 s is now waited for, the
+  pool ~4 s); a return visit skips the download. Not done: speeding up the riders' animation preparation itself.

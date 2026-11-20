@@ -15,7 +15,7 @@ import { buildWorld, buildSky, groundRain, SKY_SCALE, updateNeon, puddleField } 
 import { updateTentFlaps } from './flags.js';
 import { Rain, sheltered } from './rain.js';
 import { Rides } from './rides.js';
-import { Character, Corpse, nameTag, setCharacterRim } from './characters.js';
+import { Character, Corpse, nameTag, setCharacterRim, whenAllRiders } from './characters.js';
 import { loadRagdolls, stepRagdolls } from './ragdoll.js';
 import { loadCloak } from './cloak.js';
 import { FX } from './fx.js';
@@ -378,8 +378,6 @@ export class Client {
     };
     requestAnimationFrame(loop);
     this.watchContext();
-    // pay for first uses now, under the title, instead of in the first fight
-    setTimeout(() => this.warmUp(), 500);
   }
 
   /**
@@ -425,9 +423,10 @@ export class Client {
 
   /**
    * The first hit flash, splash or damage number used to cost a frame of its own (a texture upload, a shader, a
-   * first layout). Set each off once out of sight, upload every texture in the park and compile every material.
+   * first layout). Set each off once out of sight and upload every texture in the park. (Called from warmUp: this
+   * used to share its name, so the later one replaced it and none of this ever ran.)
    */
-  warmUp() {
+  warmFirstUses() {
     const r = this.renderer;
     this.fx.strike(0, -60, 0, 1, 0, true, false);
     this.fx.strike(0, -60, 0, 1, 0, false, true);
@@ -447,7 +446,6 @@ export class Client {
         }
       }
     });
-    r.compile(this.scene, this.camera);
     // the fight HUD's first layout
     const fb = this.foeBar;
     const was = fb.style.display;
@@ -763,6 +761,7 @@ export class Client {
    * Weapons, projectiles and items nobody holds yet are included.
    */
   warmUp() {
+    this.warmFirstUses();
     const extras = new THREE.Group();
     const all = [
       ...WEAPON_IDS.map((w) => weaponModel(w, 2)),
@@ -771,8 +770,95 @@ export class Client {
     ];
     for (const m of all) extras.add(m);
     // in the background (stage.js): weapons, projectiles and items nobody holds yet, and anything new in the park
-    whenCompiled(extras);
-    whenCompiled(this.scene);
+    return Promise.all([whenCompiled(extras), whenCompiled(this.scene)]);
+  }
+
+  /**
+   * Riders built ahead of time: two per outfit, one at a time in quiet moments on the menu and the end screen, their
+   * shaders (and the ghost look's) prepared before they are needed. Building all twenty when a ride began froze the
+   * picture for half a second; a ride now takes them from here (takeRider), and builds only a third of one outfit.
+   */
+  fillRiderPool() {
+    if (this.poolBusy) return this.poolDone;
+    this.riderPool ??= new Map();
+    if (!this.poolGroup) {
+      // out of sight below the park; shown only while their shaders are built
+      this.poolGroup = new THREE.Group();
+      this.poolGroup.name = 'riderPool';
+      this.poolGroup.position.set(0, -400, 0);
+      this.scene.add(this.poolGroup);
+    }
+    this.poolBusy = true;
+    let done;
+    this.poolDone = new Promise((res) => {
+      done = res;
+    });
+    whenAllRiders().then(() => {
+      const queue = [];
+      for (const o of OUTFITS) {
+        const have = this.riderPool.get(o.id)?.length || 0;
+        for (let i = have; i < 2; i++) queue.push(o.id);
+      }
+      let ghostWarmed = this.ghostWarmed;
+      const next = () => {
+        if (!queue.length) {
+          this.poolGroup.visible = true;
+          whenCompiled(this.poolGroup).then(() => {
+            this.poolGroup.visible = false;
+            this.poolBusy = false;
+            done();
+          });
+          return;
+        }
+        const id = queue.shift();
+        const ch = new Character(id);
+        this.poolGroup.add(ch.root);
+        // one rider wears the ghost look while the shaders are built (it is the same for everyone)
+        if (!ghostWarmed) {
+          ch.warmGhost(true);
+          ghostWarmed = this.ghostWarmed = true;
+          this.poolGroup.visible = true;
+          whenCompiled(ch.root).then(() => ch.warmGhost(false));
+        }
+        if (!this.riderPool.has(id)) this.riderPool.set(id, []);
+        this.riderPool.get(id).push(ch);
+        // (back to back under the loading screen; spaced out on the end screen, where the picture is moving)
+        setTimeout(next, this.preloading ? 0 : 40);
+      };
+      next();
+    });
+    return this.poolDone;
+  }
+
+  /**
+   * Everything that could cost a frame later, done while the loading screen is still up: the park's shaders, the
+   * weapons', projectiles' and effects' (and their first textures), every rider's model, ready-built riders with
+   * their shaders and the ghost look's, then one last pass for anything that arrived meanwhile.
+   * onStep(what, fraction of the bar) says how far along it is.
+   */
+  async preload(onStep = () => {}) {
+    onStep('Preparing the park…', 0.86);
+    await this.ready;
+    onStep('Preparing weapons and effects…', 0.89);
+    await this.warmUp();
+    onStep('Waiting for the riders…', 0.91);
+    await whenAllRiders();
+    onStep('Preparing the riders…', 0.93);
+    this.preloading = true;
+    await this.fillRiderPool();
+    this.preloading = false;
+    onStep('Almost there…', 0.97);
+    await whenCompiled(this.scene);
+  }
+
+  /** A ready-built rider for this outfit, given this rider's look (null when the pool has none: build one). */
+  takeRider(outfit, seed) {
+    const ch = this.riderPool?.get(outfit)?.pop();
+    if (!ch) return null;
+    if (ch.isGhost) ch.warmGhost(false);
+    ch.reseed(seed);
+    ch.root.position.set(0, 0, 0);
+    return ch;
   }
 
   mySnap() {
@@ -1532,6 +1618,8 @@ export class Client {
           break;
         }
         case 'end':
+          // ready-built riders for the next ride, while the end screen is up
+          this.fillRiderPool();
           // the one who rode it out throws their arms up for the end screen
           if (e.winner != null) this.chars.get(e.winner)?.char.gesture('victory', 60);
           audio.setMusicIntensity(0);
@@ -1914,7 +2002,7 @@ export class Client {
       seen.add(p.id);
       let c = this.chars.get(p.id);
       if (!c) {
-        const char = new Character(p.outfit, p.id);
+        const char = this.takeRider(p.outfit, p.id) || new Character(p.outfit, p.id);
         char.wear(p.look);
         const style = lookItem('tag', p.look?.tag);
         const tag = nameTag(p.name, style.color, style.glow);

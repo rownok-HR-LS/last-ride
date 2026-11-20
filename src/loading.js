@@ -35,5 +35,5 @@ const prev = M.onProgress;
 M.onProgress = (url, loaded, total) => {
   prev?.(url, loaded, total);
   // the first few files say little about how many follow: ease in
-  if (total > 0) loading.set((loaded / total) * Math.min(1, total / 60));
+  if (total > 0) loading.set((loaded / total) * Math.min(1, total / 60) * 0.85);
 };
