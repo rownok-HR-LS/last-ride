@@ -670,3 +670,20 @@ sounds; lightning that lights the park, rides that light up, lived-in details (B
   once froze the menu ~4 s the first time.
 - Dev measurement: live park 6.2 s, all ready 10.3 s (was 20.8 s with the photo up the whole time), the menu at
   ~37 fps while preparing (one 0.5 s hiccup); a ride still starts with no shader built and 63 ms worst frame.
+
+## Online stutter: an adaptive view delay (2026-11-21)
+
+- The user (on this PC: RTX 5060, Ryzen 7 5700X, 1080p 165 Hz) found the cutscene and the start of play choppy,
+  "freezes for a moment". Measured: frames are fine (80-165 fps, also at the user's 1888x905 window, also in their
+  own Chrome, which uses the RTX). Online, the server keeps perfect time (every snapshot exactly 50 ms of game time
+  apart) but they arrive in bunches: gaps up to 250-500 ms, often two at once, the game's ping ~0.85 s. The server
+  is in Render's default region (Oregon; render.yaml sets none), far from the user.
+- src/net.js: the others, the bus and the rides were drawn a fixed INTERP (0.1 s) behind the newest snapshot, so
+  every longer gap froze them and the bunch made them jump. NetGame now keeps the last 120 arrival gaps and draws
+  this.delay behind: the 99th percentile gap + 40 ms, between INTERP and 0.5 s, rising at once and falling slowly
+  (2% a snapshot). Your own rider is predicted as before. Counters for testing: game.starved (frames the view ran
+  out of snapshots), game.jumps (clock snaps), game.delay.
+- Measured against the live server from the dev build (?server=wss://last-ride-server.onrender.com), back to back on
+  the same line: frozen frames 12.7% / 7.4% with the fixed 0.1 s, 3.0% / 0.8% adaptive (delay 0.16-0.28 s).
+- The real cure for distance is a server nearer the players: Render's region is fixed when a service is created, so
+  it would mean a new service in Singapore (render.yaml `region: singapore`) and the client pointed at its URL.

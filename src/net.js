@@ -160,6 +160,13 @@ export class NetGame {
     this.players = new Map();
     this.phase = 'launch';
     this.rt = null;
+    // how far behind the newest update the others are drawn: INTERP on a steady line, more on a bumpy one (see
+    // receive); gaps between updates (ms) and how often the view ran out of updates or had to jump (for testing)
+    this.delay = INTERP;
+    this.gaps = [];
+    this.lastRecv = 0;
+    this.starved = 0;
+    this.jumps = 0;
     // your input and commands, numbered, until the server says it has used them
     this.input = {};
     this.cmds = [];
@@ -271,6 +278,20 @@ export class NetGame {
   receive(m) {
     const snap = m.snap;
     snap.recv = performance.now();
+    // Updates leave the server every 50 ms but can reach a far-away player in bunches (a long route drops and resends
+    // packets): gaps of a quarter to half a second. Drawn only INTERP behind, the others and the bus froze in every gap
+    // and jumped when the bunch came in. Draw them far enough behind to ride out the gaps this line actually has
+    // (all but the rarest of the last few seconds' worth), up to half a second; come back down slowly when it settles.
+    if (this.lastRecv) {
+      this.gaps.push(snap.recv - this.lastRecv);
+      if (this.gaps.length > 120) this.gaps.shift();
+      if (this.gaps.length >= 20) {
+        const sorted = [...this.gaps].sort((x, y) => x - y);
+        const want = Math.min(0.5, Math.max(INTERP, sorted[Math.floor(sorted.length * 0.99)] / 1000 + 0.04));
+        this.delay = want > this.delay ? want : this.delay + (want - this.delay) * 0.02;
+      }
+    }
+    this.lastRecv = snap.recv;
     if (m.loot) {
       if (m.loot.full) {
         this.loot.clear();
@@ -291,7 +312,7 @@ export class NetGame {
     this.latest = snap;
     if (m.self) this.reconcile(m.self, m.ack | 0, snap);
     if (!this.view) {
-      this.rt = snap.time - INTERP;
+      this.rt = snap.time - this.delay;
       this.view = this.buildView();
       this.players = new Map(this.view.players.map((p) => [p.id, p]));
       this.phase = snap.phase;
@@ -377,12 +398,15 @@ export class NetGame {
 
   // ---------------------------------------------------------------- drawing time
 
-  /** Others are drawn INTERP behind the newest update; the clock eases back on course if it drifts. */
+  /** Others are drawn this.delay behind the newest update; the clock eases back on course if it drifts. */
   advanceClock(dt) {
     const L = this.latest;
     if (!L) return;
-    const target = L.time - INTERP + Math.min(0.25, (performance.now() - L.recv) / 1000);
-    this.rt = this.rt === null || Math.abs(this.rt + dt - target) > 0.3 ? target : this.rt + dt + (target - this.rt - dt) * 0.08;
+    const target = L.time - this.delay + Math.min(0.25, (performance.now() - L.recv) / 1000);
+    const jump = this.rt === null || Math.abs(this.rt + dt - target) > 0.3;
+    if (jump && this.rt !== null) this.jumps++;
+    this.rt = jump ? target : this.rt + dt + (target - this.rt - dt) * 0.08;
+    if (this.rt >= L.time) this.starved++;
     this.rt = Math.min(this.rt, L.time);
   }
 
