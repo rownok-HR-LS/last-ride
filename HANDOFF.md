@@ -603,3 +603,18 @@ sounds; lightning that lights the park, rides that light up, lived-in details (B
 - client.js nightLook(night): fog #3a1a1e, sky light #a8686c, moonlight #ff8a74 (the usual colours restored on other
   nights) and a painted red moon sprite at camera + moonDir * 700 (scale 107; far plane 2500). The doors-open
   banner says BLOOD MOON (style.css .banner.blood). Needs Render (constants.js, game.js, bots.js).
+
+## The haunted Free Fall (2026-11-20)
+
+- The user picked: crushing 60; climb-then-clank warning; a shockwave for those near.
+- RIDES.freefall { cost 50, cd 25, reach 12, dmg 60, climb 3, hang 0.5, fall 0.9, top 44, under 4.8, wave 9,
+  waveDmg 10, waveThrow 8 }. game.js this.freefall { y, driver, owner, phase climb|hang|fall|reset, t, cd, from };
+  the idle drift (30 + sin(t*0.25)*12) now lives in the sim, so everyone sees the ring at the same height.
+  updateFreefall / slamFreefall: within 4.8 m of the column 60 damage and thrown out, within 9 m 10 damage and a
+  shove (tumbleHow 'freefall'); then the ring rises back over 4 s and the ghost is let go. Letting go before the
+  drop cancels it. The ghost sits on top of the tower (y 50). Snapshot freefall { y, phase, cd, driver }; events
+  'freefall' {phase climb|clank|slam}.
+- Client: rides.js follows snap.freefall.y (snaps during the fall), flashes the seat ring's own (cloned) materials red
+  while it climbs and hangs; audio.js 'freefall' (chains, clank, crash); dust round the base on the slam; HUD,
+  guide marker + icon, death cause "the Free Fall". Bots take it when a survivor stands at its foot (75%).
+  8 bot matches: 2 drops (it stands at the edge of the park), 0 kills; match length ~6 min. Needs Render.

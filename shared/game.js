@@ -11,7 +11,7 @@ import {
   rollWeapon, rollFloor, weaponLabel, weaponDef, makeWeapon,
 } from './items.js';
 import {
-  LOOT_SPOTS, CHEST_SPOTS, PRIZE_BOOTHS, FERRIS, STATION, CAROUSEL, CAR_SPAWNS, TRACK, trackAt, PARK_EDGE, BUS_ROUTE, busAt,
+  LOOT_SPOTS, CHEST_SPOTS, PRIZE_BOOTHS, FERRIS, STATION, CAROUSEL, FREEFALL, CAR_SPAWNS, TRACK, trackAt, PARK_EDGE, BUS_ROUTE, busAt,
   BREAKABLES, BREAKABLE_MODELS,
 } from './map.js';
 import { rayWorld, rayPlayer, groundAt, lineOfSight } from './collide.js';
@@ -74,6 +74,8 @@ export class Game {
     this.ferris = { angle: 0, driver: null };
     // the carousel turns slowly on its own; a ghost can wind it up and spin it (phase warn, then fling, then slow)
     this.carousel = { angle: 0, v: 0.18, driver: null, owner: null, phase: null, t: 0, cd: 0, hits: new Map() };
+    // the Free Fall's seat ring drifts up and down its tower; a ghost can haul it up and drop it (climb, hang, fall, reset)
+    this.freefall = { y: 30, driver: null, owner: null, phase: null, t: 0, cd: 0, from: 30 };
     this.coaster = { s: 0, v: 0, dist: 0, running: false, driver: null, cd: 0, hits: new Map() };
     this.bus = { s: 0, v: 0, x: 0, z: 0, dx: 0, dz: -1, yaw: 0 };
     this.placeBus();
@@ -951,6 +953,7 @@ export class Game {
     }
     if (g.possess?.kind === 'ferris') return { x: FERRIS.x, y: 2, z: FERRIS.z }; // the wheel's base
     if (g.possess?.kind === 'carousel') return { x: CAROUSEL.x, y: 2, z: CAROUSEL.z };
+    if (g.possess?.kind === 'freefall') return { x: FREEFALL.x, y: 2, z: FREEFALL.z };
     return g;
   }
 
@@ -988,6 +991,9 @@ export class Game {
     if (!this.coaster.running && Math.hypot(p.x - STATION.x, p.z - STATION.z) < RIDES.coaster.reach) {
       return { kind: 'coaster', ready: this.coaster.cd <= 0 };
     }
+    if (!this.freefall.driver && !this.freefall.phase && Math.hypot(p.x - FREEFALL.x, p.z - FREEFALL.z) < RIDES.freefall.reach) {
+      return { kind: 'freefall', ready: this.freefall.cd <= 0 };
+    }
     if (!this.carousel.driver && !this.carousel.phase && Math.hypot(p.x - CAROUSEL.x, p.z - CAROUSEL.z) < RIDES.carousel.reach) {
       return { kind: 'carousel', ready: this.carousel.cd <= 0 };
     }
@@ -1017,6 +1023,14 @@ export class Game {
       Object.assign(this.coaster, { running: true, driver: p.id, owner: p.id, dist: 0, v: 0 });
       this.coaster.hits.clear();
       p.possess = { kind: 'coaster' };
+    } else if (r.kind === 'freefall') {
+      if (!r.ready || p.ecto < RIDES.freefall.cost) return;
+      p.ecto -= RIDES.freefall.cost;
+      Object.assign(this.freefall, { driver: p.id, owner: p.id, phase: 'climb', t: 0, from: this.freefall.y });
+      // up on top of the tower, looking down
+      Object.assign(p, { x: FREEFALL.x, y: 50, z: FREEFALL.z, vx: 0, vy: 0, vz: 0 });
+      p.possess = { kind: 'freefall' };
+      this.events.push({ e: 'freefall', phase: 'climb', x: FREEFALL.x, z: FREEFALL.z });
     } else if (r.kind === 'carousel') {
       if (!r.ready || p.ecto < RIDES.carousel.cost) return;
       p.ecto -= RIDES.carousel.cost;
@@ -1044,6 +1058,15 @@ export class Game {
     const k = p.possess.kind;
     if (k === 'ferris' && this.ferris.driver === p.id) this.ferris.driver = null;
     if (k === 'coaster' && this.coaster.driver === p.id) this.coaster.driver = null;
+    if (k === 'freefall' && this.freefall.driver === p.id) {
+      // let go before it drops: the ring slides back down without hurting anyone (the ecto is spent)
+      if (this.freefall.phase === 'climb' || this.freefall.phase === 'hang') {
+        this.freefall.phase = 'reset';
+        this.freefall.t = 0;
+        this.freefall.from = this.freefall.y;
+      }
+      this.freefall.driver = null;
+    }
     if (k === 'carousel' && this.carousel.driver === p.id) {
       // let go while it is still winding up: it never throws (the ecto is spent); once spinning it runs its course
       if (this.carousel.phase === 'warn') {
@@ -1598,6 +1621,13 @@ export class Game {
       if (c.t <= 0) this.release(p);
       return;
     }
+    if (pos?.kind === 'freefall') {
+      // on top of the tower
+      p.x = FREEFALL.x;
+      p.y = 50;
+      p.z = FREEFALL.z;
+      return;
+    }
     if (pos?.kind === 'carousel') {
       // up on the centre pole, turning with it
       p.x = CAROUSEL.x;
@@ -1712,6 +1742,7 @@ export class Game {
     const f = this.ferris;
     f.angle += (f.driver ? 0.28 : 0.05) * dt;
     this.updateCarousel(dt);
+    this.updateFreefall(dt);
 
     // coaster
     const c = this.coaster;
@@ -1810,6 +1841,81 @@ export class Game {
         this.events.push({ e: 'bump', x: car.x, z: car.z });
         this.damage(q, RIDES.car.dmg * Math.min(1.2, speed / RIDES.car.speed + 0.3), owner, 'car');
       }
+    }
+  }
+
+  /** The Free Fall: the seat ring's slow drift, and a ghost's haul up, clank and drop (RIDES.freefall). */
+  updateFreefall(dt) {
+    const F = this.freefall;
+    const R = RIDES.freefall;
+    F.cd = Math.max(0, F.cd - dt);
+    const idle = 30 + Math.sin(this.time * 0.25) * 12;
+    if (!F.phase) {
+      F.y = idle;
+      return;
+    }
+    F.t += dt;
+    const ease = (u) => u * u * (3 - 2 * u);
+    if (F.phase === 'climb') {
+      F.y = F.from + (R.top - F.from) * ease(Math.min(1, F.t / R.climb));
+      if (F.t >= R.climb) {
+        F.phase = 'hang';
+        F.t = 0;
+        this.events.push({ e: 'freefall', phase: 'clank', x: FREEFALL.x, z: FREEFALL.z });
+      }
+    } else if (F.phase === 'hang') {
+      F.y = R.top;
+      if (F.t >= R.hang) {
+        F.phase = 'fall';
+        F.t = 0;
+      }
+    } else if (F.phase === 'fall') {
+      // straight down, faster than falling (the brakes are long gone)
+      const a = (2 * (R.top - 1)) / (R.fall * R.fall);
+      F.y = Math.max(1, R.top - 0.5 * a * F.t * F.t);
+      if (F.y <= 1) this.slamFreefall(F);
+    } else if (F.phase === 'reset') {
+      F.y = F.from + (idle - F.from) * ease(Math.min(1, F.t / 4));
+      if (F.t >= 4) {
+        F.phase = null;
+        F.cd = R.cd;
+        const d = this.players.get(F.driver);
+        if (d && d.possess?.kind === 'freefall') this.release(d);
+        F.driver = null;
+        F.owner = null;
+      }
+    }
+  }
+
+  /** The ring hits the bottom: crushing whoever is under it, knocking back whoever is near the base. */
+  slamFreefall(F) {
+    const R = RIDES.freefall;
+    F.phase = 'reset';
+    F.t = 0;
+    F.from = 1;
+    this.events.push({ e: 'freefall', phase: 'slam', x: FREEFALL.x, z: FREEFALL.z });
+    const owner = this.players.get(F.owner) || null;
+    for (const q of this.players.values()) {
+      if (q.state !== 'alive' || q.y > 3) continue;
+      const dx = q.x - FREEFALL.x;
+      const dz = q.z - FREEFALL.z;
+      const d = Math.hypot(dx, dz);
+      if (d > R.wave) continue;
+      const nx = dx / (d || 1);
+      const nz = dz / (d || 1);
+      const under = d <= R.under;
+      // thrown out from the tower: hard from under the ring, a shove for those near
+      const k = under ? 1 : 1 - (d - R.under) / (R.wave - R.under) * 0.5;
+      q.vx = nx * R.waveThrow * k;
+      q.vz = nz * R.waveThrow * k;
+      q.vy = under ? 5 : 3.5;
+      q.onGround = false;
+      q.knockT = Math.max(q.knockT || 0, under ? 0.8 : 0.5);
+      q.tumbleT = under ? 1.1 : 0.7;
+      q.tumbleBy = F.owner;
+      q.tumbleHow = 'freefall';
+      q.atk = null;
+      this.damage(q, under ? R.dmg : R.waveDmg, owner, 'freefall');
     }
   }
 
@@ -1987,6 +2093,7 @@ export class Game {
       zone: { cx: zn.cx, cz: zn.cz, r: zn.r, nx: zn.nx, nz: zn.nz, nr: zn.nr, state: zn.state, t: zn.t, idx: zn.idx, dps: this.zoneDps() },
       bus: { x: this.bus.x, z: this.bus.z, yaw: this.bus.yaw, s: this.bus.s, v: this.bus.v, open: this.phase === 'live' && this.bus.s < BUS_ROUTE.len },
       ferris: { angle: this.ferris.angle, driver: this.ferris.driver },
+      freefall: { y: this.freefall.y, phase: this.freefall.phase, cd: this.freefall.cd, driver: this.freefall.driver },
       carousel: { angle: this.carousel.angle, v: this.carousel.v, phase: this.carousel.phase, cd: this.carousel.cd, driver: this.carousel.driver },
       coaster: { s: this.coaster.s, v: this.coaster.v, running: this.coaster.running, cd: this.coaster.cd },
       cars: this.cars.map((c) => ({ x: c.x, y: c.y, z: c.z, yaw: c.yaw, driver: c.driver, t: c.t })),

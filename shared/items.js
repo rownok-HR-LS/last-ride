@@ -138,6 +138,10 @@ export const RIDES = {
   car: { name: 'Bumper Car', cost: 45, reach: 6, dur: 12, dmg: 30, speed: 14, help: 'Ram survivors with a bumper car.' },
   // wind it up (warn s: its dead bulbs flicker on and the music box starts, wrong), then spin (spin s) and throw anyone
   // on or right beside the platform (reach of the edge: edge m) outward; it rests cd s after
+  // haul the seat ring up the tower (climb s: its bulbs flash, the chains rattle), let go with a clank (hang s), drop it
+  // (fall s) onto anyone under it (within under m of the column: dmg) and knock back those near the base (wave m:
+  // waveDmg, thrown at waveThrow m/s); it rests cd s after
+  freefall: { name: 'Free Fall', cost: 50, cd: 25, reach: 12, dmg: 60, climb: 3, hang: 0.5, fall: 0.9, top: 44, under: 4.8, wave: 9, waveDmg: 10, waveThrow: 8, help: 'Haul the seat ring up and drop it on whoever stands beneath.' },
   carousel: { name: 'Carousel', cost: 40, cd: 22, reach: 11, dmg: 35, warn: 1.5, spin: 2.4, edge: 1.4, throw: 12, help: 'Spin it up and hurl everyone off it.' },
 };
 

@@ -715,6 +715,28 @@ export function play(name, pos = null, opt = {}) {
       noise(d, t, 0.8, { type: 'bandpass', freq: 3000, sweepTo: 300, q: 3, vol: 0.5 });
       break;
     }
+    case 'freefall': {
+      // a ghost has the Free Fall: chains rattling as the ring is hauled up, a clank as it lets go, the crash at the bottom
+      const d = out(pos, opt.phase === 'slam' ? 1 : 0.75, 70);
+      if (!d) return;
+      if (opt.phase === 'climb') {
+        for (let i = 0; i < 18; i++) {
+          if (!sample(d, 'clang_light', t + i * 0.16, { vol: 0.12, rate: 0.5 + i * 0.03, vary: 0.1 })) noise(d, t + i * 0.16, 0.06, { type: 'bandpass', freq: 2600, q: 2, vol: 0.25 });
+        }
+        sample(d, 'creak', t, { vol: 0.5, rate: 0.6 });
+        tone(d, t, 3, { type: 'sawtooth', freq: 55, to: 110, vol: 0.06, attack: 0.5 });
+      } else if (opt.phase === 'clank') {
+        if (!sample(d, 'clang', t, { vol: 1, rate: 0.45 })) tone(d, t, 0.8, { type: 'square', freq: 90, to: 60, vol: 0.4 });
+        sample(d, 'latch', t + 0.02, { vol: 0.8, rate: 0.6 });
+      } else {
+        tone(d, t, 0.6, { freq: 55, to: 26, vol: 1 });
+        sample(d, 'thud_wood', t, { vol: 1, rate: 0.4 });
+        sample(d, 'crack', t + 0.02, { vol: 0.8, rate: 0.55 });
+        sample(d, 'clang', t + 0.04, { vol: 0.7, rate: 0.35 });
+        noise(d, t, 0.9, { type: 'lowpass', freq: 900, sweepTo: 120, vol: 0.9 });
+      }
+      break;
+    }
     case 'carousel': {
       // a ghost has the carousel: its music box wound up wrong (two reeds out of tune, speeding up), then the rush of it
       // spinning and the old steel groaning as it throws them

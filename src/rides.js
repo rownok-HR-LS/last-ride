@@ -562,6 +562,13 @@ uniform float haunt;`)
   /** Twelve outward-facing seats with shoulder harnesses round a red ring (scripts/blender/build-rides.py). */
   async upgradeFreefall() {
     const seats = await kitPart(Builder, 'freefall_seats');
+    // its own materials, so the haunted ring can flash red without touching the rest of the park
+    this.freefallMats = [];
+    seats.traverse((o) => {
+      if (!o.isMesh || !o.material?.emissive) return;
+      o.material = o.material.clone();
+      this.freefallMats.push(o.material);
+    });
     const g = this.freefallSeat;
     for (const ch of [...g.children]) {
       g.remove(ch);
@@ -762,7 +769,16 @@ uniform float haunt;`)
       const y0 = h.userData.y0 ?? 1.6;
       h.position.y = y0 + Math.sin(this.carAng * 9 + i * 1.3) * (h.userData.amp ?? 0.35);
     });
-    this.freefallSeat.position.y = 30 + Math.sin(time * 0.25) * 12;
+    // the Free Fall's ring rides where the park says (a ghost hauls it up and drops it); it flashes red while haunted
+    const ff = snap.freefall;
+    const want = ff ? ff.y : 30 + Math.sin(time * 0.25) * 12;
+    this.ffY = this.ffY === undefined || ff?.phase === 'fall' ? want : this.ffY + (want - this.ffY) * Math.min(1, dt * 12);
+    this.freefallSeat.position.y = this.ffY;
+    const haunted = ff?.phase === 'climb' || ff?.phase === 'hang';
+    const flash = haunted ? (Math.sin(time * (ff.phase === 'hang' ? 30 : 14)) > 0 ? 1 : 0.15) : 0;
+    for (const mat of this.freefallMats || []) {
+      mat.emissive.setRGB(flash * 1.6, flash * 0.12, flash * 0.08);
+    }
 
     // gondolas flung by ghosts
     while (this.flying.length < snap.gondolas.length) {
