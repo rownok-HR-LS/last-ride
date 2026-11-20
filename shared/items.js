@@ -29,6 +29,9 @@ export const WEAPONS = {
   crowbar: { type: 'melee', name: 'Crowbar', dmg: 21, heavy: 2, reach: 2.0, arc: 90, swing: 0.38, hitAt: 0.4, stam: 12, dura: 40, knock: 3 },
   machete: { type: 'melee', name: 'Machete', dmg: 23, heavy: 2, reach: 2.1, arc: 100, swing: 0.34, hitAt: 0.4, stam: 12, dura: 26, knock: 2 },
   axe: { type: 'melee', name: 'Fire Axe', dmg: 27, heavy: 2, reach: 2.3, arc: 90, swing: 0.52, hitAt: 0.4, stam: 16, dura: 22, knock: 4.5, poise: true },
+  // the lion tamer's whip: the longest reach of any melee weapon but light, one lash at a time (single), and its
+  // charged crack wraps the target and yanks them in (yank m/s) instead of knocking them away
+  whip: { type: 'melee', name: "Lion Tamer's Whip", dmg: 13, heavy: 1.7, reach: 4.5, arc: 34, swing: 0.36, hitAt: 0.55, stam: 9, dura: 30, knock: 1, single: true, yank: 11 },
   chainsaw: { type: 'melee', name: 'Chainsaw', dmg: 10, heavy: 1, reach: 2.2, arc: 60, swing: 0.16, hitAt: 0.5, stam: 2, dura: 70, knock: 0.8, auto: true, prize: true, poise: true },
   // rare, slow or loud ranged weapons
   darts: { type: 'ranged', name: 'Carnival Darts', ammo: 'darts', speed: 34, grav: 9, dmg: 18, head: 1.8, rof: 0.42, thrown: true },
@@ -163,7 +166,7 @@ export const PRIZES = [
 
 // ------------------------------------------------------------------ loot tables
 
-const MELEE_WEIGHTS = [['mallet', 16], ['spike', 13], ['lever', 13], ['crowbar', 16], ['machete', 12], ['axe', 9], ['sledge', 6]];
+const MELEE_WEIGHTS = [['mallet', 16], ['spike', 13], ['lever', 13], ['crowbar', 16], ['machete', 12], ['axe', 9], ['whip', 9], ['sledge', 6]];
 const RANGED_WEIGHTS = [['darts', 10], ['bow', 6], ['crossbow', 4], ['harpoon', 3], ['fireworks', 2]];
 const FLOOR_RARITY = [[0, 40], [1, 30], [2, 18], [3, 9], [4, 3]];
 const CHEST_RARITY = [[0, 8], [1, 30], [2, 33], [3, 21], [4, 8]];

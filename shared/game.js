@@ -742,7 +742,8 @@ export class Game {
         landed = true;
       }
     }
-    for (const { q, d, dx, dz } of hits.slice(0, 2)) {
+    // (a whip's lash finds one target, the nearest)
+    for (const { q, d, dx, dz } of hits.slice(0, def.single ? 1 : 2)) {
       if (q.iframeT > 0) {
         this.events.push({ e: 'dodged', id: q.id, by: p.id });
         continue;
@@ -785,6 +786,17 @@ export class Game {
       if (heavy && (!blocked || broke)) {
         q.vy = Math.max(q.vy, kind.hop);
         q.onGround = false;
+      }
+      // the whip's charged crack wraps round them and yanks them in toward the one holding it (a parry stops it; like
+      // any charged blow it breaks a plain block)
+      if (def.yank && heavy && (!blocked || broke)) {
+        const pull = def.yank * (HEAVY.minMul + (1 - HEAVY.minMul) * power);
+        q.vx = -nx * pull;
+        q.vz = -nz * pull;
+        q.knockT = Math.min(0.4, Math.max(0.12, (d - 1.3) / pull));
+        q.vy = Math.max(q.vy, 2.5);
+        q.onGround = false;
+        this.events.push({ e: 'yank', id: q.id, by: p.id });
       }
       // a big two-handed swing already under way rides through a light hit
       const qdef = weaponDef(q.slots[q.cur]);

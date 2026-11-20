@@ -142,7 +142,7 @@ function band(rarity, y, r = 0.022, axis = 'y') {
  * 'aim': like a rifle, pointing along -z from the grip. 'bow': in the left hand, the string toward +z.
  */
 export const GRIP = {
-  mallet: 'hand', spike: 'hand', lever: 'hand', sledge: 'hand', crowbar: 'hand', machete: 'hand', axe: 'hand', chainsaw: 'hand',
+  mallet: 'hand', spike: 'hand', lever: 'hand', sledge: 'hand', crowbar: 'hand', machete: 'hand', axe: 'hand', chainsaw: 'hand', whip: 'hand',
   darts: 'hand', bow: 'bow', crossbow: 'aim', harpoon: 'aim', fireworks: 'aim',
 };
 
@@ -196,6 +196,13 @@ export function weaponModel(w, rarity = 0) {
       add(cyl(0.012, 0.14, RUST(), 0.04, 0.66, 0, 0, -0.9, 0.012, 6));
       add(cyl(0.01, 0.06, RUST(), 0.035, -0.11, 0, 0, 0.5, 0.006, 6));
       add(band(rarity, 0.02, 0.015));
+      break;
+    }
+    case 'whip': {
+      // (until the Blender whip has loaded) a leather handle and a coil of lash
+      add(cyl(0.016, 0.3, plain('#3b2414', 0.8), 0, 0.1, 0));
+      add(cyl(0.12, 0.02, plain('#241509', 0.9), 0.05, 0.05, 0, 0, Math.PI / 2, 0.12, 16));
+      add(band(rarity, -0.03, 0.019));
       break;
     }
     case 'machete': {

@@ -360,6 +360,14 @@ export function play(name, pos = null, opt = {}) {
       // a grunt of effort behind a heavy swing
       if (opt.heavy) sample(d, opt.female ? 'grunt_f' : 'grunt', t, { vol: 0.35, rate: (opt.female ? 1.08 : 1.12), vary: 0.04 });
       if (opt.w === 'chainsaw') sample(d, 'chainsaw', t, { vol: 0.8, vary: 0.04 });
+      // a whip cracks at the end of its throw: a sharp snap, louder on a charged crack
+      if (opt.w === 'whip') {
+        const at = t + (opt.heavy ? 0.26 : 0.19);
+        noise(d, at, 0.035, { type: 'highpass', freq: 2800, q: 0.7, vol: opt.heavy ? 1.3 : 0.95, attack: 0.001 });
+        noise(d, at + 0.004, 0.09, { type: 'bandpass', freq: 1400, q: 1.5, vol: 0.35 });
+        sample(d, 'swish', t, { vol: 0.3, rate: 1.4, vary: 0.06 });
+        break;
+      }
       // a recorded swish, slowed down for heavy weapons and charged swings
       if (sample(d, 'swish', t + 0.02, { vol: 0.38 + big * 0.1, rate: (1.12 - big * 0.4) * (opt.heavy ? 0.85 : 1), vary: 0.07 })) break;
       noise(d, t, 0.18 + big * 0.12, { type: 'bandpass', freq: 1400 - big * 600, sweepTo: 500 - big * 200, q: 1.4, vol: 0.9, attack: 0.05 });
@@ -384,6 +392,15 @@ export function play(name, pos = null, opt = {}) {
       }
       tone(d, t, 0.14, { freq: opt.heavy ? 95 : 140, to: 45, vol: 1 });
       noise(d, t, blade ? 0.16 : 0.1, { freq: blade ? 3200 : 900, sweepTo: 300, vol: blade ? 0.9 : 1.1 });
+      break;
+    }
+    case 'yank': {
+      // the lash wraps round someone: a snap, a creak of leather and a grunt as they are hauled in
+      const d = out(pos, 0.8, 30);
+      if (!d) return;
+      noise(d, t, 0.04, { type: 'highpass', freq: 3000, vol: 1.1, attack: 0.001 });
+      sample(d, 'cloth', t + 0.02, { vol: 0.7, rate: 0.8 });
+      sample(d, opt.female ? 'grunt_f' : 'grunt', t + 0.06, { vol: 0.4, rate: 1.1, vary: 0.05 });
       break;
     }
     case 'creak': {

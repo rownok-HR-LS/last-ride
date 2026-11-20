@@ -1,4 +1,4 @@
-# The hand weapons, their projectiles, the occult items, the loot and the chests, modelled in Blender: real tools and
+# The hand weapons (the lion tamer's whip among them), their projectiles, the occult items, the loot and the chests, modelled in Blender: real tools and
 # fairground gear found in the park, worn and dirty (chipped paint, tape on handles, rust).
 #
 #   blender --background --factory-startup --python scripts/blender/build-weapons.py -- out.glb
@@ -577,9 +577,35 @@ def chest():
     return K
 
 
+def whip():
+    """The lion tamer's whip: a braided leather handle with a brass knob, the lash coiled in three loops in the same
+    hand (as a tamer carries it) and its tail hanging down."""
+    K = Kit()
+    K.cyl('#3b2414', (0, 0.1, 0), 0.016, 0.3, segs=12, r2=0.013)
+    wraps(K, '#22140a', 'y', -0.04, 0.22, 0.0175, step=0.016)
+    K.ball('gold', (0, -0.062, 0), 0.022, segs=10)
+    K.cyl('gold', (0, 0.255, 0), 0.015, 0.014, segs=12)
+    K.cyl('rarity', (0, -0.032, 0), 0.019, 0.02, segs=14)
+    # the lash: up out of the handle, over into three loops beside the hand, the tail hanging below
+    pts = [(0, 0.262, 0), (0.012, 0.29, 0), (0.035, 0.27, 0)]
+    loops = 3
+    n = 20 * loops
+    for i in range(n + 1):
+        a = math.pi / 2 + 2 * math.pi * loops * i / n
+        pts.append((0.05 + 0.014 * (a - math.pi / 2) / (2 * math.pi), 0.05 + 0.12 * math.sin(a), 0.12 * math.cos(a)))
+    last = pts[-1]
+    pts += [(last[0] + 0.01, last[1] - 0.09, 0.03), (last[0] + 0.02, last[1] - 0.24, 0.06), (last[0] + 0.03, last[1] - 0.36, 0.05), (last[0] + 0.035, last[1] - 0.44, 0.03)]
+    m = len(pts)
+    radii = [0.0095 - 0.0055 * (i / (m - 1)) for i in range(m)]
+    tube(K, '#7a5230', pts, 0.008, segs=7, radii=radii)
+    # the frayed popper at the tip
+    K.ball('#c9b48a', (last[0] + 0.035, last[1] - 0.45, 0.03), 0.006, segs=6)
+    return K
+
+
 MODELS = {
     'w_mallet': mallet, 'w_spike': spike, 'w_lever': lever, 'w_sledge': sledge, 'w_crowbar': crowbar,
-    'w_machete': machete, 'w_axe': axe, 'w_chainsaw': chainsaw, 'w_darts': darts, 'w_bow': bow,
+    'w_machete': machete, 'w_axe': axe, 'w_chainsaw': chainsaw, 'w_whip': whip, 'w_darts': darts, 'w_bow': bow,
     'w_crossbow': crossbow, 'w_harpoon': harpoon, 'w_fireworks': fireworks,
     'p_bow': projectile_bow, 'p_crossbow': projectile_crossbow, 'p_darts': projectile_darts,
     'p_harpoon': projectile_harpoon, 'p_fireworks': projectile_fireworks, 'p_holy': projectile_holy, 'p_flare': projectile_flare,

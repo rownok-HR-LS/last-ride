@@ -618,3 +618,17 @@ sounds; lightning that lights the park, rides that light up, lived-in details (B
   while it climbs and hangs; audio.js 'freefall' (chains, clank, crash); dust round the base on the slam; HUD,
   guide marker + icon, death cause "the Free Fall". Bots take it when a survivor stands at its foot (75%).
   8 bot matches: 2 drops (it stands at the edge of the park), 0 kills; match length ~6 min. Needs Render.
+
+## The lion tamer's whip (2026-11-20)
+
+- The user picked: the charged crack yanks; light and quick; normal uncommon loot.
+- shared/items.js WEAPONS.whip { dmg 13, heavy 1.7, reach 4.5 (the longest melee), arc 34, swing 0.36, hitAt 0.55,
+  stam 9, dura 30, knock 1, single, yank 11 }; MELEE_WEIGHTS whip 9 (like the axe). game.js meleeHit: a `single`
+  weapon hits only the nearest target; a heavy with `yank` pulls the target toward the attacker at up to 11 m/s
+  (knockT sized to stop ~1.3 m away) and pushes a 'yank' event. Like any heavy it breaks a plain block; a parry
+  stops it. bots.js weaponValue counts it as a machete (21) so they pick it up.
+- build-weapons.py whip(): braided leather handle, brass knob and cap, rarity band, the lash coiled in three loops
+  with its tail and popper hanging (tan #7a5230 so it reads against dark clothes); pack-kit.mjs -> weapons.glb.
+  weapons.js GRIP whip 'hand' + a fallback model. audio.js: the swing cracks (a sharp high-passed snap at the end of
+  the throw), 'yank' snap + leather + grunt; client.js toasts "Yanked by a whip!" to the one pulled.
+- 8 bot matches: 9 of 172 kills with it (machete 12, bow 10), 20 yanks, ~6 min. Needs Render (shared/).

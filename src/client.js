@@ -1303,6 +1303,13 @@ export class Client {
         case 'carousel':
           audio.play('carousel', [e.x, 1.5, e.z], { phase: e.phase });
           break;
+        case 'yank': {
+          // a whip's charged crack hauls them in
+          const v = this.game.players.get(e.id);
+          if (v) audio.play('yank', e.id === me ? null : [v.x, v.y + 1, v.z], { female: FEMALE.has(v.outfit) });
+          if (e.id === me) this.hud.toast('Yanked by a whip!');
+          break;
+        }
         case 'freefall':
           audio.play('freefall', [e.x, e.phase === 'slam' ? 1 : 20, e.z], { phase: e.phase });
           // the crash at the bottom throws up dust all round the tower

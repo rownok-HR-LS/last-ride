@@ -176,7 +176,8 @@ function armed(p) {
 function weaponValue(p, w, rarity) {
   const def = WEAPONS[w];
   if (def.type === 'ranged') return 1.5 + rarity * 0.3 + (p.ammo[def.ammo] > 0 ? 1 : 0);
-  return def.dmg / 12 + rarity * 0.4;
+  // (the whip hits light but from far off and pulls runners back: worth about a machete)
+  return (def.yank ? 21 : def.dmg) / 12 + rarity * 0.4;
 }
 
 /** Loot worth walking to, scored by value / distance. */
