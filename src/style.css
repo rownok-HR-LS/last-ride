@@ -788,7 +788,7 @@ body.touch .hud-top-right { right: max(14px, env(safe-area-inset-right)); }
 /* title while loading: a still of the park behind the sign, a slim bar and a tip; the live park fades in behind */
 .title2 .t-still { position: fixed; inset: 0; z-index: -1; pointer-events: none; background: #06070a center / cover no-repeat; transition: opacity 1.4s ease; }
 .title2 .t-still::after { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 30% 60%, transparent 40%, rgba(0,0,0,0.55)); }
-.title2.ready .t-still { opacity: 0; }
+.title2.ready .t-still, .title2.live .t-still { opacity: 0; }
 .t-load { margin-top: 22px; width: min(340px, 40vw); transition: opacity 0.8s; }
 .title2.ready .t-load { opacity: 0; }
 .t-bar { height: 2px; background: rgba(241,223,182,0.18); overflow: hidden; }

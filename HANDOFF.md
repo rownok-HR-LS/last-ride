@@ -655,3 +655,18 @@ sounds; lightning that lights the park, rides that light up, lived-in details (B
 - Result (dev/preview): no shader built during a whole ride (start, doors, landing, fights, death); the worst frame
   87 ms (at death). Loading: preparing adds ~8 s on this PC (riders' animation retargeting ~4 s is now waited for, the
   pool ~4 s); a return visit skips the download. Not done: speeding up the riders' animation preparation itself.
+
+## Shorter loading, the live park back early (2026-11-21)
+
+- The user saw the title stuck at "Waiting for the riders… 91%" over the still photo with no rider: the loading
+  screen waited for all 14 riders (download + preparation) before the live park faded in. Now main.js fades the
+  photo out (class `live`) as soon as client.ready (the park's shaders), showing the live park and the showcase
+  rider; the bar and status keep going until client.preload finishes (class `ready`), and only a ride waits for that.
+- characters.js retarget: the source side of each clip (per frame, every bone's world rotation from rest, and the
+  hips' rise) is worked out once (clipMotion, kept in a WeakMap) instead of once per rider, and the per-rider pass
+  allocates nothing per frame. Checked against the old version on all 132 clips: same to 1e-7. ~1.8x faster.
+  Each rider's retargeting yields every ~8 ms so the live menu keeps moving.
+- fillRiderPool builds and compiles one rider at a time (await whenCompiled per rider, a frame between): all 28 at
+  once froze the menu ~4 s the first time.
+- Dev measurement: live park 6.2 s, all ready 10.3 s (was 20.8 s with the photo up the whole time), the menu at
+  ~37 fps while preparing (one 0.5 s hiccup); a ride still starts with no shader built and 63 ms worst frame.

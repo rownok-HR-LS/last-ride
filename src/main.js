@@ -289,13 +289,20 @@ async function title() {
     app.insertBefore(client.renderer.domElement, app.firstChild);
     ridersReady = true;
     client.showcase(profile.outfit, profile.look);
-    // everything that could make the game stutter later is prepared now, with the loading screen still up: the park's
-    // and every rider's shaders, weapons, effects and the ghost look (client.preload); Practice and Ride wait for it
+    // everything that could make the game stutter later is prepared now: the park's and every rider's shaders,
+    // weapons, effects and the ghost look (client.preload); Practice and Ride wait for it
     preparing = true;
-    await client.preload((what, p) => {
+    const prepared = client.preload((what, p) => {
       loading.set(p);
       step(`${what} ${Math.round(loading.pct * 100)}%`);
     });
+    // the live park (and your rider under the lamp) shows as soon as the park itself is ready; the rest is prepared
+    // behind it with the line still saying how far along it is, and only a ride has to wait for it
+    await client.ready;
+    const showPark = () => el.classList.add('live');
+    requestAnimationFrame(showPark);
+    setTimeout(showPark, 250);
+    await prepared;
     // the still of the park fades into the live one, and the loading line goes
     loading.finish();
     offBar();

@@ -799,33 +799,31 @@ export class Client {
         const have = this.riderPool.get(o.id)?.length || 0;
         for (let i = have; i < 2; i++) queue.push(o.id);
       }
-      let ghostWarmed = this.ghostWarmed;
-      const next = () => {
-        if (!queue.length) {
-          this.poolGroup.visible = true;
-          whenCompiled(this.poolGroup).then(() => {
-            this.poolGroup.visible = false;
-            this.poolBusy = false;
-            done();
-          });
-          return;
+      // one rider at a time, each one's shaders built before the next is started: a new outfit's shaders take a
+      // moment, and all 28 at once froze the menu for seconds (the pool is shown, out of sight, while it fills)
+      this.poolGroup.visible = true;
+      const step = async () => {
+        for (const id of queue) {
+          const ch = new Character(id);
+          this.poolGroup.add(ch.root);
+          // one rider wears the ghost look while its shaders are built (it is the same for everyone)
+          const ghost = !this.ghostWarmed;
+          if (ghost) {
+            ch.warmGhost(true);
+            this.ghostWarmed = true;
+          }
+          await whenCompiled(ch.root);
+          if (ghost) ch.warmGhost(false);
+          if (!this.riderPool.has(id)) this.riderPool.set(id, []);
+          this.riderPool.get(id).push(ch);
+          // (a frame for the menu between riders; longer on the end screen, where a ride may be about to start)
+          await new Promise((r) => setTimeout(r, this.preloading ? 16 : 40));
         }
-        const id = queue.shift();
-        const ch = new Character(id);
-        this.poolGroup.add(ch.root);
-        // one rider wears the ghost look while the shaders are built (it is the same for everyone)
-        if (!ghostWarmed) {
-          ch.warmGhost(true);
-          ghostWarmed = this.ghostWarmed = true;
-          this.poolGroup.visible = true;
-          whenCompiled(ch.root).then(() => ch.warmGhost(false));
-        }
-        if (!this.riderPool.has(id)) this.riderPool.set(id, []);
-        this.riderPool.get(id).push(ch);
-        // (back to back under the loading screen; spaced out on the end screen, where the picture is moving)
-        setTimeout(next, this.preloading ? 0 : 40);
+        this.poolGroup.visible = false;
+        this.poolBusy = false;
+        done();
       };
-      next();
+      step();
     });
     return this.poolDone;
   }

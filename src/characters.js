@@ -636,10 +636,14 @@ function targetRig(scene) {
 }
 
 /**
- * Re-express a clip made on the source skeleton for the target skeleton: every bone gets the same
- * world-space rotation away from its rest pose. Hip height is scaled to the character; hip drift is removed.
+ * What a clip does on the source skeleton, worked out once and kept for every rider: per frame (RATE a second), each
+ * bone's world rotation away from its rest pose, and how far the hips rise and fall. Retargeting used to redo this for
+ * each of the 14 riders; it was most of the loading screen's "Waiting for the riders".
  */
-function retarget(clip, src, tgt) {
+const MOTION = new WeakMap();
+function clipMotion(clip, src) {
+  let m = MOTION.get(clip);
+  if (m) return m;
   const ev = {};
   for (const t of clip.tracks) {
     const [bone, prop] = t.name.split('.');
@@ -647,12 +651,54 @@ function retarget(clip, src, tgt) {
   }
   const frames = Math.max(2, Math.round(clip.duration * RATE) + 1);
   const times = new Float32Array(frames);
+  const D = {};
+  for (const bn of src.bones) D[bn.name] = new Float32Array(frames * 4);
+  const hipsS = src.byName.mixamorigHips;
+  const hipY = hipsS ? new Float32Array(frames) : null;
+  const hipIt = ev['mixamorigHips.position'];
+  const sw = {};
+  const q = new THREE.Quaternion();
+  const inv = new THREE.Quaternion();
+  const d = new THREE.Quaternion();
+  const pv = new THREE.Vector3();
+  for (let f = 0; f < frames; f++) {
+    const t = Math.min(clip.duration, f / RATE);
+    times[f] = t;
+    for (const bn of src.bones) {
+      const it = ev[`${bn.name}.quaternion`];
+      const local = it ? q.fromArray(it.evaluate(t)) : q.copy(bn.restLocal);
+      const parent = bn.parent ? sw[bn.parent] : bn.parentWorld;
+      const w = (sw[bn.name] ||= new THREE.Quaternion()).copy(parent).multiply(local);
+      d.copy(w).multiply(inv.copy(bn.restWorld).invert()).toArray(D[bn.name], f * 4);
+    }
+    if (hipY) {
+      // the hips' local offset from rest, in world terms (only the vertical part is used: no drift)
+      if (hipIt) pv.fromArray(hipIt.evaluate(t)).sub(hipsS.restLocalPos);
+      else pv.set(0, 0, 0);
+      hipY[f] = pv.applyQuaternion(hipsS.parentWorld).y;
+    }
+  }
+  m = { frames, times, D, hipY };
+  MOTION.set(clip, m);
+  return m;
+}
+
+/**
+ * Re-express a clip made on the source skeleton for the target skeleton: every bone gets the same
+ * world-space rotation away from its rest pose. Hip height is scaled to the character; hip drift is removed.
+ * (The source side is shared by every rider: clipMotion.)
+ */
+function retarget(clip, src, tgt) {
+  const { frames, times: srcTimes, D, hipY } = clipMotion(clip, src);
+  const times = srcTimes.slice();
   const mapped = tgt.bones.filter((b) => src.byName[b.name]);
   const outQ = Object.fromEntries(mapped.map((b) => [b.name, new Float32Array(frames * 4)]));
   // The clips assume a T-pose rest; many models are bound in an A-pose. Swing each arm and leg bone so
   // it points the same way as the source bone at rest (towards the next joint), then retarget.
   if (!tgt.aligned) {
     tgt.aligned = {};
+    // and for bones the clips don't move: their rest offset from their parent
+    tgt.fixed = {};
     for (const b of tgt.bones) {
       const s = src.byName[b.name];
       let a = b.restWorld.clone();
@@ -667,51 +713,36 @@ function retarget(clip, src, tgt) {
         }
       }
       tgt.aligned[b.name] = a;
+      if (!s) tgt.fixed[b.name] = b.parentWorld.clone().invert().multiply(b.restWorld);
     }
   }
   const hipsT = tgt.byName.mixamorigHips;
   const hipsS = src.byName.mixamorigHips;
   const outP = hipsT && hipsS ? new Float32Array(frames * 3) : null;
-  const k = hipsT && hipsS ? hipsT.restWorldPos.y / hipsS.worldPos.y : 1;
-  const sw = {};
+  const k = hipsT && hipsS ? (hipsT.restWorldPos.y / hipsS.worldPos.y) * hipsScale(hipsS) : 1;
+  const toParent = outP ? new THREE.Matrix4().copy(hipsT.parentMatrix).invert() : null;
   const tw = {};
-  const q = new THREE.Quaternion();
-  const d = new THREE.Quaternion();
+  const dq = new THREE.Quaternion();
   const inv = new THREE.Quaternion();
+  const v = new THREE.Vector3();
   for (let f = 0; f < frames; f++) {
-    const t = Math.min(clip.duration, f / RATE);
-    times[f] = t;
-    // source world rotations for this frame
-    for (const b of src.bones) {
-      const it = ev[`${b.name}.quaternion`];
-      const local = it ? q.fromArray(it.evaluate(t)) : q.copy(b.restLocal);
-      const parent = b.parent ? sw[b.parent] : b.parentWorld;
-      sw[b.name] = (sw[b.name] || new THREE.Quaternion()).copy(parent).multiply(local);
-    }
-    // target: same world delta from rest, converted back to local
+    // same world delta from rest, converted back to local
     for (const b of tgt.bones) {
       const parent = b.parent ? tw[b.parent] : b.parentWorld;
-      const s = src.byName[b.name];
-      const w = tw[b.name] || (tw[b.name] = new THREE.Quaternion());
-      if (s) {
-        d.copy(sw[b.name]).multiply(inv.copy(s.restWorld).invert());
-        w.copy(d).multiply(tgt.aligned[b.name]);
-        const local = inv.copy(parent).invert().multiply(w);
-        local.toArray(outQ[b.name], f * 4);
+      const w = (tw[b.name] ||= new THREE.Quaternion());
+      const motion = D[b.name];
+      if (motion) {
+        w.copy(dq.fromArray(motion, f * 4)).multiply(tgt.aligned[b.name]);
+        inv.copy(parent).invert().multiply(w).toArray(outQ[b.name], f * 4);
       } else {
         // not animated: keeps its rest offset from its (possibly animated) parent
-        w.copy(parent).multiply(inv.copy(b.parentWorld).invert()).multiply(b.restWorld);
+        w.copy(parent).multiply(tgt.fixed[b.name]);
       }
     }
     if (outP) {
-      const it = ev['mixamorigHips.position'];
-      const p = new THREE.Vector3();
-      if (it) p.fromArray(it.evaluate(t)).sub(hipsS.restLocalPos);
-      // local offset -> world, keep only the vertical part (no drift), scale to the character
-      p.applyQuaternion(hipsS.parentWorld);
-      const world = hipsT.restWorldPos.clone().add(new THREE.Vector3(0, p.y * k * hipsScale(hipsS), 0));
-      world.applyMatrix4(new THREE.Matrix4().copy(hipsT.parentMatrix).invert());
-      world.toArray(outP, f * 3);
+      v.copy(hipsT.restWorldPos);
+      v.y += hipY[f] * k;
+      v.applyMatrix4(toParent).toArray(outP, f * 3);
     }
   }
   const tracks = mapped.map((b) => new THREE.QuaternionKeyframeTrack(`${b.name}.quaternion`, times, outQ[b.name]));
@@ -925,7 +956,13 @@ export async function loadCharacters(onProgress, first = OUTFITS.map((o) => o.id
     const h = headY > 0 ? headY / 0.86 : box.max.y - box.min.y || 1.8;
     addBodyCoords(scene, box, PLAYER_HEIGHT / h, o.id);
     const own = {};
+    // (a few milliseconds at a time: the live menu keeps moving while the riders are prepared behind it)
+    let slice = performance.now();
     for (const c of animSrc.clips) {
+      if (performance.now() - slice > 8) {
+        await new Promise((r) => setTimeout(r, 0));
+        slice = performance.now();
+      }
       const clip = retarget(c, animSrc.rig, rig);
       // retargeting writes every bone; an upper-body clip must leave the hips and legs to the walk cycle
       if (c.name.endsWith('_up')) clip.tracks = clip.tracks.filter((t) => !LOWER_BODY.test(t.name.split('.')[0]));
