@@ -33,7 +33,7 @@ export function usingTouch() {
 const TOUCH = {
   interact: 'E', prizes: 'E', reload: 'R', jump: '⤒', slide: '⤓', up: '⤒', down: '⤓', attack: 'the attack button', aim: 'the aim button',
   cancel: 'the aim button', map: 'Map', weapons: '⇄', powers: '↯', pause: '☰', move: 'the left stick', look: 'drag to look', close: '✕',
-  fast: '»',
+  fast: '»', sprint: 'a full push of the stick', dodge: '↯', items: 'tap an item', chat: 'the chat button',
 };
 /** "press E", or "tap E" on a touch screen. */
 export const press = (action) => `${usingTouch() ? 'tap' : 'press'} ${keyOf(action)}`;
@@ -59,6 +59,20 @@ export function keyOf(action) {
   if (action === 'fast') return first('sprint');
   if (action === 'close') return 'Esc';
   return MOUSE[action] ?? first(action);
+}
+
+/** keyOf as it reads on a keyboard ('keys'), a touch screen ('touch') or a controller ('pad'), whatever is in use now. */
+export function keyFor(action, mode) {
+  const p = pad;
+  const t = touch;
+  pad = mode === 'pad';
+  touch = mode === 'touch';
+  try {
+    return keyOf(action);
+  } finally {
+    pad = p;
+    touch = t;
+  }
 }
 
 /** keyOf in a key cap, for HUD text. */

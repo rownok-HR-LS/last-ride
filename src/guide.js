@@ -8,7 +8,7 @@ const TUT_KEY = 'last-ride-ghost-tutorial';
 const v = new THREE.Vector3();
 
 /** The controls card: [action (see prompts.js), what it does]; the key or button is named for what is in use. */
-const CONTROLS = {
+export const CONTROLS = {
   alive: [
     ['move', 'move'], ['sprint', 'sprint'], ['slide', 'slide (while running)'], ['jump', 'jump'], ['attack', 'swing (hold: heavy)'], ['aim', 'block / aim (just before a hit: parry)'],
     ['dodge', 'dodge'], ['interact', 'pick up / open'], ['reload', 'reload'], ['weapons', 'weapons'], ['items', 'heal, shield, holy water, flare, salt, relic'],

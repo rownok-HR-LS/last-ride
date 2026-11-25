@@ -687,3 +687,8 @@ sounds; lightning that lights the park, rides that light up, lived-in details (B
   the same line: frozen frames 12.7% / 7.4% with the fixed 0.1 s, 3.0% / 0.8% adaptive (delay 0.16-0.28 s).
 - The real cure for distance is a server nearer the players: Render's region is fixed when a service is created, so
   it would mean a new service in Singapore (render.yaml `region: singapore`) and the client pointed at its URL.
+
+## How to play, rewritten (2026-11-25)
+- The user found the old How to play (three paragraphs over a long credits list, and it named bats, which aren't in the game) not good enough. They chose tabs with icons, and controls for keyboard and touch.
+- src/howto.js builds the sheet: The ride, Fighting, Ghosts, Rides, Items, Controls, Credits. Names, costs and help lines come from shared/items.js (WEAPONS, POWERS, RIDES, ITEMS, PRIZES) and constants, so it stays right when they change. Controls reuse guide.js CONTROLS (now exported) with a Keyboard & mouse / Touch / Controller switch; prompts.js keyFor(action, mode) names a key for any input type without changing the one in use. TOUCH in prompts.js gained sprint, dodge, items and chat (in-game touch prompts used to say Shift / V / 4–0).
+- Short screens (phones held sideways): the title hides and spacing shrinks so the page keeps room.

@@ -973,6 +973,47 @@ body.pad .slot kbd, body.pad .item kbd:empty, body.pad .power kbd:empty { displa
 .tm-sheet .tm-done { margin-top: 18px; width: 100%; }
 .tm-sheet a { color: #ffe14f; }
 .tm-credits { padding-left: 18px; margin: 0; font-size: 12px; color: #a9a092; }
+/* how to play (src/howto.js): tabs, icon rows, prize list, controls */
+.tm-sheet.ht { width: min(720px, calc(100vw - 32px)); display: flex; flex-direction: column; overflow: hidden; height: min(680px, calc(100vh - 48px)); }
+.ht-tabs { display: flex; gap: 4px; margin: 14px -4px 0; padding: 0 4px 10px; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid rgba(255,255,255,0.1); flex: none; }
+.ht-tabs::-webkit-scrollbar { display: none; }
+.ht-tabs button { flex: none; padding: 7px 12px; border: 1px solid transparent; border-radius: 999px; background: none; color: #a9a092; cursor: pointer;
+  font: 700 13px/1 var(--hud); letter-spacing: 0.1em; text-transform: uppercase; }
+.ht-tabs button:hover { color: #f1ece2; }
+.ht-tabs button.on { color: #14110c; background: #ffe14f; }
+.ht-page { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 4px 4px 0; }
+.ht-page h4:first-child { margin-top: 0; }
+.ht-lead { margin: 0 0 12px; color: #cfc6b6; }
+.ht-list + .ht-lead { margin-top: 18px; }
+.ht-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.ht-list li { display: grid; grid-template-columns: 34px 1fr; gap: 12px; align-items: start; }
+.ht-list .ico { width: 34px; height: 34px; padding: 7px; box-sizing: border-box; border-radius: 9px; color: #ffe14f; background: rgba(255,225,79,0.08); border: 1px solid rgba(255,225,79,0.18); }
+.ht-list b { display: block; font: 700 15px/1.25 var(--hud); letter-spacing: 0.05em; color: #f1ece2; }
+.ht-list b small { font: 500 12px/1 var(--ui); letter-spacing: 0; color: #a9a092; margin-left: 6px; }
+.ht-list span { display: block; color: #cfc6b6; font-size: 14px; line-height: 1.45; }
+.ht kbd, .ht-key kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.25); border-bottom-width: 2px;
+  background: rgba(255,255,255,0.06); color: #f1ece2; font: 600 12px/1.5 var(--hud); letter-spacing: 0.04em; text-align: center; white-space: nowrap; }
+.ht-prizes { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px; }
+.ht-prizes li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; background: rgba(255,255,255,0.05); }
+.ht-prizes b { display: flex; align-items: center; gap: 4px; color: #ffe14f; font: 700 14px/1 var(--hud); white-space: nowrap; }
+.ht-prizes .ico { width: 16px; height: 16px; }
+.ht-modes { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+.ht-mode { padding: 6px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.04); color: #cfc6b6; cursor: pointer; font: 600 13px/1 var(--ui); }
+.ht-mode.on { border-color: #ffe14f; color: #ffe14f; background: rgba(255,225,79,0.08); }
+.ht-keys { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 24px; }
+.ht-keys h4 { margin: 0 0 8px; }
+.ht-keys > div > h4:not(:first-child) { margin-top: 16px; }
+.ht-key { display: grid; grid-template-columns: minmax(64px, auto) 1fr; gap: 10px; align-items: center; padding: 4px 0; font-size: 13px; color: #cfc6b6; }
+.ht-key kbd { justify-self: start; }
+.ht .tm-done { flex: none; margin-top: 14px; }
+@media (max-height: 520px) {
+  .tm-sheet.ht { height: calc(100vh - 48px); padding: 10px 16px; border-radius: 10px; }
+  .tm-sheet.ht h2 { display: none; }
+  .ht-tabs { margin-top: 0; padding-bottom: 8px; }
+  .ht-page { padding-top: 10px; }
+  .ht .tm-done { margin-top: 8px; padding-top: 8px; padding-bottom: 8px; }
+}
+@media (max-width: 560px) { .ht-keys { grid-template-columns: 1fr; } .tm-sheet.ht { padding: 16px; height: calc(100vh - 24px); } }
 .tm-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(116px, 1fr)); gap: 8px; }
 .tm-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 10px; border-radius: 10px; cursor: pointer; text-align: left;
   border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); color: #f1ece2; font: 600 14px/1.1 var(--hud); letter-spacing: 0.05em; }

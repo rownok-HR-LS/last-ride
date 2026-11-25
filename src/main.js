@@ -4,7 +4,7 @@
 import { OUTFITS } from '../shared/constants.js';
 import { loadCharacters, whenAllRiders, whenRider } from './characters.js';
 import { initAudio } from './audio.js';
-import { CREDITS } from './credits.js';
+import { howToPlay } from './howto.js';
 import { loadSettings } from './settings.js';
 import { settingsBoard } from './menu.js';
 import { loadProgress, saveProgress, levelOf, dailies, looksFor } from './progress.js';
@@ -202,20 +202,9 @@ async function title() {
   };
   el.querySelector('.tm-looks').addEventListener('click', openLooks);
 
-  // how to play, and the credits
+  // how to play, the controls and the credits (src/howto.js)
   el.querySelector('.tm-how').addEventListener('click', () => {
-    const panel = document.createElement('div');
-    panel.className = 'tm-sheet';
-    panel.innerHTML = `<h2>How the ride works</h2>
-      <p>Twenty riders get off the bus in a park that closed in 1987. Loot bats, axes and crossbows from the stalls
-      and chests and fight. The storm closes in around the big top; the last one standing leaves on the last bus.</p>
-      <p>The dead come back as ghosts. They haunt with the rides, traps and blackouts, and a ghost who lands the
-      killing blow steals that body and rides again (twice at most).</p>
-      <p>Every ride earns experience. Levels unlock looks; three challenges change every day.</p>
-      <h4>Credits</h4><ul class="tm-credits">${CREDITS.map((c) => `<li><a href="${c.url}" target="_blank" rel="noopener">${c.what}</a> by ${c.by} (${c.license})</li>`).join('')}</ul>
-      <button class="tm-btn tm-done">Done</button>`;
-    panel.querySelector('.tm-done').addEventListener('click', closeLayer);
-    layer.replaceChildren(panel);
+    layer.replaceChildren(howToPlay(closeLayer));
     layer.classList.add('show');
   });
 
