@@ -76,14 +76,27 @@ export class Connection {
       this.ws.onerror = () => fail(new Error('no server'));
     });
     this.ws.onclose = () => this.handlers.close?.();
-    // how long a message takes there and back
+    // how long a message takes there and back: an average (rtt, seconds) and the last 15 round trips (pings, ms)
     this.rtt = 0.1;
-    this.handlers.pong = (m) => (this.rtt = this.rtt * 0.7 + ((performance.now() - m.at) / 1000) * 0.3);
-    this.pinger = setInterval(() => this.send({ t: 'ping', at: performance.now() }), 2000);
+    this.pings = [];
+    this.handlers.pong = (m) => {
+      const ms = performance.now() - m.at;
+      this.rtt = this.rtt * 0.7 + (ms / 1000) * 0.3;
+      this.pings.push(ms);
+      if (this.pings.length > 15) this.pings.shift();
+    };
+    this.pinger = setInterval(() => this.send({ t: 'ping', at: performance.now() }), 1000);
   }
 
   get open() {
     return this.ws.readyState === 1;
+  }
+
+  /** The ping shown on screen (ms): the middle of the last round trips, so a one-off slow one doesn't swing it. */
+  get ping() {
+    if (!this.pings.length) return null;
+    const s = [...this.pings].sort((a, b) => a - b);
+    return Math.round(s[s.length >> 1]);
   }
 
   send(m) {

@@ -173,6 +173,7 @@ export class Hud {
       <div class="hud-top-right">
         <div class="counts"><span class="c-alive" title="Survivors"></span><span class="c-ghosts" title="Ghosts"></span><span class="c-kills" title="Kills"></span></div>
         <div class="zone-info"></div>
+        <div class="ping" title="Ping: how long a message takes to the game server and back"></div>
         <div class="feed"></div>
       </div>
       <div class="crosshair"><i></i><i></i><i></i><i></i><b></b><u class="charge"></u></div>
@@ -243,6 +244,13 @@ export class Hud {
     if (this.lastKey[sel] === html) return;
     this.lastKey[sel] = html;
     $(sel, this.root).innerHTML = html;
+  }
+
+  /** The ping to the game server in ms (online only; null hides it). */
+  ping(ms) {
+    if (ms == null) return this.set('.ping', '');
+    const how = ms < 100 ? 'good' : ms < 180 ? 'ok' : 'bad';
+    this.set('.ping', `<i class="${how}"></i>Ping <b>${ms}</b> ms`);
   }
 
   toast(text) {

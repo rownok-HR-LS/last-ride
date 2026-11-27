@@ -631,6 +631,13 @@ body.touch .minimap { width: 130px; height: 130px; }
 .counts .c-kills { color: #ffb4a0; }
 .zone-info { background: none; border: 0; padding: 0; font: 500 15px var(--hud); letter-spacing: 0.06em; text-transform: uppercase; color: #d6cfe8; display: flex; align-items: center; gap: 6px; }
 .zone-info b { font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; }
+/* ping to the game server, online only (hud.js ping) */
+.ping { display: flex; align-items: center; gap: 6px; font: 500 13px var(--hud); letter-spacing: 0.06em; text-transform: uppercase; color: #a9a2b8; }
+.ping:empty { display: none; }
+.ping b { font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; }
+.ping i { width: 7px; height: 7px; border-radius: 50%; background: #45c75e; box-shadow: 0 0 6px currentColor; }
+.ping i.ok { background: #ffd23f; }
+.ping i.bad { background: #ff5a4a; }
 .zone-info .warn, .zone-info .warn b, .ico.warn { color: #ff6a6a; }
 .feed { margin-top: 6px; gap: 2px; }
 .feed-item { background: none; border: 0 !important; padding: 1px 0; font: 500 14px var(--hud); letter-spacing: 0.02em; }

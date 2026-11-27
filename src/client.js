@@ -1950,6 +1950,7 @@ export class Client {
     // while the death camera runs, the card saying who did it is the only thing on screen
     this.hudRoot.classList.toggle('dying', !!this.deathCam);
     this.hud.update(snap, dt, this.view);
+    this.hud.ping(this.online ? this.game.conn?.ping : null);
     this.touch?.update();
     this.hud.scoreboard(snap, this.input.down('Tab'));
     this.guide.update(snap, this);
