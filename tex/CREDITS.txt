@@ -1,0 +1,18 @@
+Textures and HDRI from Poly Haven (https://polyhaven.com), CC0.
+rusty_metal_02
+rust_coarse_01
+concrete_floor_worn_001
+cracked_concrete_wall
+forrest_ground_01
+cobblestone_floor_08
+weathered_planks
+old_planks_02
+painted_metal_shutter
+red_brick_03
+corrugated_iron_02
+damaged_plaster
+forest_leaves_02
+withered_grass
+mud_forest
+mossy_cobblestone
+kloppenheim_02
