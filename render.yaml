@@ -2,6 +2,8 @@
 services:
   - type: web
     name: last-ride-server
+    # the Oregon server (region left at Render's default). The live game uses last-ride-sg in Singapore, made by hand
+    # in the dashboard (2026-11-28) from the same repo: build npm ci --omit=dev, start npm start, NODE_VERSION 22, free.
     runtime: node
     plan: free
     buildCommand: npm ci --omit=dev

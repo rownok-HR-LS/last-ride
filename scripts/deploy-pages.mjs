@@ -7,7 +7,7 @@ import { join } from 'node:path';
 
 const server = process.argv[2] || process.env.VITE_SERVER_URL;
 if (!server || !/^wss?:\/\//.test(server)) {
-  console.error('Pass the game server URL, e.g. node scripts/deploy-pages.mjs wss://last-ride-server.onrender.com');
+  console.error('Pass the game server URL, e.g. node scripts/deploy-pages.mjs wss://last-ride-sg.onrender.com');
   process.exit(1);
 }
 const run = (cmd, opts = {}) => execSync(cmd, { stdio: 'inherit', ...opts });
